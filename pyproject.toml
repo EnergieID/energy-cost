@@ -24,20 +24,15 @@ dev = [
 [build-system]
 requires = ["setuptools>=75.0", "wheel"]
 build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
 [tool.poe.tasks]
 lint = "ruff check --fix"
 format = "ruff format"
 check = "ty check"
 test = "pytest --cov=energy_cost --cov-report=term-missing"
-[tool.poe.tasks.worker]
-cmd = "saq worker.settings"
-envfile = ".env"
-[tool.poe.tasks.dev]
-cmd = "fastapi dev main.py"
-envfile = ".env"
-[tool.poe.tasks.db]
-cmd = "python db.py"
-envfile = ".env"
+notebook = "marino run"
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
