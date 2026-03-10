@@ -1,0 +1,23 @@
+changelog:
+  exclude:
+    labels:
+      - no-release-notes
+  categories:
+    - title: "⚡ New Features"
+      labels:
+        - feature
+    - title: "🐞 Bug Fixes"
+      labels:
+        - bug
+    - title: "🪄 Minor Improvements"
+      labels:
+        - "enhancement"
+    - title: "🔧 Maintenance"
+      labels:
+        - chore
+    - title: "📦 Dependencies"
+      labels:
+        - dependencies
+    - title: "✨ Other changes"
+      labels:
+        - "*"

@@ -1,0 +1,56 @@
+name: test
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.9.21'
+      - name: Install dependencies
+        run: uv sync
+      - name: Install poethepoet
+        run: uv tool install poethepoet
+      - name: Run tests
+        run: poe test --cov-report=lcov:cov.info --cov-report=xml:cov.xml
+      - name: Code Coverage Annotation
+        uses: ggilder/codecoverage@v1
+        with:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          COVERAGE_FILE_PATH: "cov.info"
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-data
+          path: cov.xml
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Download coverage data
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-data
+      - name: Code Coverage Report
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: cov.xml
+          badge: true
+          hide_complexity: true
+          hide_branch_rate: true
+          fail_below_min: true
+          format: markdown
+          indicators: true
+          thresholds: '100 100'

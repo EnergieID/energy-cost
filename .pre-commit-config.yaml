@@ -1,0 +1,18 @@
+repos:
+- repo: local
+  hooks:
+    - id: lint
+      name: poe lint
+      entry: poe lint
+      language: system
+      types: [python]
+    - id: type-check
+      name: poe type-check
+      entry: poe check
+      language: system
+      types: [python]
+    - id: format
+      name: poe format
+      entry: poe format
+      language: system
+      types: [python]

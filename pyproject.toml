@@ -1,0 +1,54 @@
+[project]
+name = "energy-cost"
+authors = [
+    { name="EnergyID", email = "info@energieid.be" },
+    { name="Jorg" }
+]
+version = "0.1.0"
+description = "Energy cost calculation"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0.0",
+    "entsoe-py>=0.7.10",
+    "narwhals>=2.15.0"
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.13",
+    "ty>=0.0.12",
+    "pytest-cov>=7.0.0",
+    "pytest>=9.0.2",
+]
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.build_meta"
+[tool.poe.tasks]
+lint = "ruff check --fix"
+format = "ruff format"
+check = "ty check"
+test = "pytest --cov=energy_cost --cov-report=term-missing"
+[tool.poe.tasks.worker]
+cmd = "saq worker.settings"
+envfile = ".env"
+[tool.poe.tasks.dev]
+cmd = "fastapi dev main.py"
+envfile = ".env"
+[tool.poe.tasks.db]
+cmd = "python db.py"
+envfile = ".env"
+[tool.ruff]
+line-length = 120
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle
+    "F", # Pyflakes
+    "UP", # pyupgrade
+    "B", # flake8-bugbear
+    "SIM", # flake8-simplify
+    "I", # isort
+]
+ignore = [
+    "E501", #Line too long
+]
