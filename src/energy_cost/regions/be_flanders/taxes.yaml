@@ -1,0 +1,47 @@
+tax_rules:
+  - name: Bijzondere accijns elektriciteit
+    carrier: electricity
+    direction: offtake
+    customer_type: residential
+    kind: tiered
+    vat_applicable: true
+    tiers:
+      - from_kwh: 0
+        to_kwh: 3000
+        eur_per_kwh: 0.050329
+      - from_kwh: 3000
+        to_kwh: 20000
+        eur_per_kwh: 0.050329
+      - from_kwh: 20000
+        to_kwh: 50000
+        eur_per_kwh: 0.048188
+      - from_kwh: 50000
+        to_kwh: 1000000
+        eur_per_kwh: 0.047569
+
+  - name: Energiefonds
+    carrier: electricity
+    direction: offtake
+    customer_type: residential
+    kind: variable
+    unit: EUR/kWh
+    value: 0.0020417
+    vat_applicable: true
+
+  - name: Energiefonds variabel
+    carrier: electricity
+    direction: offtake
+    customer_type: professional
+    kind: variable
+    unit: EUR/kWh
+    value: 0.0019261
+    vat_applicable: true
+
+  - name: Energiefonds vast
+    carrier: electricity
+    direction: offtake
+    customer_type: professional
+    kind: fixed_monthly
+    unit: EUR/month
+    value: 10.07
+    vat_applicable: true

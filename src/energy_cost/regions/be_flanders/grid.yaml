@@ -1,0 +1,88 @@
+tariff_sets:
+  - region: BE-VLG
+    dso: Fluvius Antwerpen
+    carrier: electricity
+    direction: offtake
+    meter_type: digital
+    valid_from: 2026-01-01
+    valid_to: 2026-12-31
+    components:
+      - name: Capaciteitstarief
+        component_type: capacity_tariff
+        unit: EUR/kW/month
+        value: 4.1169714
+      - name: Netgebruik variabel
+        component_type: distribution_variable
+        unit: EUR/kWh
+        value: 0.0234492
+      - name: Databeheer LV
+        component_type: databeheer
+        unit: EUR/year
+        value: 17.85
+      - name: ODV kWh-tarief normaal LV
+        component_type: public_service
+        unit: EUR/kWh
+        value: 0.0254845
+
+  - region: BE-VLG
+    dso: Fluvius Antwerpen
+    carrier: electricity
+    direction: offtake
+    meter_type: analog
+    valid_from: 2026-01-01
+    valid_to: 2026-12-31
+    components:
+      - name: Vast recht (retrograde)
+        component_type: distribution_fixed
+        unit: EUR/year
+        value: 123.51
+      - name: Netgebruik variabel
+        component_type: distribution_variable
+        unit: EUR/kWh
+        value: 0.0492427
+      - name: Databeheer LV
+        component_type: databeheer
+        unit: EUR/year
+        value: 17.85
+      - name: ODV kWh-tarief normaal LV
+        component_type: public_service
+        unit: EUR/kWh
+        value: 0.0254845
+
+  - region: BE-VLG
+    dso: Fluvius Antwerpen
+    carrier: electricity
+    direction: injection
+    meter_type: digital
+    valid_from: 2026-01-01
+    valid_to: 2026-12-31
+    components:
+      - name: Netgebruik variabel injectie
+        component_type: distribution_variable
+        unit: EUR/kWh
+        value: 0.001751
+      - name: Databeheer LV (apart injectiepunt)
+        component_type: databeheer
+        unit: EUR/year
+        value: 17.85
+        conditions:
+          has_separate_injection_point: true
+
+  - region: BE-VLG
+    dso: Fluvius Antwerpen
+    carrier: electricity
+    direction: injection
+    meter_type: analog
+    valid_from: 2026-01-01
+    valid_to: 2026-12-31
+    components:
+      - name: Netgebruik variabel injectie
+        component_type: distribution_variable
+        unit: EUR/kWh
+        value: 0.001751
+      - name: Databeheer LV (apart injectiepunt)
+        component_type: databeheer
+        unit: EUR/year
+        value: 17.85
+        conditions:
+          has_separate_injection_point: true
