@@ -49,7 +49,7 @@ def constant_energy(one_day_index: pd.DatetimeIndex) -> EnergySeries:
     return EnergySeries(
         carrier=Carrier.ELECTRICITY,
         direction=Direction.OFFTAKE,
-        data=pd.DataFrame({"kwh": 0.25}, index=one_day_index),
+        data=pd.DataFrame({"timestamp": one_day_index, "kwh": 0.25}),
     )
 
 
@@ -58,7 +58,7 @@ def constant_prices(one_day_index: pd.DatetimeIndex) -> MarketPriceSeries:
     """Constant 100 EUR/MWh day-ahead price."""
     return MarketPriceSeries(
         market=Market.EPEX_DA_BE_15MIN,
-        data=pd.Series(100.0, index=one_day_index),
+        data=pd.DataFrame({"timestamp": one_day_index, "price": 100.0}),
     )
 
 
@@ -119,8 +119,10 @@ def residential_connection() -> ConnectionInfo:
 def monthly_peaks_january() -> MonthlyPeaks:
     """Monthly peak of 2.5 kW for January 2026."""
     return MonthlyPeaks(
-        data=pd.Series(
-            [2.5],
-            index=pd.PeriodIndex(["2026-01"], freq="M"),
+        data=pd.DataFrame(
+            {
+                "month": ["2026-01"],
+                "peak_kw": [2.5],
+            }
         ),
     )

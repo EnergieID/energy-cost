@@ -119,7 +119,7 @@ def _(np, pd):
     noise = np.random.normal(0, 0.02, size=len(index)).clip(-0.05, 0.05)
     consumption_kwh = (base_load + morning_peak + evening_peak + noise).clip(0.01)
 
-    energy_df = pd.DataFrame({"kwh": consumption_kwh}, index=index)
+    energy_df = pd.DataFrame({"timestamp": index, "kwh": consumption_kwh})
     return consumption_kwh, energy_df, index
 
 
@@ -131,14 +131,17 @@ def _(index, np, pd):
     daily_pattern = 30 * np.sin((hours_p - 6) * np.pi / 12).clip(0) + 10 * np.random.normal(0, 1, len(index))
     prices_eur_per_mwh = (base_price + daily_pattern).clip(10, 300)
 
-    price_series = pd.Series(prices_eur_per_mwh, index=index)
-    return (price_series,)
+    price_df = pd.DataFrame({"timestamp": index, "price": prices_eur_per_mwh})
+    return (price_df,)
 
 
 @app.cell
-def _(energy_df, mo, pd, price_series):
+def _(energy_df, mo, pd, price_df):
     _fig_data = pd.DataFrame(
-        {"Consumption (kWh)": energy_df["kwh"], "Price (EUR/MWh)": price_series}
+        {
+            "Consumption (kWh)": energy_df.set_index("timestamp")["kwh"],
+            "Price (EUR/MWh)": price_df.set_index("timestamp")["price"],
+        }
     )
     mo.md(
         f"""
@@ -146,24 +149,24 @@ def _(energy_df, mo, pd, price_series):
 
         **Consumption** — {len(energy_df)} quarter-hourly readings, total {energy_df['kwh'].sum():.1f} kWh
 
-        **Day-ahead prices** — mean {price_series.mean():.1f} EUR/MWh,
-        range [{price_series.min():.1f}, {price_series.max():.1f}] EUR/MWh
+        **Day-ahead prices** — mean {price_df['price'].mean():.1f} EUR/MWh,
+        range [{price_df['price'].min():.1f}, {price_df['price'].max():.1f}] EUR/MWh
         """
     )
     return
 
 
 @app.cell
-def _(energy_df, mo, price_series):
+def _(energy_df, mo, price_df):
     import altair as _alt
 
-    _energy_df = energy_df.reset_index()
-    _price_df = price_series.reset_index().rename(columns={"index": "time", 0: "price"})
+    _energy_df = energy_df.rename(columns={"timestamp": "time"})
+    _price_df = price_df.rename(columns={"timestamp": "time"})
 
     _chart_e_spec = (
         _alt.Chart(_energy_df, title="Consumption (kWh per 15 min)")
         .mark_line()
-        .encode(x="index:T", y="kwh:Q")
+        .encode(x="time:T", y="kwh:Q")
         .properties(width="container", height=200)
     )
     _chart_p_spec = (
@@ -259,7 +262,13 @@ def _(MonthlyPeaks, consumption_kwh, index, pd):
     # Compute monthly peak from the consumption data (kW = kWh / 0.25h)
     power_kw = consumption_kwh / 0.25
     peak_per_month = pd.Series(power_kw, index=index).resample("MS").max()
-    monthly_peaks = MonthlyPeaks(data=peak_per_month)
+    monthly_peaks_df = pd.DataFrame(
+        {
+            "month": peak_per_month.index.strftime("%Y-%m"),
+            "peak_kw": peak_per_month.values,
+        }
+    )
+    monthly_peaks = MonthlyPeaks(data=monthly_peaks_df)
     return (monthly_peaks,)
 
 
@@ -287,11 +296,11 @@ def _(
     connection,
     energy_df,
     monthly_peaks,
-    price_series,
+    price_df,
     tariff,
 ):
     energy = EnergySeries(carrier=Carrier.ELECTRICITY, direction=Direction.OFFTAKE, data=energy_df)
-    prices = MarketPriceSeries(market=Market.EPEX_DA_BE_15MIN, data=price_series)
+    prices = MarketPriceSeries(market=Market.EPEX_DA_BE_15MIN, data=price_df)
 
     grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
     taxes = TaxRule.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)

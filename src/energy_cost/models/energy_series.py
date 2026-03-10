@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
 
 import narwhals as nw
+from narwhals.typing import IntoDataFrame
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from energy_cost.models._enums import Carrier, Direction
@@ -18,9 +18,8 @@ class EnergyUnit(StrEnum):
 class EnergySeries(BaseModel):
     """Energy consumption or injection time series.
 
-    Accepted input is a native eager dataframe with either:
-    - a DatetimeIndex and one or more energy columns, or
-    - explicit ``timestamp`` column and one or more energy columns.
+    Accepted input is ``IntoDataFrame`` with explicit ``timestamp`` and one or
+    more energy columns.
 
     Internal normalized schema is a Narwhals dataframe that always includes
     ``timestamp`` and preserves provided energy columns.
@@ -36,21 +35,12 @@ class EnergySeries(BaseModel):
 
     @field_validator("data", mode="before")
     @classmethod
-    def validate_data(cls, v: Any) -> nw.DataFrame:
+    def validate_data(cls, v: IntoDataFrame) -> nw.DataFrame:
         if v is None:
             raise ValueError("Data cannot be None")
 
         df = nw.from_native(v, eager_only=True)
-        if "timestamp" in df.columns:
-            return df
+        if "timestamp" not in df.columns:
+            raise ValueError("EnergySeries requires a dataframe with a 'timestamp' column")
 
-        if not hasattr(v, "index"):
-            raise ValueError("EnergySeries requires a DatetimeIndex or a 'timestamp' column")
-
-        return nw.from_dict(
-            {
-                "timestamp": list(v.index),
-                **{column: df[column].to_list() for column in df.columns},
-            },
-            backend=df.implementation,
-        )
+        return df

@@ -210,7 +210,7 @@ class TestInputValidation:
         gas_energy = EnergySeries(
             carrier=Carrier.GAS,
             direction=Direction.OFFTAKE,
-            data=pd.DataFrame({"kwh": 0.25}, index=one_day_index),
+            data=pd.DataFrame({"timestamp": one_day_index, "kwh": 0.25}),
         )
         grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
@@ -226,7 +226,7 @@ class TestInputValidation:
         bad_energy = EnergySeries(
             carrier=Carrier.ELECTRICITY,
             direction=Direction.OFFTAKE,
-            data=pd.DataFrame({"kwh_day": 0.15, "kwh_night": 0.10}, index=one_day_index),
+            data=pd.DataFrame({"timestamp": one_day_index, "kwh_day": 0.15, "kwh_night": 0.10}),
         )
         grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
@@ -242,7 +242,7 @@ class TestInputValidation:
         wrong_index = pd.date_range("2026-01-16", periods=96, freq="15min", tz="Europe/Brussels")
         bad_prices = MarketPriceSeries(
             market=Market.EPEX_DA_BE_15MIN,
-            data=pd.Series(100.0, index=wrong_index),
+            data=pd.DataFrame({"timestamp": wrong_index, "price": 100.0}),
         )
         grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
@@ -267,11 +267,11 @@ class TestVariablePrices:
         energy = EnergySeries(
             carrier=Carrier.ELECTRICITY,
             direction=Direction.OFFTAKE,
-            data=pd.DataFrame({"kwh": kwh_array}, index=one_day_index),
+            data=pd.DataFrame({"timestamp": one_day_index, "kwh": kwh_array}),
         )
         prices = MarketPriceSeries(
             market=Market.EPEX_DA_BE_15MIN,
-            data=pd.Series(prices_array, index=one_day_index),
+            data=pd.DataFrame({"timestamp": one_day_index, "price": prices_array}),
         )
 
         grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)

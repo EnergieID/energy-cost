@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
 
 import narwhals as nw
+from narwhals.typing import IntoDataFrame
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -23,9 +23,7 @@ class Market(StrEnum):
 class MarketPriceSeries(BaseModel):
     """Market price series (e.g., EPEX Spot day-ahead 15-min prices).
 
-    Accepted input is either:
-    - a native eager series with DatetimeIndex, or
-    - a native eager dataframe with ``price`` and optional ``timestamp``.
+    Accepted input is ``IntoDataFrame`` with ``timestamp`` and ``price``.
 
     Internal normalized schema is a Narwhals dataframe with:
     - ``timestamp``
@@ -40,37 +38,15 @@ class MarketPriceSeries(BaseModel):
 
     @field_validator("data", mode="before")
     @classmethod
-    def validate_data(cls, v: Any) -> nw.DataFrame:
+    def validate_data(cls, v: IntoDataFrame) -> nw.DataFrame:
         if v is None:
             raise ValueError("Data cannot be None")
 
-        if hasattr(v, "index") and not hasattr(v, "columns"):
-            series = nw.from_native(v, eager_only=True, allow_series=True)
-            return nw.from_dict(
-                {
-                    "timestamp": list(v.index),
-                    "price": series.to_list(),
-                },
-                backend=series.implementation,
-            )
-
         df = nw.from_native(v, eager_only=True)
-        if "price" not in df.columns:
-            raise ValueError("MarketPriceSeries requires a 'price' column or a native series")
+        if "timestamp" not in df.columns or "price" not in df.columns:
+            raise ValueError("MarketPriceSeries requires a dataframe with 'timestamp' and 'price' columns")
 
-        if "timestamp" in df.columns:
-            return df
-
-        if not hasattr(v, "index"):
-            raise ValueError("MarketPriceSeries requires a DatetimeIndex or a 'timestamp' column")
-
-        return nw.from_dict(
-            {
-                "timestamp": list(v.index),
-                "price": df["price"].to_list(),
-            },
-            backend=df.implementation,
-        )
+        return df
 
     def factor_to_eur_per_kwh(self) -> float:
         """Convert prices to EUR/kWh."""
