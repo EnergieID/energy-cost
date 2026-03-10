@@ -16,11 +16,18 @@ from energy_cost.core.engine import (
     COL_VAT,
     calculate_dynamic_electricity_cost,
 )
-from energy_cost.core.models import ConnectionInfo, EnergySeries, MarketPriceSeries, MonthlyPeaks
-from energy_cost.enums import Carrier, Direction, Market
-from energy_cost.regions.be_flanders.grid import resolve_grid_tariffs
-from energy_cost.regions.be_flanders.taxes import resolve_tax_rules
-from energy_cost.tariffs.models import TariffDefinition
+from energy_cost.models import (
+    Carrier,
+    ConnectionInfo,
+    Direction,
+    EnergySeries,
+    GridTariffSet,
+    Market,
+    MarketPriceSeries,
+    MonthlyPeaks,
+    TariffDefinition,
+    TaxRule,
+)
 
 ALL_COLUMNS = [
     COL_SUPPLIER_ENERGY,
@@ -45,8 +52,8 @@ class TestDynamicElectricityCost:
         connection: ConnectionInfo,
         peaks: MonthlyPeaks,
     ):
-        grid = resolve_grid_tariffs(connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-        taxes = resolve_tax_rules(connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        taxes = TaxRule.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         return calculate_dynamic_electricity_cost(
             energy=energy,
             market_prices=prices,
@@ -205,8 +212,8 @@ class TestInputValidation:
             direction=Direction.OFFTAKE,
             data=pd.DataFrame({"kwh": 0.25}, index=one_day_index),
         )
-        grid = resolve_grid_tariffs(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-        taxes = resolve_tax_rules(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         with pytest.raises(ValueError, match="Expected electricity"):
             calculate_dynamic_electricity_cost(
                 gas_energy, constant_prices, dynamic_offtake_tariff, residential_connection,
@@ -221,8 +228,8 @@ class TestInputValidation:
             direction=Direction.OFFTAKE,
             data=pd.DataFrame({"kwh_day": 0.15, "kwh_night": 0.10}, index=one_day_index),
         )
-        grid = resolve_grid_tariffs(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-        taxes = resolve_tax_rules(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         with pytest.raises(ValueError, match="'kwh' column"):
             calculate_dynamic_electricity_cost(
                 bad_energy, constant_prices, dynamic_offtake_tariff, residential_connection,
@@ -237,8 +244,8 @@ class TestInputValidation:
             market=Market.EPEX_DA_BE_15MIN,
             data=pd.Series(100.0, index=wrong_index),
         )
-        grid = resolve_grid_tariffs(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-        taxes = resolve_tax_rules(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         with pytest.raises(ValueError, match="does not align"):
             calculate_dynamic_electricity_cost(
                 constant_energy, bad_prices, dynamic_offtake_tariff, residential_connection,
@@ -267,8 +274,8 @@ class TestVariablePrices:
             data=pd.Series(prices_array, index=one_day_index),
         )
 
-        grid = resolve_grid_tariffs(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-        taxes = resolve_tax_rules(residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+        taxes = TaxRule.resolve("energy_cost.regions.be_flanders", residential_connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
         result = calculate_dynamic_electricity_cost(
             energy, prices, dynamic_offtake_tariff, residential_connection,
             monthly_peaks_january, grid, taxes,

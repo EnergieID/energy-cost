@@ -7,24 +7,28 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from energy_cost.core.models import ConnectionInfo, ElectricityConnection, EnergySeries, MarketPriceSeries, MonthlyPeaks
-from energy_cost.enums import (
+from energy_cost.models import (
     Carrier,
     Channel,
+    ConnectionInfo,
     ContractType,
     CustomerType,
     Direction,
+    ElectricityConnection,
+    EnergySeries,
     Market,
+    MarketPriceSeries,
     MeterRegister,
     MeterType,
+    MonthlyPeaks,
     PricingKind,
+    PricingRule,
     Region,
+    TariffComponent,
     TariffComponentType,
+    TariffDefinition,
     VoltageLevel,
 )
-from energy_cost.regions.be_flanders.grid import resolve_grid_tariffs
-from energy_cost.regions.be_flanders.taxes import resolve_tax_rules
-from energy_cost.tariffs.models import PricingRule, TariffComponent, TariffDefinition
 
 
 @pytest.fixture()

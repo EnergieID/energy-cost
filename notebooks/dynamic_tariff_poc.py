@@ -39,32 +39,7 @@ def _():
     import pandas as pd
 
     from energy_cost.core.engine import calculate_dynamic_electricity_cost
-    from energy_cost.core.models import (
-        ConnectionInfo,
-        ElectricityConnection,
-        EnergySeries,
-        MarketPriceSeries,
-        MonthlyPeaks,
-    )
-    from energy_cost.enums import (
-        Carrier,
-        Channel,
-        ContractType,
-        CustomerType,
-        Direction,
-        Market,
-        MeterRegister,
-        MeterType,
-        PricingKind,
-        Region,
-        TariffComponentType,
-        VoltageLevel,
-    )
-    from energy_cost.regions.be_flanders.grid import resolve_grid_tariffs
-    from energy_cost.regions.be_flanders.taxes import resolve_tax_rules
-    from energy_cost.tariffs.models import PricingRule, TariffComponent, TariffDefinition
-
-    return (
+    from energy_cost.models import (
         Carrier,
         Channel,
         ConnectionInfo,
@@ -73,6 +48,7 @@ def _():
         Direction,
         ElectricityConnection,
         EnergySeries,
+        GridTariffSet,
         Market,
         MarketPriceSeries,
         MeterRegister,
@@ -84,13 +60,37 @@ def _():
         TariffComponent,
         TariffComponentType,
         TariffDefinition,
+        TaxRule,
+        VoltageLevel,
+    )
+
+    return (
+        Carrier,
+        Channel,
+        ConnectionInfo,
+        ContractType,
+        CustomerType,
+        Direction,
+        ElectricityConnection,
+        EnergySeries,
+        GridTariffSet,
+        Market,
+        MarketPriceSeries,
+        MeterRegister,
+        MeterType,
+        MonthlyPeaks,
+        PricingKind,
+        PricingRule,
+        Region,
+        TariffComponent,
+        TariffComponentType,
+        TariffDefinition,
+        TaxRule,
         VoltageLevel,
         calculate_dynamic_electricity_cost,
         date,
         np,
         pd,
-        resolve_grid_tariffs,
-        resolve_tax_rules,
     )
 
 
@@ -279,22 +279,22 @@ def _(
     Carrier,
     Direction,
     EnergySeries,
+    GridTariffSet,
     Market,
     MarketPriceSeries,
+    TaxRule,
     calculate_dynamic_electricity_cost,
     connection,
     energy_df,
     monthly_peaks,
     price_series,
-    resolve_grid_tariffs,
-    resolve_tax_rules,
     tariff,
 ):
     energy = EnergySeries(carrier=Carrier.ELECTRICITY, direction=Direction.OFFTAKE, data=energy_df)
     prices = MarketPriceSeries(market=Market.EPEX_DA_BE_15MIN, data=price_series)
 
-    grid = resolve_grid_tariffs(connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
-    taxes = resolve_tax_rules(connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+    grid = GridTariffSet.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
+    taxes = TaxRule.resolve("energy_cost.regions.be_flanders", connection, Carrier.ELECTRICITY, Direction.OFFTAKE)
 
     result = calculate_dynamic_electricity_cost(
         energy=energy,
