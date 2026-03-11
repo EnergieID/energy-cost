@@ -1,22 +1,23 @@
 import datetime as dt
 from abc import ABC, abstractmethod
+from os import environ
+from typing import ClassVar
 
-import narwhals as nw
+import pandas as pd
 
 
 class Index(ABC):
     """An index to use for calculating the energy cost."""
 
-    name: str
-    indexes: dict[str, "Index"] = {}
+    indexes: ClassVar[dict[str, "Index"]] = {}
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if hasattr(cls, "name"):
-            cls.indexes[cls.name] = cls()
+    @classmethod
+    def register(cls, name: str, index: "Index") -> None:
+        """Register an index instance by name."""
+        cls.indexes[name] = index
 
     @abstractmethod
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> nw.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the index values for the given time range and resolution."""
 
     @staticmethod
@@ -25,3 +26,13 @@ class Index(ABC):
         if name not in Index.indexes:
             raise ValueError(f"Unsupported index: {name}")
         return Index.indexes[name]
+
+
+def register_default_indexes() -> None:
+    """Register all built-in indexes explicitly."""
+    from .entsoe_day_ahead_index import EntsoeDayAheadIndex
+
+    Index.register("Belpex15min", EntsoeDayAheadIndex(country_code="BE", api_key=environ["ENTSOE_API_KEY"]))
+
+
+register_default_indexes()

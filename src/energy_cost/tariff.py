@@ -3,7 +3,7 @@ import datetime as dt
 from collections import defaultdict
 from pathlib import Path
 
-import narwhals as nw
+import pandas as pd
 import yaml
 from pydantic import BaseModel, Field
 
@@ -12,7 +12,7 @@ from .price_component import ComponentType, PriceComponent
 
 class Tariff(BaseModel):
     supplier: str
-    product_name: str
+    product: str
     components: dict[ComponentType, list[PriceComponent]] = Field(default_factory=lambda: defaultdict(list))
 
     @classmethod
@@ -22,12 +22,6 @@ class Tariff(BaseModel):
             raw_data = yaml.safe_load(file)
         tariff = cls.model_validate(raw_data)
         return tariff
-
-    def add_component(self, component: PriceComponent):
-        """Add a price component to the tariff."""
-        items = self.components[component.type]
-        index = bisect.bisect_right(items, component.start, key=lambda c: c.start)
-        items.insert(index, component)
 
     def get_components(
         self,
@@ -43,7 +37,7 @@ class Tariff(BaseModel):
 
     def get_cost(
         self, component_type: ComponentType, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta
-    ) -> nw.DataFrame:
+    ) -> pd.DataFrame:
         """Get the cost values for the given component type and time range."""
         components = self.get_components(component_type, start, end)
         if not components:
@@ -54,6 +48,6 @@ class Tariff(BaseModel):
 
         for component, end_time in zip(components[1:], ends[1:], strict=True):
             component_values = component.get_values(component.start, end_time, resolution)
-            df = nw.concat([df, component_values], how="vertical")
+            df = pd.concat([df, component_values], ignore_index=True)
 
         return df

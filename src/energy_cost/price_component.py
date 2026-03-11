@@ -1,8 +1,7 @@
 import datetime as dt
 from enum import StrEnum
 
-import narwhals as nw
-import polars as pl
+import pandas as pd
 from pydantic import BaseModel, Field
 
 from energy_cost.index.index import Index
@@ -21,38 +20,35 @@ class IndexBasedCost(BaseModel):
     index: str
     scalar: float
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> nw.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution."""
         index = Index.from_name(self.index)
         index_values = index.get_values(start, end, resolution)
-        return index_values.with_columns(value=index_values["value"] * self.scalar)
+        index_values = index_values.copy()
+        index_values["value"] = index_values["value"] * self.scalar
+        return index_values
 
 
 class PriceComponent(BaseModel):
-    type: ComponentType
     start: dt.datetime
     constant_cost: float
     variable_costs: list[IndexBasedCost] = Field(default_factory=list)
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> nw.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution."""
         actual_start = max(self.start, start)
 
-        df = nw.from_native(
-            pl.DataFrame(
-                {
-                    "timestamp": pl.date_range(actual_start, end, resolution, closed="left"),
-                    "value": self.constant_cost,
-                }
-            )
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range(start=actual_start, end=end, freq=resolution, inclusive="left"),
+                "value": self.constant_cost,
+            }
         )
 
         for variable_cost in self.variable_costs:
             variable_cost_values = variable_cost.get_values(actual_start, end, resolution)
-            df = (
-                df.join(variable_cost_values, on="timestamp", how="left")
-                .with_columns(value=nw.col("value") + nw.col("value_right").fill_null(0))
-                .drop("value_right")
-            )
+            df = df.merge(variable_cost_values, on="timestamp", how="left", suffixes=("", "_right"))
+            df["value"] = df["value"] + df["value_right"].fillna(0)
+            df = df.drop(columns=["value_right"])
 
         return df
