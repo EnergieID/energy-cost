@@ -3,6 +3,7 @@ from enum import StrEnum
 
 import narwhals as nw
 import polars as pl
+from pydantic import BaseModel, Field
 
 from energy_cost.index.index import Index
 
@@ -16,7 +17,7 @@ class ComponentType(StrEnum):
     INJECTION = "injection"
 
 
-class IndexBasedCost:
+class IndexBasedCost(BaseModel):
     index: str
     scalar: float
 
@@ -27,11 +28,11 @@ class IndexBasedCost:
         return index_values.with_columns(value=index_values["value"] * self.scalar)
 
 
-class PriceComponent:
+class PriceComponent(BaseModel):
     type: ComponentType
     start: dt.datetime
     constant_cost: float
-    variable_costs: list[IndexBasedCost]
+    variable_costs: list[IndexBasedCost] = Field(default_factory=list)
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> nw.DataFrame:
         """Get the cost values for the given time range and resolution."""

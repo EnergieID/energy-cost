@@ -1,21 +1,32 @@
 import bisect
 import datetime as dt
 from collections import defaultdict
+from pathlib import Path
 
 import narwhals as nw
+import yaml
+from pydantic import BaseModel, Field
 
 from .price_component import ComponentType, PriceComponent
 
 
-class Tariff:
+class Tariff(BaseModel):
     supplier: str
     product_name: str
-    components: dict[ComponentType, list[PriceComponent]] = defaultdict(list)
+    components: dict[ComponentType, list[PriceComponent]] = Field(default_factory=lambda: defaultdict(list))
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "Tariff":
+        """Load a tariff definition from YAML."""
+        with Path(path).open(encoding="utf-8") as file:
+            raw_data = yaml.safe_load(file)
+        tariff = cls.model_validate(raw_data)
+        return tariff
 
     def add_component(self, component: PriceComponent):
         """Add a price component to the tariff."""
         items = self.components[component.type]
-        index = bisect.bisect_left(items, component.start, key=lambda c: c.start)
+        index = bisect.bisect_right(items, component.start, key=lambda c: c.start)
         items.insert(index, component)
 
     def get_components(
@@ -26,7 +37,7 @@ class Tariff:
     ) -> list[PriceComponent]:
         """Get the price components of the given type that are active during the given time range."""
         components = self.components[component_type]
-        start_index = bisect.bisect_right(components, start, key=lambda c: c.start) - 1
+        start_index = max(0, bisect.bisect_right(components, start, key=lambda c: c.start) - 1)
         end_index = bisect.bisect_right(components, end, key=lambda c: c.start)
         return components[start_index:end_index]
 
