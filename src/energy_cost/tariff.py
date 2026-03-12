@@ -1,19 +1,41 @@
 import bisect
 import datetime as dt
 from collections import defaultdict
+from enum import StrEnum
 from pathlib import Path
 
 import pandas as pd
 import yaml
 from pydantic import BaseModel, Field
 
-from .price_component import ComponentType, PriceComponent
+from .price_formula import PriceFormula
+
+
+class MeterType(StrEnum):
+    SINGLE_RATE = "single_rate"
+    TOU_PEAK = "tou_peak"
+    TOU_OFF_PEAK = "tou_off_peak"
+    TOU_SHOULDER = "tou_shoulder"
+    NIGHT_ONLY = "night_only"
+    INJECTION = "injection"
+
+
+class TimedPriceFormula(BaseModel):
+    start: dt.datetime
+    formula: PriceFormula
+
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+        """Get the cost values for the given time range and resolution."""
+        actual_start = max(self.start, start)
+        if actual_start >= end:
+            return pd.DataFrame(columns=["timestamp", "value"])
+        return self.formula.get_values(actual_start, end, resolution)
 
 
 class Tariff(BaseModel):
     supplier: str
     product: str
-    components: dict[ComponentType, list[PriceComponent]] = Field(default_factory=lambda: defaultdict(list))
+    by_meter_type: dict[MeterType, list[TimedPriceFormula]] = Field(default_factory=lambda: defaultdict(list))
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Tariff":
@@ -23,31 +45,31 @@ class Tariff(BaseModel):
         tariff = cls.model_validate(raw_data)
         return tariff
 
-    def get_components(
+    def get_formulas(
         self,
-        component_type: ComponentType,
+        meter_type: MeterType,
         start: dt.datetime,
         end: dt.datetime,
-    ) -> list[PriceComponent]:
-        """Get the price components of the given type that are active during the given time range."""
-        components = self.components[component_type]
-        start_index = max(0, bisect.bisect_right(components, start, key=lambda c: c.start) - 1)
-        end_index = bisect.bisect_right(components, end, key=lambda c: c.start)
-        return components[start_index:end_index]
+    ) -> list[TimedPriceFormula]:
+        """Get the price formulas of the given type that are active during the given time range."""
+        timed_formulas = self.by_meter_type[meter_type]
+        start_index = max(0, bisect.bisect_right(timed_formulas, start, key=lambda c: c.start) - 1)
+        end_index = bisect.bisect_right(timed_formulas, end, key=lambda c: c.start)
+        return timed_formulas[start_index:end_index]
 
     def get_cost(
-        self, component_type: ComponentType, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta
+        self, meter_type: MeterType, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta
     ) -> pd.DataFrame:
-        """Get the cost values for the given component type and time range."""
-        components = self.get_components(component_type, start, end)
-        if not components:
-            raise ValueError(f"No components of type {component_type} found in tariff.")
+        """Get the cost values for the given meter type and time range."""
+        formulas = self.get_formulas(meter_type, start, end)
+        if not formulas:
+            raise ValueError(f"No meters of type {meter_type} found in tariff.")
 
-        ends = [component.start for component in components[1:]] + [end]
-        df = components[0].get_values(start, ends[0], resolution)
+        ends = [formula.start for formula in formulas[1:]] + [end]
+        df = formulas[0].get_values(start, ends[0], resolution)
 
-        for component, end_time in zip(components[1:], ends[1:], strict=True):
-            component_values = component.get_values(component.start, end_time, resolution)
-            df = pd.concat([df, component_values], ignore_index=True)
+        for formula, end_time in zip(formulas[1:], ends[1:], strict=True):
+            formula_values = formula.get_values(formula.start, end_time, resolution)
+            df = pd.concat([df, formula_values], ignore_index=True)
 
         return df
