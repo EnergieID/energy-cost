@@ -21,7 +21,8 @@ dev = [
     "ty>=0.0.12",
     "pytest-cov>=7.0.0",
     "pytest>=9.0.2",
-    "marimo>=0.20.4",
+    "ipykernel>=6.29.5",
+    "jupyterlab>=4.4.0",
 ]
 [build-system]
 requires = ["setuptools>=75.0", "wheel"]
@@ -34,8 +35,8 @@ lint = "ruff check --fix"
 format = "ruff format"
 check = "ty check"
 test = "pytest --cov=energy_cost --cov-report=term-missing"
-[tool.poe.tasks.notebook]
-cmd = "marimo edit"
+[tool.poe.tasks.notebooks]
+cmd = "jupyter lab notebooks"
 envfile = ".env"
 [tool.ruff]
 line-length = 120
