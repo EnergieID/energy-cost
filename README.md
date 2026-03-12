@@ -1,38 +1,39 @@
-# Energy cost calculation
+# Energy cost
 
+Python package to model your energy bill based on your energy consumption.
 
+This package is currently under construction, with many features still incomplete or missing.
+See [issues](https://github.com/EnergieID/energy-cost/issues) for future planned work and feel free to contribute!
+
+Currently implemented features are documented using notebooks in the `notebooks/` directory.
 
 ## Development
 
 ### Prerequisites
-
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) (fast Python package manager)
 
 ### 1. Install dependencies
-
 ```bash
 uv sync
+uv tool install poethepoet
 ```
 
 ### 2. Notebooks
-
-You can easilly test the project using our [marimo](marimo.io) notebooks. Just open the `notebooks` folder and run the notebook of your choice.
+You can easilly test the project using our notebooks. They are located in the `notebooks` directory and can be run with:
 
 ```bash
-marimo run notebooks/quick_start.py
+poe notebooks
 ```
 
 If you add new features, please add a new notebook to demonstrate them.
 
 ### 3. Run tests
-
 ```bash
 poe test
 ```
 
 ### 4. Code quality (pre-commit)
-
 Pre-commit hooks are configured out of the box. Install them once:
 
 ```bash
