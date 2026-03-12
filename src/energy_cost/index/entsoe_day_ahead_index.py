@@ -17,7 +17,7 @@ class EntsoeDayAheadIndex(Index):
         self.default_resolution = default_resolution
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the index values for the given time range and resolution."""
+        """Get the index values for the given time range and resolution in €/MWh."""
         # resolution should be a whole divisor of the default resolution
         if resolution > self.default_resolution or self.default_resolution % resolution != dt.timedelta(0):
             raise ValueError(f"Resolution must be a whole divisor of {self.default_resolution}")

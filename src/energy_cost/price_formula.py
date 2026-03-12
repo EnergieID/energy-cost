@@ -11,7 +11,7 @@ class IndexAdder(BaseModel):
     scalar: float
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the cost values for the given time range and resolution."""
+        """Get the cost values for the given time range and resolution in €/MWh."""
         index = Index.from_name(self.index)
         index_values = index.get_values(start, end, resolution)
         index_values = index_values.copy()
@@ -20,11 +20,12 @@ class IndexAdder(BaseModel):
 
 
 class PriceFormula(BaseModel):
+    # The constant cost component of the price formula in €/MWh.
     constant_cost: float
     variable_costs: list[IndexAdder] = Field(default_factory=list)
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the cost values for the given time range and resolution."""
+        """Get the cost values for the given time range and resolution in €/MWh."""
         df = pd.DataFrame(
             {
                 "timestamp": pd.date_range(start=start, end=end, freq=resolution, inclusive="left"),

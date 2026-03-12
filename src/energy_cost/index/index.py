@@ -17,7 +17,7 @@ class Index(ABC):
 
     @abstractmethod
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the index values for the given time range and resolution."""
+        """Get the index values for the given time range and resolution in €/MWh."""
 
     @staticmethod
     def from_name(name: str) -> "Index":

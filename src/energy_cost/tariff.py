@@ -25,7 +25,7 @@ class TimedPriceFormula(BaseModel):
     formula: PriceFormula
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the cost values for the given time range and resolution."""
+        """Get the cost values for the given time range and resolution in €/MWh."""
         actual_start = max(self.start, start)
         if actual_start >= end:
             return pd.DataFrame(columns=["timestamp", "value"])
@@ -60,7 +60,7 @@ class Tariff(BaseModel):
     def get_cost(
         self, meter_type: MeterType, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta
     ) -> pd.DataFrame:
-        """Get the cost values for the given meter type and time range."""
+        """Get the cost values for the given meter type and time range at the given resolution in €/MWh."""
         formulas = self.get_formulas(meter_type, start, end)
         if not formulas:
             raise ValueError(f"No meters of type {meter_type} found in tariff.")

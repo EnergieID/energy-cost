@@ -7,6 +7,8 @@ See [issues](https://github.com/EnergieID/energy-cost/issues) for future planned
 
 Currently implemented features are documented using notebooks in the `notebooks/` directory.
 
+> Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
+
 ## Development
 
 ### Prerequisites
