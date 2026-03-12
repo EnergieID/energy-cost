@@ -1,6 +1,5 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from os import environ
 from typing import ClassVar
 
 import pandas as pd
@@ -26,13 +25,3 @@ class Index(ABC):
         if name not in Index.indexes:
             raise ValueError(f"Unsupported index: {name}")
         return Index.indexes[name]
-
-
-def register_default_indexes() -> None:
-    """Register all built-in indexes explicitly."""
-    from .entsoe_day_ahead_index import EntsoeDayAheadIndex
-
-    Index.register("Belpex15min", EntsoeDayAheadIndex(country_code="BE", api_key=environ["ENTSOE_API_KEY"]))
-
-
-register_default_indexes()
