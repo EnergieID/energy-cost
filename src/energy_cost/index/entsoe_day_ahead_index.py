@@ -9,14 +9,18 @@ from .index import Index
 class EntsoeDayAheadIndex(Index):
     """An ENTSO-E day-ahead index for a given country."""
 
-    def __init__(self, country_code: str, api_key: str):
+    def __init__(
+        self, country_code: str, api_key: str, default_resolution: dt.timedelta = dt.timedelta(minutes=15)
+    ) -> None:
         self.client = EntsoePandasClient(api_key=api_key)
         self.country_code = country_code
+        self.default_resolution = default_resolution
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the index values for the given time range and resolution."""
-        if resolution != dt.timedelta(minutes=15):
-            raise ValueError("EntsoeDayAheadIndex only supports 15 minute resolution.")
+        # resolution should be a whole divisor of the default resolution
+        if resolution > self.default_resolution or self.default_resolution % resolution != dt.timedelta(0):
+            raise ValueError(f"Resolution must be a whole divisor of {self.default_resolution}")
 
         df = (
             self.client.query_day_ahead_prices(
@@ -24,7 +28,7 @@ class EntsoeDayAheadIndex(Index):
                 start=pd.Timestamp(start),
                 end=pd.Timestamp(end),
             )
-            .resample("15min")
+            .resample(resolution)
             .ffill()
             .to_frame()
             .reset_index()
