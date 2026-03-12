@@ -8,6 +8,7 @@ from energy_cost.index.index import Index
 
 class IndexAdder(BaseModel):
     index: str
+    # The scalar to multiply the index values by before adding to the cost in €/MWh.
     scalar: float
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
