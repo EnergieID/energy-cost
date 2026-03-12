@@ -17,9 +17,6 @@ class DataFrameIndex(Index):
         end_ts = pd.Timestamp(end)
         target_index = pd.date_range(start=start_ts, end=end_ts, freq=resolution, inclusive="left")
 
-        if target_index.empty:
-            return pd.DataFrame(columns=["timestamp", "value"])
-
         return pd.merge_asof(
             left=pd.DataFrame({"timestamp": target_index}),
             right=self.df,
