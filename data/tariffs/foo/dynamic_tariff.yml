@@ -1,0 +1,24 @@
+supplier: foo
+product: dynamic tariff
+by_meter_type:
+  single_rate:
+    consumption:
+    - start: 2025-01-01T00:00:00+01
+      formula:
+        constant_cost: 12.34
+        variable_costs:
+        - index: Belpex15min
+          scalar: 1.23
+    - start: 2026-01-01T00:00:00+01
+      formula:
+        constant_cost: 14.56
+        variable_costs:
+        - index: Belpex15min
+          scalar: 1.23
+    injection:
+    - start: 2025-01-01T00:00:00+01
+      formula:
+        constant_cost: -14.56
+        variable_costs:
+        - index: Belpex15min
+          scalar: 0.9876

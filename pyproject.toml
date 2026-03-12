@@ -10,8 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0.0",
+    "pyyaml>=6.0.2",
+    "pandas>=2.2.0",
     "entsoe-py>=0.7.10",
-    "narwhals>=2.15.0"
 ]
 
 [dependency-groups]
@@ -20,23 +21,22 @@ dev = [
     "ty>=0.0.12",
     "pytest-cov>=7.0.0",
     "pytest>=9.0.2",
+    "ipykernel>=6.29.5",
+    "jupyterlab>=4.4.0",
 ]
 [build-system]
 requires = ["setuptools>=75.0", "wheel"]
 build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
 [tool.poe.tasks]
 lint = "ruff check --fix"
 format = "ruff format"
 check = "ty check"
 test = "pytest --cov=energy_cost --cov-report=term-missing"
-[tool.poe.tasks.worker]
-cmd = "saq worker.settings"
-envfile = ".env"
-[tool.poe.tasks.dev]
-cmd = "fastapi dev main.py"
-envfile = ".env"
-[tool.poe.tasks.db]
-cmd = "python db.py"
+[tool.poe.tasks.notebooks]
+cmd = "jupyter lab notebooks"
 envfile = ".env"
 [tool.ruff]
 line-length = 120
@@ -52,3 +52,6 @@ select = [
 ignore = [
     "E501", #Line too long
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*.py" = ["B018"]
