@@ -26,6 +26,8 @@ You can easilly test the project using our notebooks. They are located in the `n
 poe notebooks
 ```
 
+Some notebooks make use of external APIs and require API keys. You can set these in a `.env` file in the root of the project, using the `.env.example` file as a template.
+
 If you add new features, please add a new notebook to demonstrate them.
 
 ### 3. Run tests
