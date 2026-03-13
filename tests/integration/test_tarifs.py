@@ -275,11 +275,11 @@ def test_defaults_injection_shared_across_meter_types(tmp_path: Path, fake_index
                     - index: SolarAdj
                       scalar: 0.2
           consumption:
-            wkk:
+            chp_certificates:
               - start: 2026-03-08T00:00:00+01:00
                 formula:
                   constant_cost: 2.0
-            green:
+            renewable_certificates:
               - start: 2026-03-08T00:00:00+01:00
                 formula:
                   constant_cost: 3.0
@@ -330,15 +330,18 @@ def test_defaults_injection_shared_across_meter_types(tmp_path: Path, fake_index
 
     # Consumption merges defaults (wkk, green) with meter-specific energy
     single_consumption = tariff.get_cost(
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
-        resolution=dt.timedelta(minutes=15),
     )
 
-    assert list(single_consumption.columns) == ["timestamp", "wkk", "green", "energy", "total"]
+    assert list(single_consumption.columns) == [
+        "timestamp",
+        "chp_certificates",
+        "renewable_certificates",
+        "energy",
+        "total",
+    ]
     assert single_consumption["energy"].tolist() == [2.0, 3.0, 4.0, 5.0]
-    assert single_consumption["wkk"].tolist() == [2.0, 2.0, 2.0, 2.0]
-    assert single_consumption["green"].tolist() == [3.0, 3.0, 3.0, 3.0]
+    assert single_consumption["chp_certificates"].tolist() == [2.0, 2.0, 2.0, 2.0]
+    assert single_consumption["renewable_certificates"].tolist() == [3.0, 3.0, 3.0, 3.0]
     assert single_consumption["total"].tolist() == [7.0, 8.0, 9.0, 10.0]

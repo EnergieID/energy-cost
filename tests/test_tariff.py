@@ -189,17 +189,14 @@ def test_get_cost_returns_column_per_cost_type() -> None:
     )
 
     out = tariff.get_cost(
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
     )
 
-    assert list(out.columns) == ["timestamp", "energy", "wkk", "green", "total"]
+    assert list(out.columns) == ["timestamp", "energy", "chp_certificates", "renewable_certificates", "total"]
     assert out["energy"].tolist() == [10.0, 10.0, 10.0, 10.0]
-    assert out["wkk"].tolist() == [2.0, 2.0, 2.0, 2.0]
-    assert out["green"].tolist() == [3.0, 3.0, 3.0, 3.0]
+    assert out["chp_certificates"].tolist() == [2.0, 2.0, 2.0, 2.0]
+    assert out["renewable_certificates"].tolist() == [3.0, 3.0, 3.0, 3.0]
     assert out["total"].tolist() == [15.0, 15.0, 15.0, 15.0]
 
 
