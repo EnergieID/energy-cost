@@ -1,0 +1,17 @@
+supplier: foo
+product: dynamic tariff
+defaults:
+  injection: # specifying a separate price formula list for injection calculations
+  - start: 2025-01-01T00:00:00+01
+    formula:
+      constant_cost: -14.56
+      variable_costs:
+      - index: Belpex15min
+        scalar: 0.9876
+  consumption: # the consumption price formulas now also need to be named explicitly, as they are no longer the default
+  - start: 2025-01-01T00:00:00+01
+    formula:
+      constant_cost: 12.34
+      variable_costs:
+      - index: Belpex15min
+        scalar: 1.23

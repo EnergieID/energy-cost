@@ -130,11 +130,11 @@ class Tariff(BaseModel):
 
     def get_cost(
         self,
-        meter_type: MeterType,
-        direction: PowerDirection,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: dt.timedelta,
+        resolution: dt.timedelta = dt.timedelta(minutes=15),
+        meter_type: MeterType = MeterType.SINGLE_RATE,
+        direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame:
         """Get the cost values for the given meter type and time range at the given resolution in €/MWh.
 
