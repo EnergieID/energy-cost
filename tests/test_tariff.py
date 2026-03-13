@@ -168,10 +168,10 @@ def test_get_cost_returns_column_per_cost_type() -> None:
     energy_formulas = [
         TimedPriceFormula(start=dt.datetime(2025, 1, 1, 0, 0), formula=PriceFormula(constant_cost=10.0)),
     ]
-    wkk_formulas = [
+    chp_formulas = [
         TimedPriceFormula(start=dt.datetime(2025, 1, 1, 0, 0), formula=PriceFormula(constant_cost=2.0)),
     ]
-    green_formulas = [
+    renewable_formulas = [
         TimedPriceFormula(start=dt.datetime(2025, 1, 1, 0, 0), formula=PriceFormula(constant_cost=3.0)),
     ]
     tariff = Tariff(
@@ -181,8 +181,8 @@ def test_get_cost_returns_column_per_cost_type() -> None:
             MeterType.SINGLE_RATE: {
                 PowerDirection.CONSUMPTION: {
                     CostType.ENERGY: energy_formulas,
-                    CostType.WKK: wkk_formulas,
-                    CostType.GREEN: green_formulas,
+                    CostType.CHP_CERTIFICATES: chp_formulas,
+                    CostType.RENEWABLE_CERTIFICATES: renewable_formulas,
                 }
             }
         },
@@ -257,7 +257,7 @@ def test_direction_shorthand_cost_type_dict_defaults_to_consumption(tmp_path: Pa
         "      - start: 2025-01-01T00:00:00\n"
         "        formula:\n"
         "          constant_cost: 5.0\n"
-        "    wkk:\n"
+        "    chp_certificates:\n"
         "      - start: 2025-01-01T00:00:00\n"
         "        formula:\n"
         "          constant_cost: 1.5\n",
@@ -267,6 +267,6 @@ def test_direction_shorthand_cost_type_dict_defaults_to_consumption(tmp_path: Pa
     tariff = Tariff.from_yaml(path)
     resolved = tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
-    assert set(resolved.keys()) == {CostType.ENERGY, CostType.WKK}
+    assert set(resolved.keys()) == {CostType.ENERGY, CostType.CHP_CERTIFICATES}
     assert resolved[CostType.ENERGY][0].formula.constant_cost == 5.0
-    assert resolved[CostType.WKK][0].formula.constant_cost == 1.5
+    assert resolved[CostType.CHP_CERTIFICATES][0].formula.constant_cost == 1.5

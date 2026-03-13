@@ -25,8 +25,12 @@ class PowerDirection(StrEnum):
 
 class CostType(StrEnum):
     ENERGY = "energy"
-    WKK = "wkk"
-    GREEN = "green"
+    CHP_CERTIFICATES = (
+        "chp_certificates"  # Combined Heat and Power certificates, a type of subsidy for efficient cogeneration plants
+    )
+    RENEWABLE_CERTIFICATES = (
+        "renewable_certificates"  # Renewable Energy certificates, a type of subsidy for renewable energy generation
+    )
 
 
 class TimedPriceFormula(BaseModel):
