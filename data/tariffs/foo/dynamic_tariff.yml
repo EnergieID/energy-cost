@@ -8,6 +8,11 @@ defaults:
       variable_costs:
       - index: Belpex15min
         scalar: 0.9876
+  consumption:
+    green:
+    - start: 2025-01-01T00:00:00+01
+      formula:
+        constant_cost: 12.34
 by_meter_type:
   single_rate:
     consumption:
