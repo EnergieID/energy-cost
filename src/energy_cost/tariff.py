@@ -102,8 +102,8 @@ class Tariff(BaseModel):
             result.update(self.by_meter_type[meter_type][direction])
         return result
 
+    @staticmethod
     def filter_formulas(
-        self,
         formulas: list[TimedPriceFormula],
         start: dt.datetime,
         end: dt.datetime,
@@ -121,6 +121,10 @@ class Tariff(BaseModel):
         resolution: dt.timedelta,
     ) -> pd.DataFrame:
         """Compute the cost time series for a list of consecutive TimedPriceFormulas."""
+        formulas = Tariff.filter_formulas(formulas, start, end)
+        if not formulas:
+            return pd.DataFrame(columns=["timestamp", "value"])
+
         ends = [f.start for f in formulas[1:]] + [end]
         df = formulas[0].get_values(start, ends[0], resolution)
         for formula, end_time in zip(formulas[1:], ends[1:], strict=True):
@@ -146,10 +150,9 @@ class Tariff(BaseModel):
 
         result: pd.DataFrame | None = None
         for cost_type in resolved:
-            active = self.filter_formulas(resolved[cost_type], start, end)
-            if not active:
+            df = self._compute_cost_series(resolved[cost_type], start, end, resolution)
+            if df.empty:
                 continue
-            df = self._compute_cost_series(active, start, end, resolution)
             df = df.rename(columns={"value": cost_type.value})
             result = df if result is None else result.merge(df, on="timestamp", how="outer")
 
