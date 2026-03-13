@@ -267,3 +267,46 @@ def test_direction_shorthand_cost_type_dict_defaults_to_consumption(tmp_path: Pa
     assert set(resolved.keys()) == {CostType.ENERGY, CostType.CHP_CERTIFICATES}
     assert resolved[CostType.ENERGY][0].formula.constant_cost == 5.0
     assert resolved[CostType.CHP_CERTIFICATES][0].formula.constant_cost == 1.5
+
+
+def test_compute_cost_series_returns_empty_when_formulas_do_not_overlap() -> None:
+    formulas = [
+        TimedPriceFormula(start=dt.datetime(2025, 1, 2, 0, 0), formula=PriceFormula(constant_cost=1.0)),
+    ]
+
+    out = Tariff._compute_cost_series(
+        formulas=formulas,
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert list(out.columns) == ["timestamp", "value"]
+    assert out.empty
+
+
+def test_get_cost_raises_when_all_resolved_formulas_are_outside_range() -> None:
+    tariff = Tariff(
+        supplier="S",
+        product="P",
+        by_meter_type={
+            MeterType.SINGLE_RATE: {
+                PowerDirection.CONSUMPTION: {
+                    CostType.ENERGY: [
+                        TimedPriceFormula(start=dt.datetime(2025, 1, 2, 0, 0), formula=PriceFormula(constant_cost=1.0))
+                    ],
+                    CostType.CHP_CERTIFICATES: [
+                        TimedPriceFormula(start=dt.datetime(2025, 1, 2, 0, 0), formula=PriceFormula(constant_cost=2.0))
+                    ],
+                }
+            }
+        },
+    )
+
+    with pytest.raises(
+        ValueError, match="No formulas for meter type 'single_rate' and direction 'consumption' found in tariff"
+    ):
+        tariff.get_cost(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 1, 1, 1, 0),
+        )
