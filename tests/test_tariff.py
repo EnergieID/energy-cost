@@ -49,7 +49,7 @@ def test_tariff_from_yaml_loads_file(tmp_path: Path) -> None:
     assert list(tariff.by_meter_type.keys()) == [MeterType.SINGLE_RATE]
 
 
-def test_get_formulas_returns_only_overlapping_items() -> None:
+def test_filter_formulas_returns_only_overlapping_items() -> None:
     formulas = [
         TimedPriceFormula(start=dt.datetime(2025, 1, 1, 0, 0), formula=PriceFormula(constant_cost=1.0)),
         TimedPriceFormula(start=dt.datetime(2025, 1, 1, 1, 0), formula=PriceFormula(constant_cost=2.0)),
@@ -61,9 +61,9 @@ def test_get_formulas_returns_only_overlapping_items() -> None:
         by_meter_type={MeterType.SINGLE_RATE: {PowerDirection.CONSUMPTION: {CostType.ENERGY: formulas}}},
     )
 
-    out = tariff.get_formulas(
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
+    resolved = tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    out = tariff.filter_formulas(
+        formulas=resolved[CostType.ENERGY],
         start=dt.datetime(2025, 1, 1, 1, 30),
         end=dt.datetime(2025, 1, 1, 2, 30),
     )
@@ -120,15 +120,13 @@ def test_defaults_apply_to_all_meter_types() -> None:
         defaults={PowerDirection.INJECTION: {CostType.ENERGY: injection_formulas}},
     )
 
-    single = tariff.get_formulas(
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.INJECTION,
+    single = tariff.filter_formulas(
+        formulas=tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)[CostType.ENERGY],
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
     )
-    tou = tariff.get_formulas(
-        meter_type=MeterType.TOU_PEAK,
-        direction=PowerDirection.INJECTION,
+    tou = tariff.filter_formulas(
+        formulas=tariff.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)[CostType.ENERGY],
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
     )
@@ -151,15 +149,13 @@ def test_by_meter_type_overrides_defaults() -> None:
         by_meter_type={MeterType.SINGLE_RATE: {PowerDirection.CONSUMPTION: {CostType.ENERGY: override_formulas}}},
     )
 
-    single = tariff.get_formulas(
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
+    single = tariff.filter_formulas(
+        formulas=tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)[CostType.ENERGY],
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
     )
-    tou = tariff.get_formulas(
-        meter_type=MeterType.TOU_PEAK,
-        direction=PowerDirection.CONSUMPTION,
+    tou = tariff.filter_formulas(
+        formulas=tariff.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)[CostType.ENERGY],
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
     )

@@ -98,20 +98,16 @@ class Tariff(BaseModel):
             result.update(self.by_meter_type[meter_type][direction])
         return result
 
-    def get_formulas(
+    def filter_formulas(
         self,
-        meter_type: MeterType,
-        direction: PowerDirection,
+        formulas: list[TimedPriceFormula],
         start: dt.datetime,
         end: dt.datetime,
-        cost_type: CostType = CostType.ENERGY,
     ) -> list[TimedPriceFormula]:
         """Get the price formulas of the given type that are active during the given time range."""
-        resolved = self.resolve_cost_formulas(meter_type, direction)
-        timed_formulas = resolved.get(cost_type, [])
-        start_index = max(0, bisect.bisect_right(timed_formulas, start, key=lambda c: c.start) - 1)
-        end_index = bisect.bisect_right(timed_formulas, end, key=lambda c: c.start)
-        return timed_formulas[start_index:end_index]
+        start_index = max(0, bisect.bisect_right(formulas, start, key=lambda c: c.start) - 1)
+        end_index = bisect.bisect_right(formulas, end, key=lambda c: c.start)
+        return formulas[start_index:end_index]
 
     @staticmethod
     def _compute_cost_series(
@@ -146,7 +142,7 @@ class Tariff(BaseModel):
 
         result: pd.DataFrame | None = None
         for cost_type in resolved:
-            active = self.get_formulas(meter_type, direction, start, end, cost_type)
+            active = self.filter_formulas(resolved[cost_type], start, end)
             if not active:
                 continue
             df = self._compute_cost_series(active, start, end, resolution)
