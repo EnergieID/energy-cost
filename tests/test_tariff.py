@@ -10,6 +10,12 @@ from energy_cost.price_formula import PriceFormula
 from energy_cost.tariff import CostType, MeterType, PowerDirection, Tariff, TimedPriceFormula
 
 
+def _constant_cost(tpf: TimedPriceFormula) -> float:
+    """Narrow formula to PriceFormula and return its constant_cost (test helper)."""
+    assert isinstance(tpf.formula, PriceFormula)
+    return tpf.formula.constant_cost
+
+
 def test_timed_price_formula_returns_empty_when_outside_range() -> None:
     timed = TimedPriceFormula(
         start=dt.datetime(2025, 1, 2, 0, 0),
@@ -68,7 +74,7 @@ def test_filter_formulas_returns_only_overlapping_items() -> None:
         end=dt.datetime(2025, 1, 1, 2, 30),
     )
 
-    assert [x.formula.constant_cost for x in out] == [2.0, 3.0]
+    assert [_constant_cost(x) for x in out] == [2.0, 3.0]
 
 
 def test_get_cost_concatenates_formula_segments() -> None:
@@ -131,8 +137,8 @@ def test_defaults_apply_to_all_meter_types() -> None:
         end=dt.datetime(2025, 1, 1, 1, 0),
     )
 
-    assert [f.formula.constant_cost for f in single] == [-5.0]
-    assert [f.formula.constant_cost for f in tou] == [-5.0]
+    assert [_constant_cost(f) for f in single] == [-5.0]
+    assert [_constant_cost(f) for f in tou] == [-5.0]
 
 
 def test_by_meter_type_overrides_defaults() -> None:
@@ -160,8 +166,8 @@ def test_by_meter_type_overrides_defaults() -> None:
         end=dt.datetime(2025, 1, 1, 1, 0),
     )
 
-    assert [f.formula.constant_cost for f in single] == [99.0]
-    assert [f.formula.constant_cost for f in tou] == [1.0]
+    assert [_constant_cost(f) for f in single] == [99.0]
+    assert [_constant_cost(f) for f in tou] == [1.0]
 
 
 def test_get_cost_returns_column_per_cost_type() -> None:
@@ -218,7 +224,7 @@ def test_list_shorthand_is_interpreted_as_energy(tmp_path: Path) -> None:
     resolved = tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
 
     assert list(resolved.keys()) == [CostType.ENERGY]
-    assert resolved[CostType.ENERGY][0].formula.constant_cost == -1.0
+    assert _constant_cost(resolved[CostType.ENERGY][0]) == -1.0
 
 
 def test_direction_shorthand_bare_list_defaults_to_consumption(tmp_path: Path) -> None:
@@ -239,7 +245,7 @@ def test_direction_shorthand_bare_list_defaults_to_consumption(tmp_path: Path) -
     resolved = tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
     assert list(resolved.keys()) == [CostType.ENERGY]
-    assert resolved[CostType.ENERGY][0].formula.constant_cost == 7.0
+    assert _constant_cost(resolved[CostType.ENERGY][0]) == 7.0
 
 
 def test_direction_shorthand_cost_type_dict_defaults_to_consumption(tmp_path: Path) -> None:
@@ -265,8 +271,8 @@ def test_direction_shorthand_cost_type_dict_defaults_to_consumption(tmp_path: Pa
     resolved = tariff.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
     assert set(resolved.keys()) == {CostType.ENERGY, CostType.CHP_CERTIFICATES}
-    assert resolved[CostType.ENERGY][0].formula.constant_cost == 5.0
-    assert resolved[CostType.CHP_CERTIFICATES][0].formula.constant_cost == 1.5
+    assert _constant_cost(resolved[CostType.ENERGY][0]) == 5.0
+    assert _constant_cost(resolved[CostType.CHP_CERTIFICATES][0]) == 1.5
 
 
 def test_compute_cost_series_returns_empty_when_formulas_do_not_overlap() -> None:

@@ -106,19 +106,9 @@ class ScheduledPriceFormulas(RootModel[list[ScheduledPriceFormula]]):
     """A list of :class:`ScheduledPriceFormula` entries coalesced into a single price
     formula that varies by day-of-week and/or time-of-day.
 
-    Behaves as a list: iterate, index, and measure length directly on the instance.
     Each :class:`FormulaSchedule` contributes values only for its matching
     timestamps; the first defined value per timestamp wins (coalesce semantics).
     """
-
-    def __iter__(self):  # type: ignore[override]
-        return iter(self.root)
-
-    def __len__(self) -> int:
-        return len(self.root)
-
-    def __getitem__(self, index: int) -> ScheduledPriceFormula:
-        return self.root[index]
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution in €/MWh.
