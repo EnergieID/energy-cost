@@ -285,6 +285,27 @@ def test_three_way_abc_scenario() -> None:
         assert actual == expected, f"Saturday hour={hour}: expected {expected}, got {actual}"
 
 
+def test_unmatched_timestamps_are_nan() -> None:
+    """Timestamps not covered by any schedule produce NaN values."""
+    # Only Monday is covered; Saturday timestamps should be NaN.
+    scheduled = ScheduledPriceFormulas(
+        [
+            ScheduledPriceFormula(
+                when=WeekSchedule(days=[DayOfWeek.MONDAY]),
+                constant_cost=42.0,
+            ),
+        ]
+    )
+    # 2026-03-16 Mon 00:00, 2026-03-21 Sat 00:00
+    out = scheduled.get_values(dt.datetime(2026, 3, 16), dt.datetime(2026, 3, 16, 2), dt.timedelta(hours=1))
+    assert out["value"].tolist() == [42.0, 42.0]
+
+    out_sat = scheduled.get_values(dt.datetime(2026, 3, 21), dt.datetime(2026, 3, 21, 2), dt.timedelta(hours=1))
+    import math
+
+    assert all(math.isnan(v) for v in out_sat["value"].tolist())
+
+
 def test_output_has_correct_timestamps() -> None:
     scheduled = ScheduledPriceFormulas([ScheduledPriceFormula(constant_cost=1.0)])
     start = dt.datetime(2026, 3, 16, 0, 0)

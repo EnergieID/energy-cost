@@ -1,20 +1,3 @@
-"""Time-of-use scheduled price formula.
-
-A :class:`ScheduledPriceFormula` selects among multiple :class:`~energy_cost.price_formula.PriceFormula`
-sub-formulas based on day-of-week and/or time-of-day rules.  Schedules are
-evaluated **in order**; the first matching schedule wins.  The last entry
-**must** be a fallback (``when`` omitted / ``None``) that captures every
-timestamp not claimed by an earlier schedule.
-
-Restrictions
-------------
-* Time ranges may **not** span midnight (``start`` must be strictly before
-  ``end``).  Model a wrap-around window as two separate
-  :class:`TimeRange` objects, e.g. ``22:00–00:00`` and ``00:00–06:00``.
-* Exactly **one** fallback (no ``when``) is required and must be the
-  **last** entry in ``schedules``.
-"""
-
 import datetime as dt
 from enum import StrEnum
 
@@ -88,13 +71,7 @@ class WeekSchedule(BaseModel):
     time_ranges: list[TimeRange] = Field(default_factory=list)
 
     def matches(self, timestamps: pd.Series) -> pd.Series:
-        """Return a boolean Series for *timestamps* that satisfy this schedule.
-
-        *timestamps* must be a ``pd.Series`` whose **values** are
-        ``datetime64`` (tz-aware or naive).  Time-of-day comparisons use the
-        local time of each timestamp, so tz-aware series produce the correct
-        result for tariffs expressed in local time.
-        """
+        """Return a boolean Series for *timestamps* that satisfy this schedule."""
         day_ints = {_PANDAS_DAYOFWEEK[d] for d in self.days}
         day_mask: pd.Series = timestamps.dt.dayofweek.isin(day_ints)
 
@@ -112,11 +89,6 @@ class WeekSchedule(BaseModel):
 class ScheduledPriceFormula(PriceFormula):
     """A :class:`~energy_cost.price_formula.PriceFormula` with an optional
     :class:`WeekSchedule` that describes when it applies.
-
-    Inherits ``constant_cost`` and ``variable_costs`` from
-    :class:`~energy_cost.price_formula.PriceFormula`.  Omit ``when`` (or set
-    it to ``None``) to create the mandatory **fallback** entry that catches all
-    unmatched timestamps.
     """
 
     when: WeekSchedule | None = None
@@ -155,11 +127,9 @@ class ScheduledPriceFormulas(RootModel[list[ScheduledPriceFormula]]):
         (non-matching slots are NaN in its output); the first defined value per
         timestamp wins (coalesce semantics).
         """
-        result: pd.Series | None = None
+        timestamps = pd.date_range(start=start, end=end, freq=resolution, inclusive="left")
+        result: pd.Series = pd.Series(float("nan"), index=timestamps, dtype=float)
         for schedule in self.root:
             values = schedule.get_values(start, end, resolution).set_index("timestamp")["value"]
-            result = values if result is None else result.combine_first(values)
-        if result is None:  # unreachable: validator guarantees at least one fallback
-            raise RuntimeError("No schedules produced values.")
-        timestamps = pd.date_range(start=start, end=end, freq=resolution, inclusive="left")
+            result = result.combine_first(values)
         return pd.DataFrame({"timestamp": timestamps, "value": result.to_numpy()})
