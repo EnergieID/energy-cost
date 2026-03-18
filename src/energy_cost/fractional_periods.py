@@ -17,13 +17,6 @@ from enum import StrEnum
 from dateutil.relativedelta import relativedelta
 
 
-class Period(StrEnum):
-    HOURLY = "hourly"
-    DAILY = "daily"
-    MONTHLY = "monthly"
-    YEARLY = "yearly"
-
-
 class PeriodUnit(ABC):
     @abstractmethod
     def period_start(self, dt: datetime) -> datetime:
@@ -83,14 +76,20 @@ class YearPeriod(PeriodUnit):
         return relativedelta(end, start).years
 
 
+class Period(StrEnum):
+    HOURLY = "hourly"
+    DAILY = "daily"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+    def fractional_periods(self, start: datetime, end: datetime) -> float:
+        """Calendar-aware fractional periods for a [start, end) interval."""
+        return PERIOD_FRACTION_FUNCTIONS[self](start, end)
+
+
 PERIOD_FRACTION_FUNCTIONS: dict[Period, Callable[[datetime, datetime], float]] = {
     Period.HOURLY: lambda start, end: (end - start).total_seconds() / 3600,
     Period.DAILY: lambda start, end: (end - start).total_seconds() / 86400,
     Period.MONTHLY: MonthPeriod().fractional_periods,
     Period.YEARLY: YearPeriod().fractional_periods,
 }
-
-
-def fractional_periods(start: datetime, end: datetime, period: Period) -> float:
-    """Calendar-aware fractional periods for a [start, end) interval."""
-    return PERIOD_FRACTION_FUNCTIONS[period](start, end)
