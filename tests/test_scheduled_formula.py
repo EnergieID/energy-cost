@@ -10,101 +10,70 @@ from energy_cost.scheduled_formula import (
     DayOfWeek,
     ScheduledPriceFormula,
     ScheduledPriceFormulas,
-    TimeRange,
-    WeekSchedule,
+    WhenClause,
 )
 
 # ---------------------------------------------------------------------------
-# TimeRange
+# WhenClause
 # ---------------------------------------------------------------------------
 
 
-def test_time_range_valid() -> None:
-    tr = TimeRange(start=dt.time(9, 0), end=dt.time(17, 0))
-    assert tr.start == dt.time(9, 0)
-    assert tr.end == dt.time(17, 0)
-
-
-def test_time_range_rejects_start_after_end() -> None:
+def test_when_clause_rejects_start_after_end() -> None:
     with pytest.raises(ValidationError, match="strictly before"):
-        TimeRange(start=dt.time(22, 0), end=dt.time(6, 0))
+        WhenClause(start=dt.time(22, 0), end=dt.time(6, 0))
 
 
-def test_time_range_rejects_equal_start_end() -> None:
+def test_when_clause_rejects_equal_start_end() -> None:
     with pytest.raises(ValidationError, match="strictly before"):
-        TimeRange(start=dt.time(9, 0), end=dt.time(9, 0))
+        WhenClause(start=dt.time(9, 0), end=dt.time(9, 0))
 
 
-def test_time_range_matches_half_open_interval() -> None:
-    tr = TimeRange(start=dt.time(9, 0), end=dt.time(17, 0))
-    times = pd.Series([dt.time(8, 59), dt.time(9, 0), dt.time(12, 0), dt.time(17, 0)])
-    assert tr.matches(times).tolist() == [False, True, True, False]
+def test_when_clause_no_end_matches_rest_of_day() -> None:
+    # No end → matches from start until end of day
+    clause = WhenClause(start=dt.time(9, 0))
+    ts = pd.Series(pd.to_datetime(["2026-03-16 08:59", "2026-03-16 09:00", "2026-03-16 23:00"]))
+    assert clause.matches(ts).tolist() == [False, True, True]
+
+
+def test_when_clause_half_open_interval() -> None:
+    # Matches [09:00, 17:00)
+    clause = WhenClause(start=dt.time(9, 0), end=dt.time(17, 0))
+    ts = pd.Series(pd.to_datetime(["2026-03-16 08:59", "2026-03-16 09:00", "2026-03-16 16:59", "2026-03-16 17:00"]))
+    assert clause.matches(ts).tolist() == [False, True, True, False]
 
 
 # ---------------------------------------------------------------------------
-# WeekSchedule
+# WhenClause — days and time filtering
 # ---------------------------------------------------------------------------
 
 
-def test_week_schedule_days_only() -> None:
+def test_when_clause_days_only() -> None:
     # 2026-03-16 Mon, 2026-03-17 Tue, 2026-03-18 Wed
-    schedule = WeekSchedule(days=[DayOfWeek.MONDAY, DayOfWeek.TUESDAY])
+    clause = WhenClause(days=[DayOfWeek.MONDAY, DayOfWeek.TUESDAY])
     ts = pd.Series(pd.to_datetime(["2026-03-16", "2026-03-17", "2026-03-18"]))
-    assert schedule.matches(ts).tolist() == [True, True, False]
+    assert clause.matches(ts).tolist() == [True, True, False]
 
 
-def test_week_schedule_days_and_time_ranges() -> None:
+def test_when_clause_days_and_time_range() -> None:
     # 2026-03-16 is a Monday
-    schedule = WeekSchedule(
-        days=[DayOfWeek.MONDAY],
-        time_ranges=[TimeRange(start=dt.time(9, 0), end=dt.time(17, 0))],
-    )
+    clause = WhenClause(days=[DayOfWeek.MONDAY], start=dt.time(9, 0), end=dt.time(17, 0))
     ts = pd.Series(pd.to_datetime(["2026-03-16 08:45", "2026-03-16 09:00", "2026-03-16 16:59", "2026-03-16 17:00"]))
-    assert schedule.matches(ts).tolist() == [False, True, True, False]
+    assert clause.matches(ts).tolist() == [False, True, True, False]
 
 
-def test_week_schedule_multiple_time_ranges_or_logic() -> None:
-    # Two windows: 06-10 and 18-22 — anything in either should match
-    schedule = WeekSchedule(
-        days=list(DayOfWeek),
-        time_ranges=[
-            TimeRange(start=dt.time(6, 0), end=dt.time(10, 0)),
-            TimeRange(start=dt.time(18, 0), end=dt.time(22, 0)),
-        ],
-    )
-    ts = pd.Series(
-        pd.to_datetime(
-            [
-                "2026-03-16 05:59",
-                "2026-03-16 06:00",
-                "2026-03-16 09:59",
-                "2026-03-16 10:00",
-                "2026-03-16 17:59",
-                "2026-03-16 18:00",
-                "2026-03-16 21:59",
-                "2026-03-16 22:00",
-            ]
-        )
-    )
-    assert schedule.matches(ts).tolist() == [False, True, True, False, False, True, True, False]
-
-
-def test_week_schedule_default_days_covers_full_week() -> None:
+def test_when_clause_default_days_covers_full_week() -> None:
     # Omitting ``days`` → all seven days match
-    schedule = WeekSchedule(time_ranges=[TimeRange(start=dt.time(9, 0), end=dt.time(17, 0))])
+    clause = WhenClause(start=dt.time(9, 0), end=dt.time(17, 0))
     # One noon timestamp per day for a full week starting Monday 2026-03-16
     ts = pd.Series(pd.date_range("2026-03-16 12:00", periods=7, freq="D"))
-    assert schedule.matches(ts).all()
+    assert clause.matches(ts).all()
 
 
-def test_week_schedule_wrong_day_does_not_match() -> None:
-    schedule = WeekSchedule(
-        days=[DayOfWeek.MONDAY],
-        time_ranges=[TimeRange(start=dt.time(9, 0), end=dt.time(17, 0))],
-    )
+def test_when_clause_wrong_day_does_not_match() -> None:
     # 2026-03-17 is Tuesday — should not match even though time is in range
+    clause = WhenClause(days=[DayOfWeek.MONDAY], start=dt.time(9, 0), end=dt.time(17, 0))
     ts = pd.Series(pd.to_datetime(["2026-03-17 12:00"]))
-    assert schedule.matches(ts).tolist() == [False]
+    assert clause.matches(ts).tolist() == [False]
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +85,8 @@ def test_first_match_wins() -> None:
     """When two schedules both match a timestamp, the first one is used."""
     scheduled = ScheduledPriceFormulas(
         [
-            ScheduledPriceFormula(when=WeekSchedule(days=[DayOfWeek.MONDAY]), constant_cost=10.0),
-            ScheduledPriceFormula(when=WeekSchedule(days=list(DayOfWeek)), constant_cost=99.0),
+            ScheduledPriceFormula(when=[WhenClause(days=[DayOfWeek.MONDAY])], constant_cost=10.0),
+            ScheduledPriceFormula(when=[WhenClause(days=list(DayOfWeek))], constant_cost=99.0),
             ScheduledPriceFormula(constant_cost=1.0),  # fallback
         ]
     )
@@ -129,7 +98,7 @@ def test_first_match_wins() -> None:
 def test_fallback_covers_unmatched_timestamps() -> None:
     scheduled = ScheduledPriceFormulas(
         [
-            ScheduledPriceFormula(when=WeekSchedule(days=[DayOfWeek.MONDAY]), constant_cost=10.0),
+            ScheduledPriceFormula(when=[WhenClause(days=[DayOfWeek.MONDAY])], constant_cost=10.0),
             ScheduledPriceFormula(constant_cost=50.0),  # fallback
         ]
     )
@@ -143,15 +112,17 @@ def test_weekday_weekend_split() -> None:
     scheduled = ScheduledPriceFormulas(
         [
             ScheduledPriceFormula(
-                when=WeekSchedule(
-                    days=[
-                        DayOfWeek.MONDAY,
-                        DayOfWeek.TUESDAY,
-                        DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY,
-                        DayOfWeek.FRIDAY,
-                    ]
-                ),
+                when=[
+                    WhenClause(
+                        days=[
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ]
+                    )
+                ],
                 constant_cost=100.0,
             ),
             ScheduledPriceFormula(constant_cost=50.0),  # B fallback (weekends)
@@ -171,16 +142,19 @@ def test_time_of_day_split_on_weekday() -> None:
     scheduled = ScheduledPriceFormulas(
         [
             ScheduledPriceFormula(
-                when=WeekSchedule(
-                    days=[
-                        DayOfWeek.MONDAY,
-                        DayOfWeek.TUESDAY,
-                        DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY,
-                        DayOfWeek.FRIDAY,
-                    ],
-                    time_ranges=[TimeRange(start=dt.time(9, 0), end=dt.time(21, 0))],
-                ),
+                when=[
+                    WhenClause(
+                        days=[
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ],
+                        start=dt.time(9, 0),
+                        end=dt.time(21, 0),
+                    )
+                ],
                 constant_cost=200.0,
             ),
             ScheduledPriceFormula(constant_cost=50.0),  # B fallback
@@ -200,43 +174,54 @@ def test_three_way_abc_scenario() -> None:
     """
     scheduled = ScheduledPriceFormulas(
         [
-            # A — weekday morning
+            # A — weekday mornings and weekend daytime combined via multiple when clauses
             ScheduledPriceFormula(
-                when=WeekSchedule(
-                    days=[
-                        DayOfWeek.MONDAY,
-                        DayOfWeek.TUESDAY,
-                        DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY,
-                        DayOfWeek.FRIDAY,
-                    ],
-                    time_ranges=[TimeRange(start=dt.time(6, 0), end=dt.time(10, 0))],
-                ),
-                constant_cost=300.0,
-            ),
-            # A — weekend daytime
-            ScheduledPriceFormula(
-                when=WeekSchedule(
-                    days=[DayOfWeek.SATURDAY, DayOfWeek.SUNDAY],
-                    time_ranges=[TimeRange(start=dt.time(7, 0), end=dt.time(19, 0))],
-                ),
+                when=[
+                    WhenClause(
+                        days=[
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ],
+                        start=dt.time(6, 0),
+                        end=dt.time(10, 0),
+                    ),
+                    WhenClause(
+                        days=[DayOfWeek.SATURDAY, DayOfWeek.SUNDAY],
+                        start=dt.time(7, 0),
+                        end=dt.time(19, 0),
+                    ),
+                ],
                 constant_cost=300.0,
             ),
             # C — weekday peak windows
             ScheduledPriceFormula(
-                when=WeekSchedule(
-                    days=[
-                        DayOfWeek.MONDAY,
-                        DayOfWeek.TUESDAY,
-                        DayOfWeek.WEDNESDAY,
-                        DayOfWeek.THURSDAY,
-                        DayOfWeek.FRIDAY,
-                    ],
-                    time_ranges=[
-                        TimeRange(start=dt.time(10, 0), end=dt.time(13, 0)),
-                        TimeRange(start=dt.time(18, 0), end=dt.time(22, 0)),
-                    ],
-                ),
+                when=[
+                    WhenClause(
+                        days=[
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ],
+                        start=dt.time(10, 0),
+                        end=dt.time(13, 0),
+                    ),
+                    WhenClause(
+                        days=[
+                            DayOfWeek.MONDAY,
+                            DayOfWeek.TUESDAY,
+                            DayOfWeek.WEDNESDAY,
+                            DayOfWeek.THURSDAY,
+                            DayOfWeek.FRIDAY,
+                        ],
+                        start=dt.time(18, 0),
+                        end=dt.time(22, 0),
+                    ),
+                ],
                 constant_cost=150.0,
             ),
             # B — fallback
@@ -291,7 +276,7 @@ def test_unmatched_timestamps_are_nan() -> None:
     scheduled = ScheduledPriceFormulas(
         [
             ScheduledPriceFormula(
-                when=WeekSchedule(days=[DayOfWeek.MONDAY]),
+                when=[WhenClause(days=[DayOfWeek.MONDAY])],
                 constant_cost=42.0,
             ),
         ]
