@@ -22,7 +22,7 @@ class IndexAdder(BaseModel):
 
 class PriceFormula(BaseModel):
     # The constant cost component of the price formula in €/MWh.
-    constant_cost: float
+    constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:

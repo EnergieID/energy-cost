@@ -1,33 +1,17 @@
-supplier: foo
-product: dynamic tariff
-defaults:
-  injection: # no cost component specified, so these are assumed to apply to the energy cost component
-  - start: 2025-01-01T00:00:00+01
-    formula:
-      constant_cost: -14.56
+# Multiple cost types in consumption
+- start: 2025-01-01T00:00:00+01:00
+  injection:
+    constant_cost: -14.56
+    variable_costs:
+    - index: Belpex15min
+      scalar: 0.9876
+  consumption:
+    renewable_certificates:
+      constant_cost: 12.0
+    chp_certificates:
+      constant_cost: 4.56
+    energy:
+      constant_cost: 12.34
       variable_costs:
       - index: Belpex15min
-        scalar: 0.9876
-  consumption:
-    renewable_certificates: # specify the cost component this price formula applies to, in this case the cost of buying renewable energy certificates
-    - start: 2025-01-01T00:00:00+01
-      formula:
-        constant_cost: 12.0
-    chp_certificates: # we also support a separate cost component for the cost of buying combined heat and power certificates
-    - start: 2025-01-01T00:00:00+01
-      formula:
-        constant_cost: 4.56
-    energy: # the default cost component, the name can be omitted if there are no other cost components
-    - start: 2025-01-01T00:00:00+01
-      formula:
-        constant_cost: 12.34
-        variable_costs:
-        - index: Belpex15min
-          scalar: 1.23
-    - start: 2026-01-01T00:00:00+01
-      formula:
-        constant_cost: 14.56
-        variable_costs:
-        - index: Belpex15min
-          scalar: 1.23
-  
+        scalar: 1.23
