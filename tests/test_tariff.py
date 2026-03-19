@@ -9,7 +9,13 @@ import pytest
 from energy_cost.fractional_periods import Period
 from energy_cost.periodic_cost import PeriodicCost
 from energy_cost.price_formula import PriceFormula
+from energy_cost.scheduled_formula import ScheduledPriceFormulas
 from energy_cost.tariff import CostType, MeterType, PowerDirection, Tariff, TariffSegment
+
+
+def _constant_cost(f: PriceFormula | ScheduledPriceFormulas) -> float:
+    assert isinstance(f, PriceFormula)
+    return f.constant_cost
 
 
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
@@ -84,8 +90,8 @@ def test_all_key_applies_to_all_meter_types() -> None:
     single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
     tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
 
-    assert single[CostType.ENERGY].constant_cost == -5.0
-    assert tou[CostType.ENERGY].constant_cost == -5.0
+    assert _constant_cost(single[CostType.ENERGY]) == -5.0
+    assert _constant_cost(tou[CostType.ENERGY]) == -5.0
 
 
 def test_specific_meter_type_overrides_all() -> None:
@@ -101,8 +107,8 @@ def test_specific_meter_type_overrides_all() -> None:
     single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
     tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
-    assert single[CostType.ENERGY].constant_cost == 99.0
-    assert tou[CostType.ENERGY].constant_cost == 1.0
+    assert _constant_cost(single[CostType.ENERGY]) == 99.0
+    assert _constant_cost(tou[CostType.ENERGY]) == 1.0
 
 
 def test_get_cost_returns_column_per_cost_type() -> None:

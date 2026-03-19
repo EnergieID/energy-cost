@@ -10,6 +10,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from .periodic_cost import PeriodicCost
 from .price_formula import PriceFormula
+from .scheduled_formula import ScheduledPriceFormulas
 
 
 class MeterType(StrEnum):
@@ -47,7 +48,7 @@ def _coerce_cost_type_formulas(value: Any) -> Any:
 
 
 CostTypeFormulas = Annotated[
-    dict[CostType, PriceFormula],
+    dict[CostType, PriceFormula | ScheduledPriceFormulas],
     BeforeValidator(_coerce_cost_type_formulas),
 ]
 
@@ -83,13 +84,13 @@ class TariffSegment(BaseModel):
         self,
         meter_type: MeterType,
         direction: PowerDirection,
-    ) -> dict[CostType, PriceFormula]:
+    ) -> dict[CostType, PriceFormula | ScheduledPriceFormulas]:
         """Merge the ``all`` defaults with any meter-type-specific overrides for a direction.
 
         Per-meter-type entries take precedence over ``all`` entries for the same cost type.
         """
         direction_formulas: MeterFormulas = getattr(self, direction.value)
-        result: dict[CostType, PriceFormula] = {}
+        result: dict[CostType, PriceFormula | ScheduledPriceFormulas] = {}
         if "all" in direction_formulas:
             result.update(direction_formulas["all"])
         if meter_type.value in direction_formulas:
