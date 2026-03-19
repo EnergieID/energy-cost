@@ -9,6 +9,7 @@ import yaml
 from pydantic import BaseModel, BeforeValidator, Field
 
 from .price_formula import PriceFormula
+from .scheduled_formula import ScheduledPriceFormulas
 
 
 class MeterType(StrEnum):
@@ -35,7 +36,7 @@ class CostType(StrEnum):
 
 class TimedPriceFormula(BaseModel):
     start: dt.datetime
-    formula: PriceFormula
+    formula: PriceFormula | ScheduledPriceFormulas
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution in €/MWh."""
