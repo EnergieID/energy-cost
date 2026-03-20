@@ -1,0 +1,9 @@
+# Fixed periodic costs
+- start: 2025-01-01T00:00:00+01:00
+  periodic:
+    connection_fee:
+      period: daily
+      constant_cost: 1.5
+    service_fee:
+      period: monthly
+      constant_cost: 31.0
