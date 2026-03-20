@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import datetime as dt
 
+import pandas as pd
 import pytest
 
 from energy_cost.fractional_periods import Period
 from energy_cost.periodic_cost import PeriodicCost
 from energy_cost.price_formula import PriceFormula
 from energy_cost.scheduled_formula import ScheduledPriceFormulas
-from energy_cost.tariff_version import CostType, MeterType, PowerDirection, TariffVersion
+from energy_cost.tariff_version import (
+    CostType,
+    MeterType,
+    PowerDirection,
+    TariffVersion,
+    _coerce_cost_type_formulas,
+    _coerce_meter_formulas,
+)
 
 
 def _constant_cost(formula: PriceFormula | ScheduledPriceFormulas) -> float:
@@ -144,3 +152,32 @@ def test_model_coerces_scheduled_formula_list_to_all_energy() -> None:
         dt.timedelta(hours=1),
     )
     assert out["value"].tolist() == [100.0, 300.0]
+
+
+def test_coercion_helpers_cover_bare_formula_and_passthrough_values() -> None:
+    bare_formula = {"constant_cost": 1.0}
+
+    assert _coerce_cost_type_formulas(bare_formula) == {CostType.ENERGY: bare_formula}
+
+    sentinel = "not-a-dict"
+    assert _coerce_meter_formulas(sentinel) == sentinel
+
+
+def test_get_cost_raises_when_resolved_formulas_return_no_rows() -> None:
+    class EmptyPriceFormula(PriceFormula):
+        def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+            return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
+
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        consumption={"all": {CostType.ENERGY: EmptyPriceFormula()}},
+    )
+
+    with pytest.raises(ValueError, match="No formulas for meter type 'single_rate' and direction 'consumption'"):
+        segment.get_cost(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 1, 1, 1, 0),
+            resolution=dt.timedelta(minutes=15),
+            meter_type=MeterType.SINGLE_RATE,
+            direction=PowerDirection.CONSUMPTION,
+        )
