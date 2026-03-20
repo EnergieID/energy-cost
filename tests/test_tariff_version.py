@@ -1,0 +1,146 @@
+from __future__ import annotations
+
+import datetime as dt
+
+import pytest
+
+from energy_cost.fractional_periods import Period
+from energy_cost.periodic_cost import PeriodicCost
+from energy_cost.price_formula import PriceFormula
+from energy_cost.scheduled_formula import ScheduledPriceFormulas
+from energy_cost.tariff_version import CostType, MeterType, PowerDirection, TariffVersion
+
+
+def _constant_cost(formula: PriceFormula | ScheduledPriceFormulas) -> float:
+    assert isinstance(formula, PriceFormula)
+    return formula.constant_cost
+
+
+def test_all_key_applies_to_all_meter_types() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"all": {CostType.ENERGY: PriceFormula(constant_cost=-5.0)}},
+    )
+
+    single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
+    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
+
+    assert _constant_cost(single[CostType.ENERGY]) == -5.0
+    assert _constant_cost(tou[CostType.ENERGY]) == -5.0
+
+
+def test_specific_meter_type_overrides_all() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        consumption={
+            "all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)},
+            "single_rate": {CostType.ENERGY: PriceFormula(constant_cost=99.0)},
+        },
+    )
+
+    single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
+
+    assert _constant_cost(single[CostType.ENERGY]) == 99.0
+    assert _constant_cost(tou[CostType.ENERGY]) == 1.0
+
+
+def test_get_cost_returns_column_per_cost_type() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        consumption={
+            "all": {
+                CostType.ENERGY: PriceFormula(constant_cost=10.0),
+                CostType.CHP_CERTIFICATES: PriceFormula(constant_cost=2.0),
+                CostType.RENEWABLE_CERTIFICATES: PriceFormula(constant_cost=3.0),
+            }
+        },
+    )
+
+    out = segment.get_cost(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        resolution=dt.timedelta(minutes=15),
+        meter_type=MeterType.SINGLE_RATE,
+        direction=PowerDirection.CONSUMPTION,
+    )
+
+    assert set(out.columns) == {"timestamp", "energy", "chp_certificates", "renewable_certificates", "total"}
+    assert out["energy"].tolist() == [10.0, 10.0, 10.0, 10.0]
+    assert out["chp_certificates"].tolist() == [2.0, 2.0, 2.0, 2.0]
+    assert out["renewable_certificates"].tolist() == [3.0, 3.0, 3.0, 3.0]
+    assert out["total"].tolist() == [15.0, 15.0, 15.0, 15.0]
+
+
+def test_get_periodic_cost_returns_prorated_values() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        periodic={
+            "admin": PeriodicCost(period=Period.DAILY, constant_cost=24.0),
+            "billing": PeriodicCost(period=Period.DAILY, constant_cost=12.0),
+        },
+    )
+
+    costs = segment.get_periodic_cost(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+    )
+
+    assert costs == pytest.approx({"admin": 1.0, "billing": 0.5})
+
+
+def test_model_coerces_bare_formula_to_all_energy() -> None:
+    segment = TariffVersion.model_validate(
+        {
+            "start": "2025-01-01T00:00:00",
+            "consumption": {"constant_cost": 1.0},
+        }
+    )
+
+    resolved = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+
+    assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
+
+
+def test_model_coerces_cost_type_map_to_all_meter_types() -> None:
+    segment = TariffVersion.model_validate(
+        {
+            "start": "2025-01-01T00:00:00",
+            "consumption": {
+                "energy": {"constant_cost": 1.0},
+                "chp_certificates": {"constant_cost": 2.0},
+            },
+        }
+    )
+
+    resolved = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
+
+    assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
+    assert _constant_cost(resolved[CostType.CHP_CERTIFICATES]) == 2.0
+
+
+def test_model_coerces_scheduled_formula_list_to_all_energy() -> None:
+    segment = TariffVersion.model_validate(
+        {
+            "start": "2025-01-01T00:00:00+01:00",
+            "consumption": [
+                {
+                    "when": [{"days": ["monday"], "start": "06:00:00", "end": "10:00:00"}],
+                    "constant_cost": 300.0,
+                },
+                {"constant_cost": 100.0},
+            ],
+        }
+    )
+
+    resolved = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    formula = resolved[CostType.ENERGY]
+
+    assert isinstance(formula, ScheduledPriceFormulas)
+
+    out = formula.get_values(
+        dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
+        dt.datetime.fromisoformat("2025-01-06T07:00:00+01:00"),
+        dt.timedelta(hours=1),
+    )
+    assert out["value"].tolist() == [100.0, 300.0]
