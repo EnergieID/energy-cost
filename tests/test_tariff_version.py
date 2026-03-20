@@ -24,20 +24,29 @@ def _constant_cost(formula: PriceFormula | ScheduledPriceFormulas) -> float:
     return formula.constant_cost
 
 
-def test_all_key_applies_to_all_meter_types() -> None:
+def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         injection={"all": {CostType.ENERGY: PriceFormula(constant_cost=-5.0)}},
     )
 
     single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
-    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
 
     assert _constant_cost(single[CostType.ENERGY]) == -5.0
+
+
+def test_all_meter_type_formula_is_used_for_tou_peak_injection() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"all": {CostType.ENERGY: PriceFormula(constant_cost=-5.0)}},
+    )
+
+    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
+
     assert _constant_cost(tou[CostType.ENERGY]) == -5.0
 
 
-def test_specific_meter_type_overrides_all() -> None:
+def test_meter_specific_formula_overrides_all_formula_for_single_rate_consumption() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
@@ -47,13 +56,24 @@ def test_specific_meter_type_overrides_all() -> None:
     )
 
     single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    assert _constant_cost(single[CostType.ENERGY]) == 99.0
+
+
+def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        consumption={
+            "all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)},
+            "single_rate": {CostType.ENERGY: PriceFormula(constant_cost=99.0)},
+        },
+    )
+
     tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
-    assert _constant_cost(single[CostType.ENERGY]) == 99.0
     assert _constant_cost(tou[CostType.ENERGY]) == 1.0
 
 
-def test_get_cost_returns_column_per_cost_type() -> None:
+def test_get_cost_returns_one_column_per_resolved_cost_type() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
@@ -80,7 +100,7 @@ def test_get_cost_returns_column_per_cost_type() -> None:
     assert out["total"].tolist() == [15.0, 15.0, 15.0, 15.0]
 
 
-def test_get_periodic_cost_returns_prorated_values() -> None:
+def test_get_periodic_cost_returns_prorated_cost_for_each_periodic_entry() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         periodic={
@@ -97,7 +117,7 @@ def test_get_periodic_cost_returns_prorated_values() -> None:
     assert costs == pytest.approx({"admin": 1.0, "billing": 0.5})
 
 
-def test_model_coerces_bare_formula_to_all_energy() -> None:
+def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_energy() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00",
@@ -110,7 +130,7 @@ def test_model_coerces_bare_formula_to_all_energy() -> None:
     assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
 
 
-def test_model_coerces_cost_type_map_to_all_meter_types() -> None:
+def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00",
@@ -127,7 +147,7 @@ def test_model_coerces_cost_type_map_to_all_meter_types() -> None:
     assert _constant_cost(resolved[CostType.CHP_CERTIFICATES]) == 2.0
 
 
-def test_model_coerces_scheduled_formula_list_to_all_energy() -> None:
+def test_model_validation_treats_scheduled_formula_list_as_all_meter_type_energy() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00+01:00",
@@ -154,16 +174,19 @@ def test_model_coerces_scheduled_formula_list_to_all_energy() -> None:
     assert out["value"].tolist() == [100.0, 300.0]
 
 
-def test_coercion_helpers_cover_bare_formula_and_passthrough_values() -> None:
+def test_cost_type_formula_coercion_wraps_bare_formula_as_energy_cost() -> None:
     bare_formula = {"constant_cost": 1.0}
 
     assert _coerce_cost_type_formulas(bare_formula) == {CostType.ENERGY: bare_formula}
 
+
+def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
     sentinel = "not-a-dict"
+
     assert _coerce_meter_formulas(sentinel) == sentinel
 
 
-def test_get_cost_raises_when_resolved_formulas_return_no_rows() -> None:
+def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> None:
     class EmptyPriceFormula(PriceFormula):
         def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
