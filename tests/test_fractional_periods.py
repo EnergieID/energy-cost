@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -62,7 +63,7 @@ def test_month_period_correctly_handles_periods_starting_and_ending_in_same_mont
 def test_month_period_correctly_detects_fractions_in_the_starting_and_ending_months() -> None:
     period = MonthPeriod()
     start = dt.datetime(2025, 1, 16, 0, 0)
-    end = dt.datetime(2025, 3, 16, 0, 0)
+    end = dt.datetime(2025, 3, 15, 23, 31)
 
     assert period.fractional_periods(start, end) == pytest.approx(2.0)
 
@@ -97,3 +98,31 @@ def test_year_period_correctly_detects_complete_years_between_boundaries() -> No
     period = YearPeriod()
 
     assert period.fractional_periods(dt.datetime(2024, 1, 1), dt.datetime(2026, 1, 1)) == pytest.approx(2.0)
+
+
+def test_daily_period_correctly_handles_daylight_saving_time_transitions() -> None:
+    period = Period.DAILY
+    # Brussels DST transition on 2026-03-29 at 02:00 (clocks go forward to 03:00).
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2026, 3, 28, 12, 0, tzinfo=z)
+    end = dt.datetime(2026, 3, 29, 12, 30, tzinfo=z)
+
+    assert period.fractional_periods(start, end) == pytest.approx(1.0)
+
+
+def test_daily_period_correctly_handles_fall_daylight_saving_time_transition() -> None:
+    period = Period.DAILY
+    # Brussels DST transition on 2026-10-25 at 03:00 (clocks go back to 02:00).
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2026, 10, 24, 12, 0, tzinfo=z)
+    end = dt.datetime(2026, 10, 25, 11, 30, tzinfo=z)
+
+    assert period.fractional_periods(start, end) == pytest.approx(1.0)
+
+
+def test_hourly_period_uses_elapsed_time_across_spring_daylight_saving_transition() -> None:
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2026, 3, 29, 1, 30, tzinfo=z)
+    end = dt.datetime(2026, 3, 29, 3, 30, tzinfo=z)
+
+    assert Period.HOURLY.fractional_periods(start, end) == pytest.approx(1.0)

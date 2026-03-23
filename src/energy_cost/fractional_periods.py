@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from dateutil.relativedelta import relativedelta
@@ -32,7 +32,7 @@ class PeriodUnit(ABC):
 
     def period_seconds(self, dt: datetime) -> float:
         """Total seconds in the period containing dt."""
-        return (self.next_period(dt) - self.period_start(dt)).total_seconds()
+        return elapsed_seconds(self.period_start(dt), self.next_period(dt))
 
     def fractional_periods(self, start: datetime, end: datetime) -> float:
         """Calendar-aware fractional periods for a [start, end) interval."""
@@ -43,14 +43,22 @@ class PeriodUnit(ABC):
         period_start_of_end = self.period_start(end)
 
         if period_start_of_start == period_start_of_end:
-            return (end - start).total_seconds() / self.period_seconds(start)
+            return elapsed_seconds(start, end) / self.period_seconds(start)
 
         next_p = self.next_period(start)
-        frac_start = (next_p - start).total_seconds() / self.period_seconds(start)
+        frac_start = elapsed_seconds(start, next_p) / self.period_seconds(start)
         complete = self.complete_periods_between(next_p, period_start_of_end)
-        frac_end = (end - period_start_of_end).total_seconds() / self.period_seconds(end)
+        frac_end = elapsed_seconds(period_start_of_end, end) / self.period_seconds(end)
 
         return frac_start + complete + frac_end
+
+
+def elapsed_seconds(start: datetime, end: datetime) -> float:
+    """Return elapsed seconds, using UTC for timezone-aware datetimes."""
+    start = start.astimezone(UTC)
+    end = end.astimezone(UTC)
+
+    return (end - start).total_seconds()
 
 
 class MonthPeriod(PeriodUnit):
@@ -76,6 +84,17 @@ class YearPeriod(PeriodUnit):
         return relativedelta(end, start).years
 
 
+class DayPeriod(PeriodUnit):
+    def period_start(self, dt: datetime) -> datetime:
+        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def next_period(self, dt: datetime) -> datetime:
+        return self.period_start(dt) + relativedelta(days=1)
+
+    def complete_periods_between(self, start: datetime, end: datetime) -> int:
+        return (end.date() - start.date()).days
+
+
 class Period(StrEnum):
     HOURLY = "hourly"
     DAILY = "daily"
@@ -88,8 +107,8 @@ class Period(StrEnum):
 
 
 PERIOD_FRACTION_FUNCTIONS: dict[Period, Callable[[datetime, datetime], float]] = {
-    Period.HOURLY: lambda start, end: (end - start).total_seconds() / 3600,
-    Period.DAILY: lambda start, end: (end - start).total_seconds() / 86400,
+    Period.HOURLY: lambda start, end: elapsed_seconds(start, end) / 3600,
+    Period.DAILY: DayPeriod().fractional_periods,
     Period.MONTHLY: MonthPeriod().fractional_periods,
     Period.YEARLY: YearPeriod().fractional_periods,
 }
