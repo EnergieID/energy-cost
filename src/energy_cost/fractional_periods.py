@@ -36,6 +36,13 @@ class PeriodUnit(ABC):
 
     def fractional_periods(self, start: datetime, end: datetime) -> float:
         """Calendar-aware fractional periods for a [start, end) interval."""
+
+        # Assume UTC for naive datetimes, to avoid DST issues
+        if not start.tzinfo:
+            start = start.replace(tzinfo=UTC)
+        if not end.tzinfo:
+            end = end.replace(tzinfo=UTC)
+
         if start >= end:
             return 0.0
 

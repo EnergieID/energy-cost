@@ -63,9 +63,20 @@ def test_month_period_correctly_handles_periods_starting_and_ending_in_same_mont
 def test_month_period_correctly_detects_fractions_in_the_starting_and_ending_months() -> None:
     period = MonthPeriod()
     start = dt.datetime(2025, 1, 16, 0, 0)
-    end = dt.datetime(2025, 3, 15, 23, 31)
+    end = dt.datetime(2025, 3, 16, 0, 0)
 
     assert period.fractional_periods(start, end) == pytest.approx(2.0)
+
+
+def test_timezone_aware_month_period_calculations_take_into_acount_DST() -> None:
+    period = MonthPeriod()
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2025, 1, 16, 0, 0, tzinfo=z)
+    # March has a DST transtion, resulting in one hour less
+    # so the middle of the month is 30 minutes earlier than a naive calculation would suggest.
+    end = dt.datetime(2025, 3, 15, 23, 30, tzinfo=z)
+
+    assert period.fractional_periods(start, end) == pytest.approx(2.0, abs=1e-4)
 
 
 def test_year_period_start_truncates_datetime_to_first_day_of_year() -> None:
