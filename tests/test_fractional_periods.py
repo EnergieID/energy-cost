@@ -131,9 +131,16 @@ def test_daily_period_correctly_handles_fall_daylight_saving_time_transition() -
     assert period.fractional_periods(start, end) == pytest.approx(1.0)
 
 
-def test_hourly_period_uses_elapsed_time_across_spring_daylight_saving_transition() -> None:
+def test_timezone_aware_hourly_period_uses_elapsed_time_across_spring_daylight_saving_transition() -> None:
     z = ZoneInfo("Europe/Brussels")
     start = dt.datetime(2026, 3, 29, 1, 30, tzinfo=z)
     end = dt.datetime(2026, 3, 29, 3, 30, tzinfo=z)
 
     assert Period.HOURLY.fractional_periods(start, end) == pytest.approx(1.0)
+
+
+def test_non_timezone_aware_hourly_period_uses_elapsed_time_across_spring_daylight_saving_transition() -> None:
+    start = dt.datetime(2026, 3, 29, 1, 30)
+    end = dt.datetime(2026, 3, 29, 3, 30)
+
+    assert Period.HOURLY.fractional_periods(start, end) == pytest.approx(2.0)

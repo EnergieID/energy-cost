@@ -102,6 +102,17 @@ class DayPeriod(PeriodUnit):
         return (end.date() - start.date()).days
 
 
+class HourPeriod(PeriodUnit):
+    def period_start(self, dt: datetime) -> datetime:
+        return dt.replace(minute=0, second=0, microsecond=0)
+
+    def next_period(self, dt: datetime) -> datetime:
+        return self.period_start(dt) + relativedelta(hours=1)
+
+    def complete_periods_between(self, start: datetime, end: datetime) -> int:
+        return int(elapsed_seconds(start, end) // 3600)
+
+
 class Period(StrEnum):
     HOURLY = "hourly"
     DAILY = "daily"
@@ -114,7 +125,7 @@ class Period(StrEnum):
 
 
 PERIOD_FRACTION_FUNCTIONS: dict[Period, Callable[[datetime, datetime], float]] = {
-    Period.HOURLY: lambda start, end: elapsed_seconds(start, end) / 3600,
+    Period.HOURLY: HourPeriod().fractional_periods,
     Period.DAILY: DayPeriod().fractional_periods,
     Period.MONTHLY: MonthPeriod().fractional_periods,
     Period.YEARLY: YearPeriod().fractional_periods,
