@@ -4,7 +4,7 @@ from typing import ClassVar, Literal
 
 import pandas as pd
 
-from ..resolution import Resolution, resolution_divides, to_pandas_freq, to_pandas_offset
+from ..resolution import Resolution, is_divisor, to_pandas_freq, to_pandas_offset
 
 FillMode = Literal["ffill", "nan"]
 
@@ -40,7 +40,7 @@ class Index(ABC):
         resolution: Resolution,
         out_of_range_fill: FillMode = "nan",
     ) -> pd.DataFrame:
-        if not resolution_divides(self.resolution, resolution):
+        if not is_divisor(self.resolution, resolution):
             raise ValueError(
                 f"Requested resolution {resolution!r} is not a whole divisor "
                 f"of the index resolution {self.resolution!r}."

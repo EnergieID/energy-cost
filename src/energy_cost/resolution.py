@@ -7,17 +7,27 @@ import pandas as pd
 Resolution = dt.timedelta | isodate.Duration
 
 
+def validate_non_mixed_duration(resolution: Resolution) -> None:
+    if isinstance(resolution, isodate.Duration) and (
+        (resolution.years and resolution.months)
+        or (resolution.years and resolution.tdelta)
+        or (resolution.months and resolution.tdelta)
+    ):
+        raise ValueError(f"Mixed durations with multiple components are not supported as resolutions: {resolution}")
+
+
 def to_pandas_freq(resolution: Resolution) -> str:
     """Convert a resolution to a pandas frequency string."""
+    validate_non_mixed_duration(resolution)
     if isinstance(resolution, isodate.Duration):
-        if resolution.years and not resolution.months and not resolution.tdelta:
+        if resolution.years:
             return f"{int(resolution.years)}YS"
-        if resolution.months and not resolution.years and not resolution.tdelta:
+        if resolution.months:
             return f"{int(resolution.months)}MS"
-        # Mixed Duration (e.g. P1Y6M) — not supported as a regular frequency
-        raise ValueError(f"Cannot convert mixed isodate.Duration to pandas freq: {resolution}")
     # Plain timedelta — express in the largest clean unit to keep freq strings readable
     total_seconds = int(resolution.total_seconds())
+    if total_seconds % 86400 == 0:
+        return f"{total_seconds // 86400}D"
     if total_seconds % 3600 == 0:
         return f"{total_seconds // 3600}h"
     if total_seconds % 60 == 0:
@@ -29,38 +39,26 @@ def to_pandas_offset(resolution: Resolution) -> pd.tseries.offsets.BaseOffset:
     return pd.tseries.frequencies.to_offset(to_pandas_freq(resolution))
 
 
-def resolution_divides(source: Resolution, requested: Resolution) -> bool:
-    """
-    Return True if *requested* is a valid subdivision of *source*.
+def is_divisor(root: Resolution, divisor: Resolution) -> bool:
+    validate_non_mixed_duration(root)
+    validate_non_mixed_duration(divisor)
+    root_is_calendar = isinstance(root, isodate.Duration) and (root.years or root.months)
+    divisor_is_calendar = isinstance(divisor, isodate.Duration) and (divisor.years or divisor.months)
 
-    Rules
-    -----
-    - timedelta / timedelta  : requested seconds must evenly divide source seconds.
-    - Duration(months) / timedelta : any fixed timedelta always subdivides a
-      calendar period, because calendar period boundaries land on whole seconds.
-    - Duration / Duration    : the requested calendar period must evenly divide
-      the source calendar period (years are normalised to months).
-    - timedelta / Duration   : a fixed window cannot subdivide a calendar period
-      that is larger than it — reject.
-    """
-    src_is_calendar = isinstance(source, isodate.Duration) and (source.years or source.months)
-    req_is_calendar = isinstance(requested, isodate.Duration) and (requested.years or requested.months)
+    if not root_is_calendar and not divisor_is_calendar:
+        root_s = int(root.total_seconds())
+        divisor_s = int(divisor.total_seconds())
+        return divisor_s > 0 and root_s % divisor_s == 0
 
-    if not src_is_calendar and not req_is_calendar:
-        src_s = int(source.total_seconds())
-        req_s = int(requested.total_seconds())
-        return req_s > 0 and src_s % req_s == 0
+    if root_is_calendar and not divisor_is_calendar:
+        # a timedelta is a divisor of a calendar duration if it is a divisor of 1 day
+        return is_divisor(isodate.parse_duration("P1D"), divisor)
 
-    if src_is_calendar and not req_is_calendar:
-        # Fixed timedelta subdivides any calendar period — always valid.
-        req_s = int(requested.total_seconds())
-        return req_s > 0
-
-    if src_is_calendar and req_is_calendar:
+    if root_is_calendar and divisor_is_calendar:
         # Normalise both to months
-        src_months = int(source.years * 12 + source.months)  # type: ignore[union-attr]
-        req_months = int(requested.years * 12 + requested.months)  # type: ignore[union-attr]
-        return req_months > 0 and src_months % req_months == 0
+        root_months = int(root.years * 12 + root.months)  # type: ignore[union-attr]
+        divisor_months = int(divisor.years * 12 + divisor.months)  # type: ignore[union-attr]
+        return divisor_months > 0 and root_months % divisor_months == 0
 
     # requested is calendar, source is fixed timedelta — nonsensical subdivision
     return False

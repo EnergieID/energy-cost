@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from energy_cost.index import Index
+from energy_cost.index import DataFrameIndex, Index
 
 
 class DummyIndex(Index):
@@ -32,3 +32,23 @@ def test_register_and_from_name_returns_same_instance() -> None:
 def test_from_name_raises_for_unknown_index() -> None:
     with pytest.raises(ValueError, match="Unsupported index: unknown"):
         Index.from_name("unknown")
+
+
+def test_index_returns_nan_for_out_of_range_values() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2020, 1, 1, 6, 0),
+        end=dt.datetime(2020, 1, 1, 7, 0),
+        resolution=dt.timedelta(minutes=15),
+        out_of_range_fill="nan",
+    )
+
+    assert df["value"].isna().all()
