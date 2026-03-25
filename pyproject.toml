@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "pandas>=2.2.0",
     "entsoe-py>=0.7.10",
+    "isodate>=0.7.2",
 ]
 
 [dependency-groups]

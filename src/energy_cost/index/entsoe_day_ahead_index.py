@@ -9,27 +9,20 @@ from .index import Index
 class EntsoeDayAheadIndex(Index):
     """An ENTSO-E day-ahead index for a given country."""
 
-    def __init__(
-        self, country_code: str, api_key: str, default_resolution: dt.timedelta = dt.timedelta(minutes=15)
-    ) -> None:
+    def __init__(self, country_code: str, api_key: str, resolution: dt.timedelta = dt.timedelta(minutes=15)) -> None:
         self.client = EntsoePandasClient(api_key=api_key)
         self.country_code = country_code
-        self.default_resolution = default_resolution
+        super().__init__(resolution=resolution)
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        """Get the index values for the given time range and resolution in €/MWh."""
-        # resolution should be a whole divisor of the default resolution
-        if resolution > self.default_resolution or self.default_resolution % resolution != dt.timedelta(0):
-            raise ValueError(f"Resolution must be a whole divisor of {self.default_resolution}")
+    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+        """Get the index values for the given time range in €/MWh."""
 
         df = (
             self.client.query_day_ahead_prices(
                 country_code=self.country_code,
-                start=pd.Timestamp(start),
-                end=pd.Timestamp(end),
+                start=start,
+                end=end,
             )
-            .resample(resolution)
-            .ffill()
             .to_frame()
             .reset_index()
             .rename(columns={"index": "timestamp", 0: "value"})

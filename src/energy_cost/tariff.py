@@ -8,6 +8,8 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel, BeforeValidator, Field
 
+from energy_cost.resolution import Resolution
+
 from .price_formula import PriceFormula
 from .scheduled_formula import ScheduledPriceFormulas
 
@@ -38,7 +40,7 @@ class TimedPriceFormula(BaseModel):
     start: dt.datetime
     formula: PriceFormula | ScheduledPriceFormulas
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution in €/MWh."""
         actual_start = max(self.start, start)
         if actual_start >= end:
@@ -119,7 +121,7 @@ class Tariff(BaseModel):
         formulas: list[TimedPriceFormula],
         start: dt.datetime,
         end: dt.datetime,
-        resolution: dt.timedelta,
+        resolution: Resolution,
     ) -> pd.DataFrame:
         """Compute the cost time series for a list of consecutive TimedPriceFormulas."""
         formulas = Tariff.filter_formulas(formulas, start, end)
@@ -137,7 +139,7 @@ class Tariff(BaseModel):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: dt.timedelta = dt.timedelta(minutes=15),
+        resolution: Resolution = dt.timedelta(minutes=15),
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame:

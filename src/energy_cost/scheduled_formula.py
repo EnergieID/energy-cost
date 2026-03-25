@@ -5,6 +5,7 @@ import pandas as pd
 from pydantic import BaseModel, Field, RootModel, model_validator
 
 from energy_cost.price_formula import PriceFormula
+from energy_cost.resolution import Resolution, to_pandas_freq
 
 
 class DayOfWeek(StrEnum):
@@ -79,7 +80,7 @@ class ScheduledPriceFormula(PriceFormula):
 
     when: list[WhenClause] | None = None
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
         """Get cost values masked by ``when``; non-matching timestamps become NaN."""
         df = super().get_values(start, end, resolution)
         if self.when is not None:
@@ -98,14 +99,14 @@ class ScheduledPriceFormulas(RootModel[list[ScheduledPriceFormula]]):
     timestamps; the first defined value per timestamp wins (coalesce semantics).
     """
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
         """Get the cost values for the given time range and resolution in €/MWh.
 
         Each :class:`ScheduledPriceFormula` contributes only its matching timestamps
         (non-matching slots are NaN in its output); the first defined value per
         timestamp wins (coalesce semantics).
         """
-        timestamps = pd.date_range(start=start, end=end, freq=resolution, inclusive="left")
+        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
         result: pd.Series = pd.Series(float("nan"), index=timestamps, dtype=float)
         for schedule in self.root:
             values = schedule.get_values(start, end, resolution).set_index("timestamp")["value"]
