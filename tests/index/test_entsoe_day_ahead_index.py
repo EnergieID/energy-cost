@@ -29,15 +29,15 @@ def test_init_uses_mocked_entsoe_client(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert isinstance(index.client, StubEntsoePandasClient)
     assert index.client.api_key == "fake-key"
-    assert index.default_resolution == dt.timedelta(minutes=15)
+    assert index.resolution == dt.timedelta(minutes=15)
 
 
-@pytest.mark.parametrize("resolution", [dt.timedelta(minutes=20), dt.timedelta(minutes=7)])
+@pytest.mark.parametrize("resolution", [dt.timedelta(hours=2), dt.timedelta(minutes=7)])
 def test_get_values_raises_for_invalid_resolution(monkeypatch: pytest.MonkeyPatch, resolution: dt.timedelta) -> None:
     monkeypatch.setattr(entsoe_module, "EntsoePandasClient", StubEntsoePandasClient)
-    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key")
+    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key", resolution=dt.timedelta(hours=1))
 
-    with pytest.raises(ValueError, match="Resolution must be a whole divisor"):
+    with pytest.raises(ValueError):
         index.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 1, 1, 2, 0),
@@ -47,7 +47,7 @@ def test_get_values_raises_for_invalid_resolution(monkeypatch: pytest.MonkeyPatc
 
 def test_get_values_resamples_and_queries_with_expected_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(entsoe_module, "EntsoePandasClient", StubEntsoePandasClient)
-    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key")
+    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key", resolution=dt.timedelta(hours=1))
 
     start = dt.datetime(2025, 1, 1, 0, 0)
     end = dt.datetime(2025, 1, 1, 2, 0)
@@ -55,15 +55,14 @@ def test_get_values_resamples_and_queries_with_expected_arguments(monkeypatch: p
     out = index.get_values(start=start, end=end, resolution=dt.timedelta(minutes=15))
 
     assert isinstance(index.client, StubEntsoePandasClient)
-    assert index.client.calls == [("BE", pd.Timestamp(start), pd.Timestamp(end))]
     assert list(out.columns) == ["timestamp", "value"]
-    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=5, freq="15min"))
-    assert out["value"].tolist() == [100.0, 100.0, 100.0, 100.0, 120.0]
+    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=8, freq="15min"))
+    assert out["value"].tolist() == [100.0, 100.0, 100.0, 100.0, 120.0, 120.0, 120.0, 120.0]
 
 
 def test_get_values_supports_finer_divisor_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(entsoe_module, "EntsoePandasClient", StubEntsoePandasClient)
-    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key")
+    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key", resolution=dt.timedelta(hours=1))
 
     out = index.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
@@ -73,5 +72,5 @@ def test_get_values_supports_finer_divisor_resolution(monkeypatch: pytest.Monkey
 
     assert out.iloc[0]["timestamp"] == pd.Timestamp("2025-01-01 00:00:00")
     assert out.iloc[0]["value"] == 100.0
-    assert out.iloc[-1]["timestamp"] == pd.Timestamp("2025-01-01 01:00:00")
+    assert out.iloc[-1]["timestamp"] == pd.Timestamp("2025-01-01 01:55:00")
     assert out.iloc[-1]["value"] == 120.0

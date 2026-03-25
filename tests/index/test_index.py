@@ -9,10 +9,13 @@ from energy_cost.index import Index
 
 
 class DummyIndex(Index):
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+    def __init__(self):
+        super().__init__(resolution=dt.timedelta(minutes=15))
+
+    def _get_values(self, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
         return pd.DataFrame(
             {
-                "timestamp": pd.date_range(start=start, end=end, freq=resolution, inclusive="left"),
+                "timestamp": pd.date_range(start=start, end=end, freq="15min", inclusive="left"),
                 "value": 1.0,
             }
         )

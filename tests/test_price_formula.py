@@ -4,16 +4,8 @@ import datetime as dt
 
 import pandas as pd
 
-from energy_cost.index import Index
+from energy_cost.index import DataFrameIndex, Index
 from energy_cost.price_formula import IndexAdder, PriceFormula
-
-
-class DataFrameIndex(Index):
-    def __init__(self, df: pd.DataFrame):
-        self.df = df
-
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        return self.df
 
 
 def test_index_adder_multiplies_index_values() -> None:
@@ -53,7 +45,7 @@ def test_price_formula_constant_only() -> None:
 def test_price_formula_adds_multiple_variable_costs_and_fills_missing() -> None:
     timestamps = pd.date_range("2025-01-01", periods=3, freq="15min")
     index_a_df = pd.DataFrame({"timestamp": timestamps, "value": [1.0, 2.0, 3.0]})
-    # Missing middle timestamp on purpose to validate fillna(0)
+    # Missing middle timestamp on purpose to validate forward-filling of missing values.
     index_b_df = pd.DataFrame({"timestamp": [timestamps[0], timestamps[2]], "value": [10.0, 30.0]})
 
     Index.register("a", DataFrameIndex(index_a_df))
@@ -70,5 +62,4 @@ def test_price_formula_adds_multiple_variable_costs_and_fills_missing() -> None:
         resolution=dt.timedelta(minutes=15),
     )
 
-    # 0.5 + a + 0.1*b where middle b is missing -> +0
-    assert out["value"].tolist() == [2.5, 2.5, 6.5]
+    assert out["value"].tolist() == [2.5, 3.5, 6.5]

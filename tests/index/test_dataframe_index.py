@@ -60,7 +60,8 @@ def test_get_values_before_first_datapoint_returns_nan() -> None:
                 "timestamp": ["2025-01-01T00:00:00Z"],
                 "value": [100.0],
             }
-        )
+        ),
+        resolution=dt.timedelta(hours=1),
     )
 
     out = index.get_values(
@@ -80,8 +81,8 @@ def test_csv_and_yaml_index_load_values(tmp_path) -> None:
     yaml_path = tmp_path / "index.yml"
     yaml_path.write_text("- timestamp: 2025-01-01T00:00:00Z\n  value: 12\n", encoding="utf-8")
 
-    csv_index = CSVIndex(str(csv_path))
-    yaml_index = YAMLIndex(str(yaml_path))
+    csv_index = CSVIndex(str(csv_path), resolution=dt.timedelta(hours=1))
+    yaml_index = YAMLIndex(str(yaml_path), resolution=dt.timedelta(hours=1))
 
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 1, 1, 1, tzinfo=dt.UTC)

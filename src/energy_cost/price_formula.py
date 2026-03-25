@@ -38,7 +38,7 @@ class PriceFormula(BaseModel):
         for variable_cost in self.variable_costs:
             variable_cost_values = variable_cost.get_values(start, end, resolution)
             df = df.merge(variable_cost_values, on="timestamp", how="left", suffixes=("", "_right"))
-            df["value"] = df["value"] + df["value_right"].fillna(0)
+            df["value"] = df["value"] + df["value_right"]
             df = df.drop(columns=["value_right"])
 
         return df

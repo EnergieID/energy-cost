@@ -7,19 +7,8 @@ from textwrap import dedent
 import pandas as pd
 import pytest
 
-from energy_cost.index import Index
+from energy_cost.index import DataFrameIndex, Index
 from energy_cost.tariff import MeterType, PowerDirection, Tariff
-
-
-class FakeDataFrameIndex(Index):
-    def __init__(self, df: pd.DataFrame):
-        self.df = df.copy()
-
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
-        start_ts = pd.Timestamp(start)
-        end_ts = pd.Timestamp(end)
-        mask = (self.df["timestamp"] >= start_ts) & (self.df["timestamp"] < end_ts)
-        return self.df.loc[mask, ["timestamp", "value"]].reset_index(drop=True)
 
 
 @pytest.fixture
@@ -28,15 +17,15 @@ def fake_indexes() -> None:
 
     Index.register(
         "Belpex15min",
-        FakeDataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [10, 20, 30, 40, 50, 60, 70, 80]})),
+        DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [10, 20, 30, 40, 50, 60, 70, 80]})),
     )
     Index.register(
         "BelpexRLPO",
-        FakeDataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [1, 2, 3, 4, 5, 6, 7, 8]})),
+        DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [1, 2, 3, 4, 5, 6, 7, 8]})),
     )
     Index.register(
         "SolarAdj",
-        FakeDataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [5, 10, 15, 20, 25, 30, 35, 40]})),
+        DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [5, 10, 15, 20, 25, 30, 35, 40]})),
     )
 
 

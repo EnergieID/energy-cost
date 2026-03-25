@@ -64,3 +64,36 @@ def resolution_divides(source: Resolution, requested: Resolution) -> bool:
 
     # requested is calendar, source is fixed timedelta — nonsensical subdivision
     return False
+
+
+def detect_resolution(timestamps: pd.Series) -> Resolution:
+    """
+    Infer the resolution from a sorted timestamp series.
+
+    Strategy
+    --------
+    1. Check for yearly alignment: all timestamps on Jan 1, gaps are multiples of 1 year
+    2. Check for monthly alignment: all timestamps on the 1st, gaps are multiples of 1 month
+    3. Fall back to timedelta mode (works correctly for fixed-period data like 15min)
+    """
+    if len(timestamps) < 2:
+        raise ValueError("Cannot detect resolution from fewer than 2 timestamps.")
+
+    all_month_starts = (timestamps.dt.day == 1).all() and (timestamps.dt.hour == 0).all()
+
+    if all_month_starts:
+        all_year_starts = (timestamps.dt.month == 1).all()
+
+        if all_year_starts:
+            year_gaps = timestamps.dt.year.diff().dropna()
+            if (year_gaps > 0).all() and (year_gaps == year_gaps.iloc[0]).all():
+                return isodate.Duration(years=int(year_gaps.iloc[0]))
+
+        month_numbers = timestamps.dt.year * 12 + timestamps.dt.month
+        month_gaps = month_numbers.diff().dropna()
+        if (month_gaps > 0).all() and (month_gaps == month_gaps.iloc[0]).all():
+            return isodate.Duration(months=int(month_gaps.iloc[0]))
+
+    deltas = timestamps.diff().dropna()
+    mode_delta = deltas.mode()[0]
+    return pd.to_timedelta(mode_delta)
