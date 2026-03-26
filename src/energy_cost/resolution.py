@@ -60,7 +60,7 @@ def is_divisor(root: Resolution, divisor: Resolution) -> bool:
         divisor_months = int(divisor.years * 12 + divisor.months)  # type: ignore[union-attr]
         return divisor_months > 0 and root_months % divisor_months == 0
 
-    # requested is calendar, source is fixed timedelta — nonsensical subdivision
+    # divisor is calendar, root is fixed timedelta — nonsensical subdivision
     return False
 
 
