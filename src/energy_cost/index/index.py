@@ -77,8 +77,4 @@ class Index(ABC):
         - a ``"timestamp"`` column (``pd.Timestamp``, UTC-aware or naive,
           consistent with the inputs) marking the *start* of each period,
         - a ``"value"`` column (float) with the index value for that period in €/MWh.
-
-        The returned rows should cover the requested range; returning a
-        slightly wider range is fine — ``get_values`` will clip via the
-        target index.
         """
