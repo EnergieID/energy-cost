@@ -1,0 +1,136 @@
+# Tariffs versioned with a start date of validity
+# simple tariff with a single price formula
+- start: 2023-01-01T00:00:00+01
+  consumption:
+    constant_cost: 12.34
+    variable_costs:
+    - index: Belpex15min
+      scalar: 1.23
+# separately specified price formulas for injection and consumption
+- start: 2024-01-01T00:00:00+01
+  injection:
+    constant_cost: -14.56
+    variable_costs:
+    - index: Belpex15min
+      scalar: 0.9876
+  consumption:
+    constant_cost: 12.34
+    variable_costs:
+    - index: Belpex15min
+      scalar: 1.23
+# more complex tariff additional cost components for consumption
+- start: 2025-01-01T00:00:00+01
+  injection:
+    constant_cost: -14.56
+    variable_costs:
+    - index: Belpex15min
+      scalar: 0.9876
+  consumption:
+    renewable_certificates: 
+      constant_cost: 12.0
+    chp_certificates: 
+      constant_cost: 4.56
+    energy:
+      constant_cost: 12.34
+      variable_costs:
+      - index: Belpex15min
+        scalar: 1.23
+# add fixed periodic costs
+- start: 2026-01-01T00:00:00+01
+  injection:
+    constant_cost: -14.56
+    variable_costs:
+    - index: Belpex15min
+      scalar: 0.9876
+  consumption:
+    renewable_certificates: 
+      constant_cost: 12.0
+    chp_certificates: 
+      constant_cost: 4.56
+    energy:
+      constant_cost: 12.34
+      variable_costs:
+      - index: Belpex15min
+        scalar: 1.23
+  periodic:
+    adminsitration:
+      period: yearly
+      constant_cost: 12.0
+    billing:
+      period: monthly
+      constant_cost: 1.0
+# seperate consumption formula for meter types
+- start: 2026-01-01T00:00:00+01
+  injection:
+    constant_cost: -14.56
+    variable_costs:
+    - index: Belpex15min
+      scalar: 0.9876
+  consumption:
+    all: # these are applied to all meter types, but can be overridden by more specific formulas for individual meter types
+      renewable_certificates: 
+        constant_cost: 12.0
+      chp_certificates: 
+        constant_cost: 4.56
+    single_rate: # a single-rate price formula for consumption metered on a single-rate meter
+      constant_cost: 12.34
+      variable_costs:
+      - index: Belpex15min
+        scalar: 1.23
+    tou_peak: # an additional time-of-use peak price formula for consumption metered on a separate meter
+      constant_cost: 23.45
+      variable_costs:
+      - index: Belpex15min
+        scalar: 2.34
+    tou_offpeak: # an additional time-of-use off-peak price formula for consumption metered on a separate meter
+      constant_cost: 5.67
+      variable_costs:
+      - index: Belpex15min
+        scalar: 0.89
+  periodic:
+    administration:
+      period: yearly
+      constant_cost: 12.0
+    billing:
+      period: monthly
+      constant_cost: 1.0
+# the same as above, but all levels are now explicitly named
+- start: 2027-01-01T00:00:00+01
+  injection:
+    all:
+      energy:
+        constant_cost: -14.56
+        variable_costs:
+        - index: Belpex15min
+          scalar: 0.9876
+  consumption:
+    all: 
+      renewable_certificates: 
+        constant_cost: 12.0
+      chp_certificates: 
+        constant_cost: 4.56
+    single_rate:
+      energy:
+        constant_cost: 12.34
+        variable_costs:
+        - index: Belpex15min
+          scalar: 1.23
+    tou_peak:
+      energy:
+        constant_cost: 23.45
+        variable_costs:
+        - index: Belpex15min
+          scalar: 2.34
+    tou_offpeak:
+      energy:
+        constant_cost: 5.67
+        variable_costs:
+        - index: Belpex15min
+          scalar: 0.89
+  periodic:
+    administration:
+      period: yearly
+      constant_cost: 12.0
+    billing:
+      period: monthly
+      constant_cost: 1.0
