@@ -1,12 +1,10 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 import pandas as pd
 
 from ..resolution import Resolution, is_divisor, to_pandas_freq, to_pandas_offset
-
-FillMode = Literal["ffill", "nan"]
 
 
 class Index(ABC):
