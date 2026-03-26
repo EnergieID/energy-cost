@@ -45,10 +45,29 @@ def test_index_returns_nan_for_out_of_range_values() -> None:
     Index.register("dummy", index)
 
     df = index.get_values(
-        start=dt.datetime(2020, 1, 1, 6, 0),
+        start=dt.datetime(2020, 1, 1, 0, 30),
         end=dt.datetime(2020, 1, 1, 7, 0),
         resolution=dt.timedelta(minutes=15),
-        out_of_range_fill="nan",
     )
 
-    assert df["value"].isna().all()
+    assert df["value"].tolist()[:2] == [3.0, 4.0]
+    assert all(pd.isna(df["value"].tolist()[2:]))
+
+
+def test_index_returns_all_nan_if_no_data_in_range() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2021, 1, 1, 1, 0),
+        end=dt.datetime(2021, 1, 1, 2, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert all(pd.isna(df["value"].tolist()))

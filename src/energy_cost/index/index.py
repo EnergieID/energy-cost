@@ -38,7 +38,6 @@ class Index(ABC):
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
-        out_of_range_fill: FillMode = "nan",
     ) -> pd.DataFrame:
         if not is_divisor(self.resolution, resolution):
             raise ValueError(
@@ -59,11 +58,6 @@ class Index(ABC):
         fetch_start = start_ts - to_pandas_offset(self.resolution)
         raw = self._get_values(fetch_start, end_ts)
 
-        if raw.empty:
-            df = pd.DataFrame({"timestamp": target_index})
-            df["value"] = float("nan")
-            return df
-
         # --- merge & fill --------------------------------------------------
         merged = pd.merge_asof(
             left=pd.DataFrame({"timestamp": target_index}),
@@ -72,16 +66,15 @@ class Index(ABC):
             direction="backward",
         )
 
-        if out_of_range_fill == "nan":
-            # Slots that fall before the first raw data point get NaN from
-            # merge_asof automatically.  For slots *after* the last raw point
-            # we need to null them out explicitly, because merge_asof would
-            # have forward-filled the last value into them.
-            last_raw_ts = raw["timestamp"].max()
-            # Determine the end of the last raw period
-            last_period_end = last_raw_ts + to_pandas_offset(self.resolution)
-            out_of_range = merged["timestamp"] >= last_period_end
-            merged.loc[out_of_range, "value"] = float("nan")
+        # Slots that fall before the first raw data point get NaN from
+        # merge_asof automatically.  For slots *after* the last raw point
+        # we need to null them out explicitly, because merge_asof would
+        # have forward-filled the last value into them.
+        last_raw_ts = raw["timestamp"].max()
+        # Determine the end of the last raw period
+        last_period_end = last_raw_ts + to_pandas_offset(self.resolution)
+        out_of_range = merged["timestamp"] >= last_period_end
+        merged.loc[out_of_range, "value"] = float("nan")
 
         return merged
 
