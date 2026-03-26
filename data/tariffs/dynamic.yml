@@ -1,0 +1,12 @@
+- start: 2025-01-01T00:00:00+01:00 # the start of validity of this tariff version
+  consumption: # the cost formula for consumption
+    constant_cost: 10.0 # the constant cost component of the price formula in €/MWh
+    variable_costs: # the variable cost components of the price formula in €/MWh
+    - index: Belpex15min # the name of the index to use for this variable cost component
+      scalar: 1.05 # the scalar to apply to the index values for this variable cost component
+- start: 2026-01-01T00:00:00+01:00 # from this date, a new tariff version applies with a different price formula
+  consumption:
+    constant_cost: 12.0
+    variable_costs:
+    - index: Belpex15min
+      scalar: 1.10
