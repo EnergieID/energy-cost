@@ -41,34 +41,31 @@ class Index(ABC):
 
         start_ts = pd.Timestamp(start)
         end_ts = pd.Timestamp(end)
+        requested_freq = to_pandas_freq(resolution)
+        native_resolution_offset = to_pandas_offset(self.resolution)
 
-        # Build the desired output index
-        freq = to_pandas_freq(resolution)
-        target_index = pd.date_range(start=start_ts, end=end_ts, freq=freq, inclusive="left")
+        target_index = pd.date_range(start=start_ts, end=end_ts, freq=requested_freq, inclusive="left")
 
-        # Fetch raw data from the concrete implementation.
         # When forward-filling, we may need the last known value that lies
-        # *before* `start`, so we widen the look-back window by one native period.
-        fetch_start = start_ts - to_pandas_offset(self.resolution)
+        # *before* `start`, so we widen the look-back window by one native resolution period.
+        fetch_start = start_ts - native_resolution_offset
         raw = self._get_values(fetch_start, end_ts)
 
-        # --- merge & fill --------------------------------------------------
+        # explicitly add a timestamp one native resolution after the last raw timestamp with value `nan`
+        # This way, they are not forward-filled with the last known value, but correctly marked as out-of-range.
+        if not raw.empty:
+            last_raw_ts = raw["timestamp"].max()
+            last_period_end = last_raw_ts + native_resolution_offset
+            raw = pd.concat(
+                [raw, pd.DataFrame({"timestamp": [last_period_end], "value": [float("nan")]})], ignore_index=True
+            )
+
         merged = pd.merge_asof(
             left=pd.DataFrame({"timestamp": target_index}),
             right=raw,
             on="timestamp",
             direction="backward",
         )
-
-        # Slots that fall before the first raw data point get NaN from
-        # merge_asof automatically.  For slots *after* the last raw point
-        # we need to null them out explicitly, because merge_asof would
-        # have forward-filled the last value into them.
-        last_raw_ts = raw["timestamp"].max()
-        # Determine the end of the last raw period
-        last_period_end = last_raw_ts + to_pandas_offset(self.resolution)
-        out_of_range = merged["timestamp"] >= last_period_end
-        merged.loc[out_of_range, "value"] = float("nan")
 
         return merged
 
