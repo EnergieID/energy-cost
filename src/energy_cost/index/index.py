@@ -27,10 +27,6 @@ class Index(ABC):
     def __init__(self, resolution: Resolution) -> None:
         self.resolution = resolution
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def get_values(
         self,
         start: dt.datetime,
