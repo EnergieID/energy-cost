@@ -6,15 +6,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
-from energy_cost.periodic_cost import PeriodicCost
-from energy_cost.price_formula import PriceFormula
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import CostType, TariffVersion
 
 
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
-    """A YAML list is loaded as multiple segments sorted by start date."""
     path = tmp_path / "tariff.yml"
     path.write_text(
         "- start: 2026-01-01T00:00:00\n"
@@ -37,7 +35,7 @@ def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
     assert tariff.versions[1].start == dt.datetime(2026, 1, 1, 0, 0)
 
 
-def test_tariff_from_yaml_supports_scheduled_formula_list_shorthand() -> None:
+def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
     tariff = Tariff.from_yaml("data/tariffs/scheduled.yml")
 
     out = tariff.get_cost(
@@ -51,16 +49,15 @@ def test_tariff_from_yaml_supports_scheduled_formula_list_shorthand() -> None:
 
 
 def test_get_cost_uses_correct_segment_for_time_range() -> None:
-    """Values from the active segment are used; the boundary switches formulas correctly."""
     tariff = Tariff(
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
-                consumption={"all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)}},
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
             ),
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 30),
-                consumption={"all": {CostType.ENERGY: PriceFormula(constant_cost=2.0)}},
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=2.0)}},
             ),
         ]
     )
@@ -91,7 +88,7 @@ def test_get_cost_raises_when_no_versions_overlap_interval() -> None:
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 2, 0, 0),
-                consumption={"all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)}},
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
             )
         ]
     )
@@ -104,16 +101,15 @@ def test_get_cost_raises_when_no_versions_overlap_interval() -> None:
 
 
 def test_get_periodic_cost_spans_multiple_segments() -> None:
-    """Periodic costs are summed across segment boundaries within the queried interval."""
     tariff = Tariff(
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
-                periodic={"admin": PeriodicCost(period=Period.DAILY, constant_cost=24.0)},
+                periodic={"admin": PeriodicFormula(period=Period.DAILY, constant_cost=24.0)},
             ),
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 12, 0),
-                periodic={"admin": PeriodicCost(period=Period.DAILY, constant_cost=48.0)},
+                periodic={"admin": PeriodicFormula(period=Period.DAILY, constant_cost=48.0)},
             ),
         ]
     )

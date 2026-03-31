@@ -1,10 +1,19 @@
 import datetime as dt
+from typing import Annotated
 
 import isodate
 import pandas as pd
+from pydantic import BeforeValidator
+
+
+def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
+    if isinstance(value, str):
+        return isodate.parse_duration(value)
+    return value
+
 
 # A resolution is either a fixed timedelta or a calendar-aware Duration.
-Resolution = dt.timedelta | isodate.Duration
+Resolution = Annotated[dt.timedelta | isodate.Duration, BeforeValidator(parse_resolution)]
 
 
 def validate_non_mixed_duration(resolution: Resolution) -> None:
@@ -95,3 +104,16 @@ def detect_resolution(timestamps: pd.Series) -> Resolution:
     deltas = timestamps.diff().dropna()
     mode_delta = deltas.mode()[0]
     return pd.to_timedelta(mode_delta)
+
+
+def detect_resolution_and_range(
+    data: pd.DataFrame,
+    resolution: Resolution | None = None,
+) -> tuple[dt.datetime, dt.datetime, Resolution]:
+    if resolution is None:
+        if len(data) < 2:
+            raise ValueError("A resolution is required when applying a formula to fewer than 2 timestamps.")
+        resolution = detect_resolution(data["timestamp"])
+    start = data["timestamp"].min()
+    end = data["timestamp"].max() + resolution
+    return start, end, resolution

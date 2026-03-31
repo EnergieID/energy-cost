@@ -6,7 +6,7 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
-from .resolution import Resolution
+from .resolution import Resolution, detect_resolution_and_range
 from .tariff_version import MeterType, PowerDirection, TariffVersion
 
 
@@ -47,10 +47,7 @@ class Tariff(BaseModel):
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame:
-        """Get the cost values for the given meter type and time range at the given resolution in €/MWh.
-
-        Returns a DataFrame with a column per active cost type and a ``total`` column.
-        """
+        """Get the cost values for the given meter type and time range at the given resolution in €/MWh."""
         result: pd.DataFrame | None = None
         for version, seg_start, seg_end in self._find_active_versions(start, end):
             df = version.get_cost(seg_start, seg_end, resolution, meter_type, direction)
@@ -63,11 +60,23 @@ class Tariff(BaseModel):
 
         return result.sort_values("timestamp").reset_index(drop=True)
 
-    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
-        """Get the prorated periodic (fixed) costs for the given time interval.
+    def apply_capacity_cost(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Get the capacity cost values for the given meter type and time range in €/kW."""
+        result_frames: list[pd.DataFrame] = []
+        start, end, _ = detect_resolution_and_range(data)
+        for version, seg_start, seg_end in self._find_active_versions(start, end):
+            if version.capacity is None:
+                continue
+            df = version.apply_capacity_cost(data)
+            df = df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
+            result_frames.append(df)
 
-        Returns a mapping of cost name to the total prorated cost for ``[start, end)``.
-        """
+        if not result_frames:
+            raise ValueError("No active versions with capacity cost formulas found in tariff for the given time range.")
+
+        return pd.concat(result_frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
+
+    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
         totals: dict[str, float] = {}
         for version, seg_start, seg_end in self._find_active_versions(start, end):
             for name, cost in version.get_periodic_cost(seg_start, seg_end).items():
