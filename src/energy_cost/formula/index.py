@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from energy_cost.index.index import Index
 from energy_cost.resolution import Resolution, to_pandas_freq
@@ -24,8 +24,6 @@ class IndexAdder(BaseModel):
 
 
 class IndexFormula(Formula):
-    model_config = ConfigDict(extra="forbid")
-
     kind: str = "index"
     constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)
