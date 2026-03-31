@@ -25,7 +25,7 @@ def test_capacity_component_applies_index_formula_to_billing_values() -> None:
     component = CapacityComponent(
         measurement_period=isodate.parse_duration("P1M"),
         billing_period=isodate.parse_duration("P1M"),
-        pricing=IndexFormula(constant_cost=10.0),
+        formula=IndexFormula(constant_cost=10.0),
     )
     capacity_data = pd.DataFrame(
         {
@@ -44,7 +44,7 @@ def test_capacity_component_applies_banded_tiered_formula() -> None:
     component = CapacityComponent(
         measurement_period=isodate.parse_duration("P1M"),
         billing_period=isodate.parse_duration("P1M"),
-        pricing=TieredFormula(
+        formula=TieredFormula(
             bands=[
                 TierBand(up_to=10.0, formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=100.0)),
                 TierBand(formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=180.0)),
@@ -67,7 +67,7 @@ def test_capacity_component_supports_scheduled_formulas_inside_bands() -> None:
     component = CapacityComponent(
         measurement_period=isodate.parse_duration("P1M"),
         billing_period=isodate.parse_duration("P1M"),
-        pricing=TieredFormula(
+        formula=TieredFormula(
             bands=[
                 TierBand(
                     formula=ScheduledFormulas(
@@ -100,7 +100,7 @@ def test_capacity_component_applies_rolling_average_window() -> None:
         measurement_period=isodate.parse_duration("P1M"),
         billing_period=isodate.parse_duration("P1M"),
         window_periods=2,
-        pricing=IndexFormula(constant_cost=10.0),
+        formula=IndexFormula(constant_cost=10.0),
     )
     capacity_data = pd.DataFrame(
         {
@@ -122,7 +122,7 @@ def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
                 capacity=CapacityComponent(
                     measurement_period=isodate.parse_duration("P1M"),
                     billing_period=isodate.parse_duration("P1M"),
-                    pricing=IndexFormula(constant_cost=10.0),
+                    formula=IndexFormula(constant_cost=10.0),
                 ),
             ),
             TariffVersion(
@@ -130,7 +130,7 @@ def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
                 capacity=CapacityComponent(
                     measurement_period=isodate.parse_duration("P1M"),
                     billing_period=isodate.parse_duration("P1M"),
-                    pricing=IndexFormula(constant_cost=20.0),
+                    formula=IndexFormula(constant_cost=20.0),
                 ),
             ),
         ]

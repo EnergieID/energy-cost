@@ -60,6 +60,12 @@ class Index(ABC):
                 [raw, pd.DataFrame({"timestamp": [last_period_end], "value": [float("nan")]})], ignore_index=True
             )
 
+        # Convert raw timestamps to the same timezone as the input timestamps (if any) for correct merging
+        if raw["timestamp"].dt.tz is not None:
+            raw["timestamp"] = raw["timestamp"].dt.tz_convert(start_ts.tz)
+        elif start_ts.tz is not None:
+            raw["timestamp"] = raw["timestamp"].dt.tz_localize(start_ts.tz)
+
         merged = pd.merge_asof(
             left=pd.DataFrame({"timestamp": target_index}),
             right=raw,
