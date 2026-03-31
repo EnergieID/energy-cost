@@ -50,8 +50,6 @@ CostTypeFormulas = Annotated[
 
 def _coerce_meter_formulas(value: Any) -> Any:
     """Coerce shorthand MeterFormulas values."""
-    if isinstance(value, list):
-        return {MeterType.ALL: {CostType.ENERGY: value}}
     if not isinstance(value, dict):
         return value
     if value.keys() <= _COST_TYPE_VALUES:
@@ -113,7 +111,7 @@ class TariffVersion(BaseModel):
 
     def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame:
         if self.capacity is None:
-            raise ValueError("No capacity formula configured for this tariff version.")
+            return pd.DataFrame(columns=["timestamp", "value"])
         return self.capacity.apply(capacity_data)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:

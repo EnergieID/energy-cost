@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from energy_cost.fractional_periods import Period
 from energy_cost.resolution import Resolution, detect_resolution_and_range, to_pandas_freq
@@ -11,7 +11,7 @@ from energy_cost.resolution import Resolution, detect_resolution_and_range, to_p
 from .formula import Formula
 
 
-class PeriodicFormula(BaseModel, Formula):
+class PeriodicFormula(Formula):
     model_config = ConfigDict(extra="ignore")
 
     kind: str = "periodic"

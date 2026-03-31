@@ -20,7 +20,7 @@ class TierBand(BaseModel):
         return values <= self.up_to
 
 
-class TieredFormula(BaseModel, Formula):
+class TieredFormula(Formula):
     kind: str = "tiered"
     bands: list[TierBand] = Field(default_factory=list)
 

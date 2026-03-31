@@ -114,3 +114,15 @@ def test_tiered_formula_apply_supports_scheduled_formula_band() -> None:
     out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [15.0, 16.0]
+
+
+def test_get_values_returns_empty_dataframe_for_tiered_formula_with_no_bands() -> None:
+    formula = TieredFormula(bands=[])
+
+    out = formula.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 0, 30),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert out.empty

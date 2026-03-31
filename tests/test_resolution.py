@@ -1,8 +1,10 @@
+import datetime
+
 import isodate
 import pandas as pd
 import pytest
 
-from energy_cost.resolution import is_divisor, to_pandas_freq
+from energy_cost.resolution import detect_resolution_and_range, is_divisor, parse_resolution, to_pandas_freq
 
 
 def test_to_pandas_freq_correctly_handles_monthly_durations():
@@ -96,3 +98,15 @@ def test_detect_resolution_raises_when_to_few_timestamps():
     timestamps = pd.Series(pd.date_range("2020-01-01", periods=1, freq="15min"))
     with pytest.raises(ValueError):
         detect_resolution(timestamps)
+
+
+def test_parse_resolution_correctly_parses_iso_strings():
+
+    assert parse_resolution("PT15M") == datetime.timedelta(minutes=15)
+    assert parse_resolution("P1M") == isodate.Duration(months=1)
+    assert parse_resolution("P1Y") == isodate.Duration(years=1)
+
+
+def test_detect_resolution_and_range_raises_when_no_timestamps():
+    with pytest.raises(ValueError):
+        detect_resolution_and_range(pd.DataFrame(columns=["timestamp", "value"]))

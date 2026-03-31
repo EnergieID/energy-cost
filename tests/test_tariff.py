@@ -120,3 +120,41 @@ def test_get_periodic_cost_spans_multiple_segments() -> None:
     )
 
     assert costs == pytest.approx({"admin": 36.0})
+
+
+def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> None:
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2026, 1, 1, 0, 0),
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+            )
+        ]
+    )
+
+    out = tariff.apply_capacity_cost(
+        pd.DataFrame(
+            {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
+        ),
+    )
+
+    assert out.empty
+
+
+def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_capacity_cost() -> None:
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+            )
+        ]
+    )
+
+    out = tariff.apply_capacity_cost(
+        pd.DataFrame(
+            {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
+        ),
+    )
+
+    assert out.empty

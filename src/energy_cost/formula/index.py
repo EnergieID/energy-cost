@@ -23,7 +23,7 @@ class IndexAdder(BaseModel):
         return index_values
 
 
-class IndexFormula(BaseModel, Formula):
+class IndexFormula(Formula):
     model_config = ConfigDict(extra="forbid")
 
     kind: str = "index"

@@ -65,14 +65,12 @@ class Tariff(BaseModel):
         result_frames: list[pd.DataFrame] = []
         start, end, _ = detect_resolution_and_range(data)
         for version, seg_start, seg_end in self._find_active_versions(start, end):
-            if version.capacity is None:
-                continue
             df = version.apply_capacity_cost(data)
             df = df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
             result_frames.append(df)
 
         if not result_frames:
-            raise ValueError("No active versions with capacity cost formulas found in tariff for the given time range.")
+            return pd.DataFrame(columns=["timestamp", "value"])
 
         return pd.concat(result_frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
 

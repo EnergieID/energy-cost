@@ -4,6 +4,7 @@ import datetime as dt
 
 import isodate
 import pandas as pd
+import pytest
 
 from energy_cost.capacity_cost import CapacityComponent
 from energy_cost.formula import (
@@ -146,3 +147,19 @@ def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
 
     assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]))
     assert out["value"].tolist() == [50.0, 100.0]
+
+
+def test_data_frame_resolution_should_be_divisor_of_billing_period() -> None:
+    component = CapacityComponent(
+        measurement_period=isodate.parse_duration("P1M"),
+        billing_period=isodate.parse_duration("P1M"),
+        formula=IndexFormula(constant_cost=10.0),
+    )
+    capacity_data = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-03-01 00:00:00"]),
+            "value": [5.0, 7.0],
+        }
+    )
+
+    pytest.raises(ValueError, component.apply, capacity_data)

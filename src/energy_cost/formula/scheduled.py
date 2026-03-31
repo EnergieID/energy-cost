@@ -39,6 +39,8 @@ class WhenClause(BaseModel):
 
     @model_validator(mode="after")
     def _validate_time_range(self) -> WhenClause:
+        self.start = self.start.replace(tzinfo=None)
+        self.end = self.end.replace(tzinfo=None) if self.end is not None else None
         if self.end is not None and self.start >= self.end:
             raise ValueError(
                 f"WhenClause start ({self.start}) must be strictly before end ({self.end}). "
@@ -58,7 +60,7 @@ class WhenClause(BaseModel):
         return day_mask & time_mask
 
 
-class ScheduledFormula(BaseModel):
+class ScheduledFormula(Formula):
     when: list[WhenClause] | None = None
     formula: Formula
 
@@ -77,7 +79,7 @@ class ScheduledFormula(BaseModel):
         return df
 
 
-class ScheduledFormulas(BaseModel, Formula):
+class ScheduledFormulas(Formula):
     kind: str = "scheduled"
     schedule: list[ScheduledFormula] = Field(default_factory=list)
 

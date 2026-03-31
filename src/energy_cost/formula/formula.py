@@ -5,14 +5,18 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import pandas as pd
+from pydantic import BaseModel
 from pydantic_core import core_schema
 
 from energy_cost.resolution import Resolution, detect_resolution_and_range
 
 
-class Formula(ABC):
+class Formula(ABC, BaseModel):
     @classmethod
-    def __get_pydantic_core_schema__(cls, *args):
+    def __get_pydantic_core_schema__(cls, source_type, handler):
+        # Subclasses get normal Pydantic schema — only the base class dispatches
+        if cls.__name__ != "Formula":
+            return handler(source_type)
         return core_schema.no_info_plain_validator_function(cls._coerce)
 
     @classmethod

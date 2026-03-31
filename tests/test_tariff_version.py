@@ -206,3 +206,16 @@ def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> Non
             meter_type=MeterType.SINGLE_RATE,
             direction=PowerDirection.CONSUMPTION,
         )
+
+
+def test_apply_capacity_cost_returns_empty_dataframe_when_no_capacity_component_configured() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
+    )
+
+    out = segment.apply_capacity_cost(
+        pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]})
+    )
+
+    assert out.empty

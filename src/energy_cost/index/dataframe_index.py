@@ -18,6 +18,10 @@ class DataFrameIndex(Index):
         super().__init__(resolution=resolution)
 
     def _get_values(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+        if self.df["timestamp"].dt.tz is not None:
+            self.df["timestamp"] = self.df["timestamp"].dt.tz_convert(start.tz)
+        elif start.tz is not None:
+            self.df["timestamp"] = self.df["timestamp"].dt.tz_localize(start.tz)
         return self.df[(self.df["timestamp"] >= start) & (self.df["timestamp"] < end)].copy()
 
 
