@@ -1,0 +1,22 @@
+- start: 2026-01-01T00:00:00+01:00
+  capacity:
+    measurement_period: PT15M
+    billing_period: P1M
+    window_periods: 12
+    formula: 
+      bands:
+        - up_to: 0.0025
+          formula: # Fixed minimum monthly cost for capacity up to 0.0025 MW (2.5 kW)
+            period: monthly
+            constant_cost: 10.2924375 # 0.0025 MW * 49403.7 €/MW/year / 12 months = 10.3 €/month 
+        - formula:
+            constant_cost:  4116.975 # 49403.7 €/MW/year / 12 months = 4116.975 €/MW/month
+  consumption:
+    all:
+      constant_cost: 50.5027
+    night_only:
+      constant_cost: 45.4058
+  periodic:
+    data_mamangement:
+      period: yearly
+      constant_cost: 17.85
