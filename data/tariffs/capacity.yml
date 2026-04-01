@@ -1,6 +1,0 @@
-- start: 2025-01-01T00:00:00+01:00
-  capacity: # define the cost formula for capacity based costs
-    measurement_period: PT15M # the period over which capacity is measured in ISO 8601 duration format
-    billing_period: P1M # the period over which capacity costs are billed in ISO 8601 duration format
-    formula: # any formula definition supported for consumption costs can be used here, values are interpreted in €/MW instead of €/MWh
-      constant_cost: 5.0 # eg a constant cost component of 5 €/MW

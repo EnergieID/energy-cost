@@ -36,7 +36,7 @@ def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
 
 
 def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
-    tariff = Tariff.from_yaml("data/tariffs/scheduled.yml")
+    tariff = Tariff.from_yaml("examples/tariffs/scheduled.yml")
 
     out = tariff.get_cost(
         start=dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
