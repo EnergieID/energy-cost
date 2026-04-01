@@ -1,0 +1,13 @@
+- start: 2025-01-01T00:00:00+01:00
+  capacity:
+    measurement_period: PT15M 
+    billing_period: P1M
+    window_periods: 12 # Setting this means the capacity will be avaraged over the last 12 billing periods (eg 12 months if billing_period is P1M) instead of being based on the single billing period in which the cost is being calculated, as is used by the Flemish capacity tariff.
+    formula: 
+      bands:
+      - up_to: 0.5 # if capacity in a billing period does not exceed 0.5 MW, it is billed according to this formula
+        formula: # a fixed cost component of 5 €/month
+          period: monthly
+          constant_cost: 5.0 
+      - formula: # if capacity in a billing period exceeds 0.5 MW, it is billed according to this formula
+          constant_cost: 10.0 # usage based costs of 10 €/MW
