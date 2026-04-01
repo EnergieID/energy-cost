@@ -6,7 +6,8 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
-from .tariff_version import CostType, MeterType, PowerDirection, TariffVersion
+from .resolution import Resolution
+from .tariff_version import MeterType, PowerDirection, TariffVersion
 
 
 class Tariff(BaseModel):
@@ -31,7 +32,6 @@ class Tariff(BaseModel):
         start_index = max(0, bisect.bisect_right(self.versions, start, key=lambda c: c.start) - 1)
         end_index = bisect.bisect_right(self.versions, end, key=lambda c: c.start)
         segments = self.versions[start_index:end_index]
-
         if not segments:
             return []
 
@@ -43,7 +43,7 @@ class Tariff(BaseModel):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: dt.timedelta = dt.timedelta(minutes=15),
+        resolution: Resolution = dt.timedelta(minutes=15),
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame:
@@ -73,6 +73,3 @@ class Tariff(BaseModel):
             for name, cost in version.get_periodic_cost(seg_start, seg_end).items():
                 totals[name] = totals.get(name, 0.0) + cost
         return totals
-
-
-__all__ = ["CostType", "MeterType", "PowerDirection", "Tariff", "TariffVersion"]

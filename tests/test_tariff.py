@@ -9,15 +9,8 @@ import pytest
 from energy_cost.fractional_periods import Period
 from energy_cost.periodic_cost import PeriodicCost
 from energy_cost.price_formula import PriceFormula
-from energy_cost.tariff import CostType as TariffCostType
 from energy_cost.tariff import Tariff
-from energy_cost.tariff import TariffVersion as TariffModuleVersion
 from energy_cost.tariff_version import CostType, TariffVersion
-
-
-def test_tariff_module_reexports_version_types() -> None:
-    assert TariffCostType is CostType
-    assert TariffModuleVersion is TariffVersion
 
 
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from .periodic_cost import PeriodicCost
 from .price_formula import PriceFormula
+from .resolution import Resolution
 from .scheduled_formula import ScheduledPriceFormulas
 
 
@@ -102,7 +103,7 @@ class TariffVersion(BaseModel):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: dt.timedelta,
+        resolution: Resolution,
         meter_type: MeterType,
         direction: PowerDirection,
     ) -> pd.DataFrame:

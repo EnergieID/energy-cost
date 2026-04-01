@@ -5,14 +5,17 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from energy_cost.index import Index
+from energy_cost.index import DataFrameIndex, Index
 
 
 class DummyIndex(Index):
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+    def __init__(self):
+        super().__init__(resolution=dt.timedelta(minutes=15))
+
+    def _get_values(self, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
         return pd.DataFrame(
             {
-                "timestamp": pd.date_range(start=start, end=end, freq=resolution, inclusive="left"),
+                "timestamp": pd.date_range(start=start, end=end, freq="15min", inclusive="left"),
                 "value": 1.0,
             }
         )
@@ -29,3 +32,42 @@ def test_register_and_from_name_returns_same_instance() -> None:
 def test_from_name_raises_for_unknown_index() -> None:
     with pytest.raises(ValueError, match="Unsupported index: unknown"):
         Index.from_name("unknown")
+
+
+def test_index_returns_nan_for_out_of_range_values() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2020, 1, 1, 0, 30),
+        end=dt.datetime(2020, 1, 1, 7, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert df["value"].tolist()[:2] == [3.0, 4.0]
+    assert all(pd.isna(df["value"].tolist()[2:]))
+
+
+def test_index_returns_all_nan_if_no_data_in_range() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2021, 1, 1, 1, 0),
+        end=dt.datetime(2021, 1, 1, 2, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert all(pd.isna(df["value"].tolist()))

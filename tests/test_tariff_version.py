@@ -8,6 +8,7 @@ import pytest
 from energy_cost.fractional_periods import Period
 from energy_cost.periodic_cost import PeriodicCost
 from energy_cost.price_formula import PriceFormula
+from energy_cost.resolution import Resolution
 from energy_cost.scheduled_formula import ScheduledPriceFormulas
 from energy_cost.tariff_version import (
     CostType,
@@ -188,7 +189,7 @@ def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
 
 def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> None:
     class EmptyPriceFormula(PriceFormula):
-        def get_values(self, start: dt.datetime, end: dt.datetime, resolution: dt.timedelta) -> pd.DataFrame:
+        def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
 
     segment = TariffVersion(
