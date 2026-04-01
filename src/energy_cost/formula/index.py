@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime as dt
 
 import pandas as pd
@@ -6,14 +8,14 @@ from pydantic import BaseModel, Field
 from energy_cost.index.index import Index
 from energy_cost.resolution import Resolution, to_pandas_freq
 
+from .formula import Formula
+
 
 class IndexAdder(BaseModel):
     index: str
-    # The scalar to multiply the index values by before adding to the cost in €/MWh.
     scalar: float
 
     def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
-        """Get the cost values for the given time range and resolution in €/MWh."""
         index = Index.from_name(self.index)
         index_values = index.get_values(start, end, resolution)
         index_values = index_values.copy()
@@ -21,13 +23,17 @@ class IndexAdder(BaseModel):
         return index_values
 
 
-class PriceFormula(BaseModel):
-    # The constant cost component of the price formula in €/MWh.
+class IndexFormula(Formula):
+    kind: str = "index"
     constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)
 
-    def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
-        """Get the cost values for the given time range and resolution in €/MWh."""
+    def get_values(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        resolution: Resolution,
+    ) -> pd.DataFrame:
         df = pd.DataFrame(
             {
                 "timestamp": pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left"),

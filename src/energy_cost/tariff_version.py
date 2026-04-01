@@ -5,10 +5,9 @@ from typing import Annotated, Any
 import pandas as pd
 from pydantic import BaseModel, BeforeValidator, Field
 
-from .periodic_cost import PeriodicCost
-from .price_formula import PriceFormula
+from .capacity_cost import CapacityComponent
+from .formula import Formula, PeriodicFormula
 from .resolution import Resolution
-from .scheduled_formula import ScheduledPriceFormulas
 
 
 class MeterType(StrEnum):
@@ -37,30 +36,20 @@ _METER_KEYS = {e.value for e in MeterType}
 
 
 def _coerce_cost_type_formulas(value: Any) -> Any:
-    """Allow a bare PriceFormula dict to be shorthand for ``{energy: it}``.
-
-    Detected when the dict's keys are not all recognised CostType values.
-    """
+    """Allow a bare Formula dict to be shorthand for ``{energy: it}``."""
     if isinstance(value, dict) and not value.keys() <= _COST_TYPE_VALUES:
         return {CostType.ENERGY: value}
     return value
 
 
 CostTypeFormulas = Annotated[
-    dict[CostType, PriceFormula | ScheduledPriceFormulas],
+    dict[CostType, Formula],
     BeforeValidator(_coerce_cost_type_formulas),
 ]
 
 
 def _coerce_meter_formulas(value: Any) -> Any:
-    """Coerce shorthand MeterFormulas values.
-
-    - List of scheduled formulas → ``{"all": {energy: it}}``
-    - CostType-keyed dict → ``{"all": it}``
-    - Dict with keys not recognised as meter keys → bare PriceFormula → ``{"all": {energy: it}}``
-    """
-    if isinstance(value, list):
-        return {MeterType.ALL: {CostType.ENERGY: value}}
+    """Coerce shorthand MeterFormulas values."""
     if not isinstance(value, dict):
         return value
     if value.keys() <= _COST_TYPE_VALUES:
@@ -80,19 +69,16 @@ class TariffVersion(BaseModel):
     start: dt.datetime
     injection: MeterFormulas = Field(default_factory=dict)
     consumption: MeterFormulas = Field(default_factory=dict)
-    periodic: dict[str, PeriodicCost] = Field(default_factory=dict)
+    capacity: CapacityComponent | None = None
+    periodic: dict[str, PeriodicFormula] = Field(default_factory=dict)
 
     def resolve_cost_formulas(
         self,
         meter_type: MeterType,
         direction: PowerDirection,
-    ) -> dict[CostType, PriceFormula | ScheduledPriceFormulas]:
-        """Merge the ``all`` defaults with any meter-type-specific overrides for a direction.
-
-        Per-meter-type entries take precedence over ``all`` entries for the same cost type.
-        """
+    ) -> dict[CostType, Formula]:
         direction_formulas: MeterFormulas = getattr(self, direction)
-        result: dict[CostType, PriceFormula | ScheduledPriceFormulas] = {}
+        result: dict[CostType, Formula] = {}
         if MeterType.ALL in direction_formulas:
             result.update(direction_formulas[MeterType.ALL])
         if meter_type in direction_formulas:
@@ -107,10 +93,6 @@ class TariffVersion(BaseModel):
         meter_type: MeterType,
         direction: PowerDirection,
     ) -> pd.DataFrame:
-        """Compute cost time series per cost type for the given interval.
-
-        Returns a mapping of cost type to a DataFrame with ``timestamp`` and ``value`` columns.
-        """
         resolved = self.resolve_cost_formulas(meter_type, direction)
         result: pd.DataFrame | None = None
         for cost_type in resolved:
@@ -127,6 +109,10 @@ class TariffVersion(BaseModel):
         result["total"] = result[cost_columns].sum(axis=1)
         return result
 
+    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame:
+        if self.capacity is None:
+            return pd.DataFrame(columns=["timestamp", "value"])
+        return self.capacity.apply(capacity_data)
+
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
-        """Get the prorated periodic costs for the given interval."""
         return {name: entry.get_cost_for_interval(start, end) for name, entry in self.periodic.items()}

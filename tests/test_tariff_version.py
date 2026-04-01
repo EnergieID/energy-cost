@@ -5,11 +5,9 @@ import datetime as dt
 import pandas as pd
 import pytest
 
+from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas
 from energy_cost.fractional_periods import Period
-from energy_cost.periodic_cost import PeriodicCost
-from energy_cost.price_formula import PriceFormula
 from energy_cost.resolution import Resolution
-from energy_cost.scheduled_formula import ScheduledPriceFormulas
 from energy_cost.tariff_version import (
     CostType,
     MeterType,
@@ -20,15 +18,15 @@ from energy_cost.tariff_version import (
 )
 
 
-def _constant_cost(formula: PriceFormula | ScheduledPriceFormulas) -> float:
-    assert isinstance(formula, PriceFormula)
+def _constant_cost(formula: Formula) -> float:
+    assert isinstance(formula, IndexFormula)
     return formula.constant_cost
 
 
 def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {CostType.ENERGY: PriceFormula(constant_cost=-5.0)}},
+        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
     )
 
     single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
@@ -39,7 +37,7 @@ def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
 def test_all_meter_type_formula_is_used_for_tou_peak_injection() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {CostType.ENERGY: PriceFormula(constant_cost=-5.0)}},
+        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
     )
 
     tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
@@ -51,8 +49,8 @@ def test_meter_specific_formula_overrides_all_formula_for_single_rate_consumptio
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
-            "all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)},
-            "single_rate": {CostType.ENERGY: PriceFormula(constant_cost=99.0)},
+            "all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)},
+            "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=99.0)},
         },
     )
 
@@ -64,8 +62,8 @@ def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
-            "all": {CostType.ENERGY: PriceFormula(constant_cost=1.0)},
-            "single_rate": {CostType.ENERGY: PriceFormula(constant_cost=99.0)},
+            "all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)},
+            "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=99.0)},
         },
     )
 
@@ -79,9 +77,9 @@ def test_get_cost_returns_one_column_per_resolved_cost_type() -> None:
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
             "all": {
-                CostType.ENERGY: PriceFormula(constant_cost=10.0),
-                CostType.CHP_CERTIFICATES: PriceFormula(constant_cost=2.0),
-                CostType.RENEWABLE_CERTIFICATES: PriceFormula(constant_cost=3.0),
+                CostType.ENERGY: IndexFormula(constant_cost=10.0),
+                CostType.CHP_CERTIFICATES: IndexFormula(constant_cost=2.0),
+                CostType.RENEWABLE_CERTIFICATES: IndexFormula(constant_cost=3.0),
             }
         },
     )
@@ -105,8 +103,8 @@ def test_get_periodic_cost_returns_prorated_cost_for_each_periodic_entry() -> No
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         periodic={
-            "admin": PeriodicCost(period=Period.DAILY, constant_cost=24.0),
-            "billing": PeriodicCost(period=Period.DAILY, constant_cost=12.0),
+            "admin": PeriodicFormula(period=Period.DAILY, constant_cost=24.0),
+            "billing": PeriodicFormula(period=Period.DAILY, constant_cost=12.0),
         },
     )
 
@@ -148,24 +146,27 @@ def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types(
     assert _constant_cost(resolved[CostType.CHP_CERTIFICATES]) == 2.0
 
 
-def test_model_validation_treats_scheduled_formula_list_as_all_meter_type_energy() -> None:
+def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00+01:00",
-            "consumption": [
-                {
-                    "when": [{"days": ["monday"], "start": "06:00:00", "end": "10:00:00"}],
-                    "constant_cost": 300.0,
-                },
-                {"constant_cost": 100.0},
-            ],
+            "consumption": {
+                "kind": "scheduled",
+                "schedule": [
+                    {
+                        "when": [{"days": ["monday"], "start": "06:00:00", "end": "10:00:00"}],
+                        "formula": {"constant_cost": 300.0},
+                    },
+                    {"formula": {"constant_cost": 100.0}},
+                ],
+            },
         }
     )
 
     resolved = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
     formula = resolved[CostType.ENERGY]
 
-    assert isinstance(formula, ScheduledPriceFormulas)
+    assert isinstance(formula, ScheduledFormulas)
 
     out = formula.get_values(
         dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
@@ -188,13 +189,13 @@ def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
 
 
 def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> None:
-    class EmptyPriceFormula(PriceFormula):
+    class EmptyIndexFormula(IndexFormula):
         def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
 
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={"all": {CostType.ENERGY: EmptyPriceFormula()}},
+        consumption={"all": {CostType.ENERGY: EmptyIndexFormula()}},
     )
 
     with pytest.raises(ValueError, match="No formulas for meter type 'single_rate' and direction 'consumption'"):
@@ -205,3 +206,16 @@ def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> Non
             meter_type=MeterType.SINGLE_RATE,
             direction=PowerDirection.CONSUMPTION,
         )
+
+
+def test_apply_capacity_cost_returns_empty_dataframe_when_no_capacity_component_configured() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
+    )
+
+    out = segment.apply_capacity_cost(
+        pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]})
+    )
+
+    assert out.empty

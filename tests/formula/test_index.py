@@ -3,9 +3,27 @@ from __future__ import annotations
 import datetime as dt
 
 import pandas as pd
+import pytz
 
+from energy_cost.formula import IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
-from energy_cost.price_formula import IndexAdder, PriceFormula
+
+
+def test_index_formula_merges_with_timezone_conversion():
+    # Create index data in Europe/Brussels timezone
+    tz_brussels = pytz.timezone("Europe/Brussels")
+    timestamps_brussels = pd.date_range(tz_brussels.localize(dt.datetime(2025, 1, 1, 1, 0)), periods=3, freq="15min")
+    index_df = pd.DataFrame({"timestamp": timestamps_brussels, "value": [1.0, 2.0, 3.0]})
+    Index.register("tztest", DataFrameIndex(index_df))
+    # Request with UTC datetimes
+    start_utc = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
+    end_utc = dt.datetime(2025, 1, 1, 0, 45, tzinfo=dt.UTC)
+    formula = IndexFormula(constant_cost=1.0, variable_costs=[IndexAdder(index="tztest", scalar=1.0)])
+    out = formula.get_values(start=start_utc, end=end_utc, resolution=dt.timedelta(minutes=15))
+    # All timestamps should be UTC
+    assert all(ts.tzinfo == dt.UTC for ts in out["timestamp"])
+    # Values should be correct (constant + index values)
+    assert out["value"].tolist() == [2.0, 3.0, 4.0]
 
 
 def test_index_adder_multiplies_index_values() -> None:
@@ -25,12 +43,11 @@ def test_index_adder_multiplies_index_values() -> None:
     )
 
     assert out["value"].tolist() == [1.0, 2.0]
-    # Ensure original frame is untouched.
     assert base["value"].tolist() == [10.0, 20.0]
 
 
-def test_price_formula_constant_only() -> None:
-    formula = PriceFormula(constant_cost=1.5)
+def test_index_formula_constant_only() -> None:
+    formula = IndexFormula(constant_cost=1.5)
 
     out = formula.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
@@ -42,16 +59,15 @@ def test_price_formula_constant_only() -> None:
     assert out["value"].tolist() == [1.5, 1.5, 1.5]
 
 
-def test_price_formula_adds_multiple_variable_costs_and_fills_missing() -> None:
+def test_index_formula_adds_multiple_variable_costs() -> None:
     timestamps = pd.date_range("2025-01-01", periods=3, freq="15min")
     index_a_df = pd.DataFrame({"timestamp": timestamps, "value": [1.0, 2.0, 3.0]})
-    # Missing middle timestamp on purpose to validate forward-filling of missing values.
     index_b_df = pd.DataFrame({"timestamp": [timestamps[0], timestamps[2]], "value": [10.0, 30.0]})
 
     Index.register("a", DataFrameIndex(index_a_df))
     Index.register("b", DataFrameIndex(index_b_df))
 
-    formula = PriceFormula(
+    formula = IndexFormula(
         constant_cost=0.5,
         variable_costs=[IndexAdder(index="a", scalar=1.0), IndexAdder(index="b", scalar=0.1)],
     )
@@ -65,17 +81,31 @@ def test_price_formula_adds_multiple_variable_costs_and_fills_missing() -> None:
     assert out["value"].tolist() == [2.5, 3.5, 6.5]
 
 
-def test_price_formulas_return_nan_for_timestamps_where_one_index_returns_nan() -> None:
+def test_index_formula_apply_multiplies_input_dataframe() -> None:
+    formula = IndexFormula(constant_cost=2.0)
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=3, freq="15min"),
+            "value": [1.0, 2.0, 3.0],
+        }
+    )
+
+    out = formula.apply(data)
+
+    assert out["value"].tolist() == [2.0, 4.0, 6.0]
+
+
+def test_index_formula_returns_nan_outside_index_range() -> None:
     timestamps = pd.date_range("2025-01-01", periods=3, freq="15min")
     index_a_df = pd.DataFrame({"timestamp": timestamps, "value": [1.0, 2.0, 3.0]})
     index_b_df = pd.DataFrame({"timestamp": timestamps[:-1], "value": [10.0, 30.0]})
 
-    Index.register("a", DataFrameIndex(index_a_df))
-    Index.register("b", DataFrameIndex(index_b_df))
+    Index.register("a-range", DataFrameIndex(index_a_df))
+    Index.register("b-range", DataFrameIndex(index_b_df))
 
-    formula = PriceFormula(
+    formula = IndexFormula(
         constant_cost=0.5,
-        variable_costs=[IndexAdder(index="a", scalar=1.0), IndexAdder(index="b", scalar=0.1)],
+        variable_costs=[IndexAdder(index="a-range", scalar=1.0), IndexAdder(index="b-range", scalar=0.1)],
     )
 
     out = formula.get_values(
@@ -85,3 +115,15 @@ def test_price_formulas_return_nan_for_timestamps_where_one_index_returns_nan() 
     )
 
     assert out["value"].isna().tolist() == [True, True, False, False, True, True]
+
+
+def test_index_formula_with_only_constant_value_returns_valid_for_all_timestamps() -> None:
+    formula = IndexFormula(constant_cost=5.0)
+
+    out = formula.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert out["value"].tolist() == [5.0] * 4
