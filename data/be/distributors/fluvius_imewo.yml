@@ -8,14 +8,14 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 7.9091715
+          constant_cost: 8.2097644
       - formula:
-          constant_cost: 3163.6686167
+          constant_cost: 3283.905775
   consumption:
     all:
-      constant_cost: 39.0993
+      constant_cost: 39.7791
     night_only:
-      constant_cost: 27.9053
+      constant_cost: 28.6165
   periodic:
     data_mamangement:
       period: yearly
@@ -30,14 +30,14 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 10.4670865
+          constant_cost: 11.092133
       - formula:
-          constant_cost: 4186.8346083
+          constant_cost: 4436.8531917
   consumption:
     all:
-      constant_cost: 56.5101
+      constant_cost: 58.9031
     night_only:
-      constant_cost: 46.9616
+      constant_cost: 49.1561
   periodic:
     data_mamangement:
       period: yearly
@@ -52,14 +52,14 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 10.2924284
+          constant_cost: 11.2918712
       - formula:
-          constant_cost: 4116.9713583
+          constant_cost: 4516.7484667
   consumption:
     all:
-      constant_cost: 50.5027
+      constant_cost: 52.2864
     night_only:
-      constant_cost: 45.4058
+      constant_cost: 47.3024
   periodic:
     data_mamangement:
       period: yearly
