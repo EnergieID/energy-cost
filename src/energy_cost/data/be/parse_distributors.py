@@ -177,7 +177,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
             "night_only": {"constant_cost": tariffs["consumption_night"]},
         },
         "periodic": {
-            "data_mamangement": {
+            "data_manangement": {
                 "period": "yearly",
                 "constant_cost": tariffs["databeheer"],
             }

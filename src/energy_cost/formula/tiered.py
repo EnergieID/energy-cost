@@ -63,6 +63,10 @@ class TieredFormula(Formula):
             mask = band.matches(data_series)
             banded_series = data_series[mask]
 
+            if banded_series.empty:
+                data_series = data_series[~mask]
+                continue
+
             banded_frame = pd.DataFrame({"timestamp": banded_series.index, "value": banded_series.values})
             applied_band_values = band.formula.apply(banded_frame, resolution=resolution)
             result = result.merge(applied_band_values, on="timestamp", how="left", suffixes=("", "_band"))

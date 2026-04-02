@@ -76,7 +76,7 @@ class Tariff(BaseModel):
         return self._collect_version_frames(
             self._find_active_versions(start, end),
             lambda version, seg_start, seg_end: version.apply_energy_cost(
-                data[(data["timestamp"] >= seg_start) & (data["timestamp"] < seg_end)],
+                data,
                 meter_type,
                 direction,
             ),

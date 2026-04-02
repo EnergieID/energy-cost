@@ -14,7 +14,7 @@ class Contract(BaseModel):
     fees: Tariff = Tariff(versions=[])
     tax_rate: float = 0.0
 
-    def calculate(
+    def calculate_cost(
         self,
         consumption: pd.DataFrame,
         injection: pd.DataFrame | None = None,

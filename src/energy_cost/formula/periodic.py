@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 
 from energy_cost.fractional_periods import Period
-from energy_cost.resolution import Resolution, detect_resolution_and_range, to_pandas_freq
+from energy_cost.resolution import Resolution, detect_resolution_and_range, to_pandas_freq, to_pandas_offset
 
 from .formula import Formula
 
@@ -25,7 +25,9 @@ class PeriodicFormula(Formula):
         return pd.DataFrame(
             {
                 "timestamp": timestamps,
-                "value": timestamps.to_series().apply(lambda ts: self.get_cost_for_interval(ts, ts + resolution)),
+                "value": timestamps.to_series().apply(
+                    lambda ts: self.get_cost_for_interval(ts, ts + to_pandas_offset(resolution))
+                ),
             }
         )
 

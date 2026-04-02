@@ -115,5 +115,5 @@ def detect_resolution_and_range(
             raise ValueError("A resolution is required when applying a formula to fewer than 2 timestamps.")
         resolution = detect_resolution(data["timestamp"])
     start = data["timestamp"].min()
-    end = data["timestamp"].max() + resolution
+    end = data["timestamp"].max() + to_pandas_offset(resolution)
     return start, end, resolution

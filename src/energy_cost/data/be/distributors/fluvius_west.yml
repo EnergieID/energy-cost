@@ -17,7 +17,7 @@
     night_only:
       constant_cost: 30.0765
   periodic:
-    data_mamangement:
+    data_manangement:
       period: yearly
       constant_cost: 14.28
 - start: '2025-01-01T00:00:00+01:00'
@@ -39,7 +39,7 @@
     night_only:
       constant_cost: 57.9231
   periodic:
-    data_mamangement:
+    data_manangement:
       period: yearly
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
@@ -61,6 +61,6 @@
     night_only:
       constant_cost: 56.536
   periodic:
-    data_mamangement:
+    data_manangement:
       period: yearly
       constant_cost: 17.85

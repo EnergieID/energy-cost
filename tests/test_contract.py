@@ -256,7 +256,7 @@ def test_contract_combines_provider_and_distributor() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate(consumption)
+    result = contract.calculate_cost(consumption)
 
     assert ("provider", "consumption", "energy") in result.columns
     assert ("distributor", "consumption", "energy") in result.columns
@@ -274,7 +274,7 @@ def test_contract_taxes_applied_to_provider_and_distributor_not_fees() -> None:
     # 2 intervals × 1 MWh each
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate(consumption)
+    result = contract.calculate_cost(consumption)
 
     provider_total = result[("provider", "total", "total")].iloc[0]
     distributor_total = result[("distributor", "total", "total")].iloc[0]
@@ -299,7 +299,7 @@ def test_contract_no_fees_omits_fees_columns() -> None:
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate(_consumption(timestamps))
+    result = contract.calculate_cost(_consumption(timestamps))
 
     assert not any(isinstance(c, tuple) and c[0] == "fees" for c in result.columns)
 
@@ -312,7 +312,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate(_consumption(timestamps))
+    result = contract.calculate_cost(_consumption(timestamps))
 
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)  # type: ignore[arg-type]
@@ -328,7 +328,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.calculate(consumption)
+    result = contract.calculate_cost(consumption)
 
     p = result[("provider", "total", "total")].iloc[0]
     d = result[("distributor", "total", "total")].iloc[0]
