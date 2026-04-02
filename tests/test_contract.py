@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from energy_cost.billing import Billing
+from energy_cost.contract import Contract
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
 from energy_cost.tariff import Tariff
@@ -243,28 +243,28 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Billing.calculate
+# Contract.calculate
 # ---------------------------------------------------------------------------
 
 
-def test_billing_combines_provider_and_distributor() -> None:
+def test_contract_combines_provider_and_distributor() -> None:
     """calculate() returns a single DataFrame with provider + distributor data."""
-    billing = Billing(
+    contract = Contract(
         provider=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = billing.calculate(consumption)
+    result = contract.calculate(consumption)
 
     assert ("provider", "consumption", "energy") in result.columns
     assert ("distributor", "consumption", "energy") in result.columns
 
 
-def test_billing_taxes_applied_to_provider_and_distributor_not_fees() -> None:
+def test_contract_taxes_applied_to_provider_and_distributor_not_fees() -> None:
     """Taxes are computed on provider + distributor totals only; fees total is excluded."""
-    billing = Billing(
+    contract = Contract(
         provider=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=100.0),
         fees=_tariff(energy_rate=50.0),
@@ -274,7 +274,7 @@ def test_billing_taxes_applied_to_provider_and_distributor_not_fees() -> None:
     # 2 intervals × 1 MWh each
     consumption = _consumption(timestamps, value=1.0)
 
-    result = billing.calculate(consumption)
+    result = contract.calculate(consumption)
 
     provider_total = result[("provider", "total", "total")].iloc[0]
     distributor_total = result[("distributor", "total", "total")].iloc[0]
@@ -292,35 +292,35 @@ def test_billing_taxes_applied_to_provider_and_distributor_not_fees() -> None:
     assert total_cost == pytest.approx(540.0)
 
 
-def test_billing_no_fees_omits_fees_columns() -> None:
+def test_contract_no_fees_omits_fees_columns() -> None:
     """When fees produces no output the result has no fees columns."""
-    billing = Billing(
+    contract = Contract(
         provider=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = billing.calculate(_consumption(timestamps))
+    result = contract.calculate(_consumption(timestamps))
 
     assert not any(isinstance(c, tuple) and c[0] == "fees" for c in result.columns)
 
 
-def test_billing_column_structure_is_three_level_multiindex() -> None:
+def test_contract_column_structure_is_three_level_multiindex() -> None:
     """Data columns form a three-level MultiIndex; timestamp is a plain column."""
-    billing = Billing(
+    contract = Contract(
         provider=_tariff(energy_rate=10.0),
         distributor=_tariff(energy_rate=5.0),
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = billing.calculate(_consumption(timestamps))
+    result = contract.calculate(_consumption(timestamps))
 
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)  # type: ignore[arg-type]
 
 
-def test_billing_total_cost_equals_manual_sum() -> None:
+def test_contract_total_cost_equals_manual_sum() -> None:
     """total_cost == provider_total + distributor_total + taxes (no fees case)."""
-    billing = Billing(
+    contract = Contract(
         provider=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=50.0),
         tax_rate=0.21,
@@ -328,7 +328,7 @@ def test_billing_total_cost_equals_manual_sum() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = billing.calculate(consumption)
+    result = contract.calculate(consumption)
 
     p = result[("provider", "total", "total")].iloc[0]
     d = result[("distributor", "total", "total")].iloc[0]
