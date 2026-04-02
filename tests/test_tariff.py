@@ -134,13 +134,14 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> Non
         ]
     )
 
-    out = tariff.apply_capacity_cost(
-        pd.DataFrame(
-            {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
-        ),
+    assert (
+        tariff.apply_capacity_cost(
+            pd.DataFrame(
+                {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
+            ),
+        )
+        is None
     )
-
-    assert out.empty
 
 
 def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_capacity_cost() -> None:
@@ -153,10 +154,11 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_cap
         ]
     )
 
-    out = tariff.apply_capacity_cost(
-        pd.DataFrame(
-            {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
-        ),
+    assert (
+        tariff.apply_capacity_cost(
+            pd.DataFrame(
+                {"timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-01-01 01:00:00"]), "value": [10.0, 20.0]}
+            ),
+        )
+        is None
     )
-
-    assert out.empty

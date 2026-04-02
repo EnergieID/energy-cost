@@ -29,7 +29,7 @@ def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
         injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
     )
 
-    single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
+    single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
 
     assert _constant_cost(single[CostType.ENERGY]) == -5.0
 
@@ -40,7 +40,7 @@ def test_all_meter_type_formula_is_used_for_tou_peak_injection() -> None:
         injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
     )
 
-    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
+    tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
 
     assert _constant_cost(tou[CostType.ENERGY]) == -5.0
 
@@ -54,7 +54,7 @@ def test_meter_specific_formula_overrides_all_formula_for_single_rate_consumptio
         },
     )
 
-    single = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
     assert _constant_cost(single[CostType.ENERGY]) == 99.0
 
 
@@ -67,7 +67,7 @@ def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
         },
     )
 
-    tou = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
+    tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
     assert _constant_cost(tou[CostType.ENERGY]) == 1.0
 
@@ -125,7 +125,7 @@ def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_ener
         }
     )
 
-    resolved = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
     assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
 
@@ -141,7 +141,7 @@ def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types(
         }
     )
 
-    resolved = segment.resolve_cost_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
+    resolved = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
     assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
     assert _constant_cost(resolved[CostType.CHP_CERTIFICATES]) == 2.0
@@ -164,7 +164,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy
         }
     )
 
-    resolved = segment.resolve_cost_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
+    resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
     formula = resolved[CostType.ENERGY]
 
     assert isinstance(formula, ScheduledFormulas)
@@ -209,14 +209,15 @@ def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_se
     assert result is None
 
 
-def test_apply_capacity_cost_returns_empty_dataframe_when_no_capacity_component_configured() -> None:
+def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
     )
 
-    out = segment.apply_capacity_cost(
-        pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]})
+    assert (
+        segment.apply_capacity_cost(
+            pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]})
+        )
+        is None
     )
-
-    assert out.empty

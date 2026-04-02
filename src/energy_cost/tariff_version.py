@@ -1,4 +1,5 @@
 import datetime as dt
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -72,7 +73,7 @@ class TariffVersion(BaseModel):
     capacity: CapacityComponent | None = None
     periodic: dict[str, PeriodicFormula] = Field(default_factory=dict)
 
-    def resolve_cost_formulas(
+    def _resolve_energy_formulas(
         self,
         meter_type: MeterType,
         direction: PowerDirection,
@@ -85,6 +86,28 @@ class TariffVersion(BaseModel):
             result.update(direction_formulas[meter_type])
         return result
 
+    def _combine_energy_formulas(
+        self,
+        meter_type: MeterType,
+        direction: PowerDirection,
+        get_df: Callable[[Formula], pd.DataFrame],
+    ) -> pd.DataFrame | None:
+        resolved = self._resolve_energy_formulas(meter_type, direction)
+        result: pd.DataFrame | None = None
+        for cost_type, formula in resolved.items():
+            df = get_df(formula)
+            if df.empty:
+                continue
+            df = df.rename(columns={"value": cost_type.value})
+            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+
+        if result is None:
+            return None
+
+        cost_columns = [col for col in result.columns if col != "timestamp"]
+        result["total"] = result[cost_columns].sum(axis=1)
+        return result
+
     def get_energy_cost(
         self,
         start: dt.datetime,
@@ -94,21 +117,11 @@ class TariffVersion(BaseModel):
         direction: PowerDirection,
     ) -> pd.DataFrame | None:
         """Get energy cost rates in €/MWh. Returns None if no formulas are configured."""
-        resolved = self.resolve_cost_formulas(meter_type, direction)
-        result: pd.DataFrame | None = None
-        for cost_type, formula in resolved.items():
-            df = formula.get_values(start, end, resolution)
-            if df.empty:
-                continue
-            df = df.rename(columns={"value": cost_type.value})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
-
-        if result is None:
-            return None
-
-        cost_columns = [col for col in result.columns if col != "timestamp"]
-        result["total"] = result[cost_columns].sum(axis=1)
-        return result
+        return self._combine_energy_formulas(
+            meter_type,
+            direction,
+            lambda formula: formula.get_values(start, end, resolution),
+        )
 
     def apply_energy_cost(
         self,
@@ -117,25 +130,15 @@ class TariffVersion(BaseModel):
         direction: PowerDirection,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data, returning costs in €."""
-        resolved = self.resolve_cost_formulas(meter_type, direction)
-        result: pd.DataFrame | None = None
-        for cost_type, formula in resolved.items():
-            df = formula.apply(data)
-            if df.empty:
-                continue
-            df = df.rename(columns={"value": cost_type.value})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+        return self._combine_energy_formulas(
+            meter_type,
+            direction,
+            lambda formula: formula.apply(data),
+        )
 
-        if result is None:
-            return None
-
-        cost_columns = [col for col in result.columns if col != "timestamp"]
-        result["total"] = result[cost_columns].sum(axis=1)
-        return result
-
-    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame:
+    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame | None:
         if self.capacity is None:
-            return pd.DataFrame(columns=["timestamp", "value"])
+            return None
         return self.capacity.apply(capacity_data)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:

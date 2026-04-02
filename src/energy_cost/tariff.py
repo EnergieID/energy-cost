@@ -1,5 +1,6 @@
 import bisect
 import datetime as dt
+from collections.abc import Callable
 from pathlib import Path
 
 import isodate
@@ -49,28 +50,20 @@ class Tariff(BaseModel):
         direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame | None:
         """Get energy cost rates in €/MWh. Returns None if no active versions have formulas."""
-        result: pd.DataFrame | None = None
-        for version, seg_start, seg_end in self._find_active_versions(start, end):
-            df = version.get_energy_cost(seg_start, seg_end, resolution, meter_type, direction)
-            if df is None:
-                continue
-            result = df if result is None else pd.concat([result, df]).groupby("timestamp", as_index=False).sum()
+        return self._collect_version_frames(
+            self._find_active_versions(start, end),
+            lambda version, seg_start, seg_end: version.get_energy_cost(
+                seg_start, seg_end, resolution, meter_type, direction
+            ),
+        )
 
-        return result.sort_values("timestamp").reset_index(drop=True) if result is not None else None
-
-    def apply_capacity_cost(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Get the capacity cost values for the given meter type and time range in €/kW."""
-        result_frames: list[pd.DataFrame] = []
+    def apply_capacity_cost(self, data: pd.DataFrame) -> pd.DataFrame | None:
+        """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
         start, end, _ = detect_resolution_and_range(data)
-        for version, seg_start, seg_end in self._find_active_versions(start, end):
-            df = version.apply_capacity_cost(data)
-            df = df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
-            result_frames.append(df)
-
-        if not result_frames:
-            return pd.DataFrame(columns=["timestamp", "value"])
-
-        return pd.concat(result_frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
+        return self._collect_version_frames(
+            self._find_active_versions(start, end),
+            lambda version, seg_start, seg_end: version.apply_capacity_cost(data),
+        )
 
     def apply_energy_cost(
         self,
@@ -78,24 +71,30 @@ class Tariff(BaseModel):
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
     ) -> pd.DataFrame | None:
-        """Apply energy cost formulas to quantity data across all active versions.
-
-        Delegates to each version's ``apply_energy_cost``, which uses formula-level
-        ``apply`` so formula-specific aggregation is respected.
-        Returns None if no active versions have formulas for the given direction/meter type.
-        """
+        """Apply energy cost formulas to quantity data across all active versions."""
         start, end, _ = detect_resolution_and_range(data)
-        result: pd.DataFrame | None = None
-        for version, seg_start, seg_end in self._find_active_versions(start, end):
-            sliced = data[(data["timestamp"] >= seg_start) & (data["timestamp"] < seg_end)]
-            if sliced.empty:
-                continue
-            df = version.apply_energy_cost(sliced, meter_type, direction)
-            if df is None:
-                continue
-            result = df if result is None else pd.concat([result, df]).groupby("timestamp", as_index=False).sum()
+        return self._collect_version_frames(
+            self._find_active_versions(start, end),
+            lambda version, seg_start, seg_end: version.apply_energy_cost(
+                data[(data["timestamp"] >= seg_start) & (data["timestamp"] < seg_end)],
+                meter_type,
+                direction,
+            ),
+        )
 
-        return result.sort_values("timestamp").reset_index(drop=True) if result is not None else None
+    @staticmethod
+    def _collect_version_frames(
+        segments: list[tuple[TariffVersion, dt.datetime, dt.datetime]],
+        get_frame: "Callable[[TariffVersion, dt.datetime, dt.datetime], pd.DataFrame | None]",
+    ) -> pd.DataFrame | None:
+        frames = [
+            df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
+            for version, seg_start, seg_end in segments
+            if (df := get_frame(version, seg_start, seg_end)) is not None and not df.empty
+        ]
+        if not frames:
+            return None
+        return pd.concat(frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
         totals: dict[str, float] = {}
@@ -200,7 +199,7 @@ class Tariff(BaseModel):
         output_freq: str,
     ) -> pd.DataFrame | None:
         capacity_df = self.apply_capacity_cost(consumption)
-        if capacity_df.empty:
+        if capacity_df is None:
             return None
         filtered = capacity_df[(capacity_df["timestamp"] >= billing_start) & (capacity_df["timestamp"] < billing_end)]
         if filtered.empty:
