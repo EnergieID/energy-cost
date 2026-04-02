@@ -72,7 +72,7 @@ def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
     assert _constant_cost(tou[CostType.ENERGY]) == 1.0
 
 
-def test_get_cost_returns_one_column_per_resolved_cost_type() -> None:
+def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
@@ -84,7 +84,7 @@ def test_get_cost_returns_one_column_per_resolved_cost_type() -> None:
         },
     )
 
-    out = segment.get_cost(
+    out = segment.get_energy_cost(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
         resolution=dt.timedelta(minutes=15),
@@ -92,6 +92,7 @@ def test_get_cost_returns_one_column_per_resolved_cost_type() -> None:
         direction=PowerDirection.CONSUMPTION,
     )
 
+    assert out is not None
     assert set(out.columns) == {"timestamp", "energy", "chp_certificates", "renewable_certificates", "total"}
     assert out["energy"].tolist() == [10.0, 10.0, 10.0, 10.0]
     assert out["chp_certificates"].tolist() == [2.0, 2.0, 2.0, 2.0]
@@ -188,7 +189,7 @@ def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
     assert _coerce_meter_formulas(sentinel) == sentinel
 
 
-def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> None:
+def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_series() -> None:
     class EmptyIndexFormula(IndexFormula):
         def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
@@ -198,14 +199,14 @@ def test_get_cost_raises_when_all_resolved_formulas_return_empty_series() -> Non
         consumption={"all": {CostType.ENERGY: EmptyIndexFormula()}},
     )
 
-    with pytest.raises(ValueError, match="No formulas for meter type 'single_rate' and direction 'consumption'"):
-        segment.get_cost(
-            start=dt.datetime(2025, 1, 1, 0, 0),
-            end=dt.datetime(2025, 1, 1, 1, 0),
-            resolution=dt.timedelta(minutes=15),
-            meter_type=MeterType.SINGLE_RATE,
-            direction=PowerDirection.CONSUMPTION,
-        )
+    result = segment.get_energy_cost(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        resolution=dt.timedelta(minutes=15),
+        meter_type=MeterType.SINGLE_RATE,
+        direction=PowerDirection.CONSUMPTION,
+    )
+    assert result is None
 
 
 def test_apply_capacity_cost_returns_empty_dataframe_when_no_capacity_component_configured() -> None:

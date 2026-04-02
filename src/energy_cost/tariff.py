@@ -7,7 +7,7 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
-from .resolution import Resolution, detect_resolution, detect_resolution_and_range, to_pandas_freq
+from .resolution import Resolution, detect_resolution_and_range, to_pandas_freq
 from .tariff_version import MeterType, PowerDirection, TariffVersion
 
 
@@ -40,26 +40,23 @@ class Tariff(BaseModel):
         ends = [segment.start for segment in segments[1:]] + [end]
         return list(zip(segments, starts, ends, strict=True))
 
-    def get_cost(
+    def get_energy_cost(
         self,
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution = dt.timedelta(minutes=15),
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
-    ) -> pd.DataFrame:
-        """Get the cost values for the given meter type and time range at the given resolution in €/MWh."""
+    ) -> pd.DataFrame | None:
+        """Get energy cost rates in €/MWh. Returns None if no active versions have formulas."""
         result: pd.DataFrame | None = None
         for version, seg_start, seg_end in self._find_active_versions(start, end):
-            df = version.get_cost(seg_start, seg_end, resolution, meter_type, direction)
+            df = version.get_energy_cost(seg_start, seg_end, resolution, meter_type, direction)
+            if df is None:
+                continue
             result = df if result is None else pd.concat([result, df]).groupby("timestamp", as_index=False).sum()
 
-        if result is None:
-            raise ValueError(
-                f"No active versions with formulas for meter type '{meter_type}' and direction '{direction}' found in tariff for the given time range."
-            )
-
-        return result.sort_values("timestamp").reset_index(drop=True)
+        return result.sort_values("timestamp").reset_index(drop=True) if result is not None else None
 
     def apply_capacity_cost(self, data: pd.DataFrame) -> pd.DataFrame:
         """Get the capacity cost values for the given meter type and time range in €/kW."""
@@ -74,6 +71,31 @@ class Tariff(BaseModel):
             return pd.DataFrame(columns=["timestamp", "value"])
 
         return pd.concat(result_frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
+
+    def apply_energy_cost(
+        self,
+        data: pd.DataFrame,
+        meter_type: MeterType = MeterType.SINGLE_RATE,
+        direction: PowerDirection = PowerDirection.CONSUMPTION,
+    ) -> pd.DataFrame | None:
+        """Apply energy cost formulas to quantity data across all active versions.
+
+        Delegates to each version's ``apply_energy_cost``, which uses formula-level
+        ``apply`` so formula-specific aggregation is respected.
+        Returns None if no active versions have formulas for the given direction/meter type.
+        """
+        start, end, _ = detect_resolution_and_range(data)
+        result: pd.DataFrame | None = None
+        for version, seg_start, seg_end in self._find_active_versions(start, end):
+            sliced = data[(data["timestamp"] >= seg_start) & (data["timestamp"] < seg_end)]
+            if sliced.empty:
+                continue
+            df = version.apply_energy_cost(sliced, meter_type, direction)
+            if df is None:
+                continue
+            result = df if result is None else pd.concat([result, df]).groupby("timestamp", as_index=False).sum()
+
+        return result.sort_values("timestamp").reset_index(drop=True) if result is not None else None
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
         totals: dict[str, float] = {}
@@ -90,7 +112,7 @@ class Tariff(BaseModel):
         end: dt.datetime | None = None,
         resolution: Resolution | None = None,
         meter_type: MeterType = MeterType.SINGLE_RATE,
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | None:
         """Apply the tariff to consumption (and optionally injection) data.
 
         Parameters
@@ -116,30 +138,25 @@ class Tariff(BaseModel):
         if resolution is None:
             resolution = isodate.Duration(months=1)
         billing_start: dt.datetime = start if start is not None else consumption["timestamp"].min()
-        billing_end: dt.datetime = end if end is not None else consumption["timestamp"].max() + resolution
+        if end is not None:
+            billing_end: dt.datetime = end
+        else:
+            data_resolution = detect_resolution_and_range(consumption)[2]
+            billing_end = consumption["timestamp"].max() + data_resolution
         output_freq = to_pandas_freq(resolution)
 
-        frames: list[pd.DataFrame] = [
-            self._apply_direction_costs(
-                consumption,
-                billing_start,
-                billing_end,
-                meter_type,
-                PowerDirection.CONSUMPTION,
-                output_freq,
-            ),
-        ]
-        if injection is not None:
-            frames.append(
-                self._apply_direction_costs(
-                    injection,
-                    billing_start,
-                    billing_end,
-                    meter_type,
-                    PowerDirection.INJECTION,
-                    output_freq,
-                )
+        frames: list[pd.DataFrame] = []
+        for direction, direction_data in [
+            (PowerDirection.CONSUMPTION, consumption),
+            (PowerDirection.INJECTION, injection),
+        ]:
+            if direction_data is None:
+                continue
+            frame = self._apply_direction_costs(
+                direction_data, billing_start, billing_end, meter_type, direction, output_freq
             )
+            if frame is not None:
+                frames.append(frame)
 
         for optional_frame in [
             self._apply_capacity_costs(consumption, billing_start, billing_end, output_freq),
@@ -148,8 +165,12 @@ class Tariff(BaseModel):
             if optional_frame is not None:
                 frames.append(optional_frame)
 
+        if not frames:
+            return None
+
         result = pd.concat(frames, axis=1)
-        result[("total", "total")] = result.sum(axis=1)
+        total_cols = [c for c in result.columns if c[-1] == "total"]
+        result[("total", "total")] = result[total_cols].sum(axis=1)
         return result.reset_index()
 
     def _apply_direction_costs(
@@ -160,18 +181,14 @@ class Tariff(BaseModel):
         meter_type: MeterType,
         direction: PowerDirection,
         output_freq: str,
-    ) -> pd.DataFrame:
-        data_resolution = detect_resolution(data["timestamp"])
+    ) -> pd.DataFrame | None:
         sliced = data[(data["timestamp"] >= billing_start) & (data["timestamp"] < billing_end)].copy()
-
-        rates = self.get_cost(billing_start, billing_end, data_resolution, meter_type, direction)
-
-        merged = sliced.merge(rates, on="timestamp", how="left")
-        for col in [c for c in rates.columns if c != "timestamp"]:
-            merged[col] = merged[col] * merged["value"]
-        merged = merged.drop(columns=["value"])
-
-        agg = merged.set_index("timestamp").resample(output_freq).sum()
+        costs = self.apply_energy_cost(sliced, meter_type, direction)
+        if costs is None:
+            return None
+        agg = costs.set_index("timestamp").resample(output_freq).sum()
+        cost_cols = [c for c in agg.columns if c != "total"]
+        agg[("total")] = agg[cost_cols].sum(axis=1)
         agg.columns = pd.MultiIndex.from_tuples([(direction.value, c) for c in agg.columns])
         return agg
 
@@ -188,7 +205,7 @@ class Tariff(BaseModel):
         filtered = capacity_df[(capacity_df["timestamp"] >= billing_start) & (capacity_df["timestamp"] < billing_end)]
         if filtered.empty:
             return None
-        agg = filtered.set_index("timestamp").resample(output_freq).sum().rename(columns={"value": "capacity"})
+        agg = filtered.set_index("timestamp").resample(output_freq).sum().rename(columns={"value": "total"})
         agg.columns = pd.MultiIndex.from_tuples([("capacity", c) for c in agg.columns])
         return agg
 
@@ -209,5 +226,6 @@ class Tariff(BaseModel):
         if not names:
             return None
         df = pd.DataFrame(rows).set_index("timestamp").fillna(0.0)
+        df["total"] = df.sum(axis=1)
         df.columns = pd.MultiIndex.from_tuples([("fixed", c) for c in df.columns])
         return df

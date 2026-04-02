@@ -85,25 +85,49 @@ class TariffVersion(BaseModel):
             result.update(direction_formulas[meter_type])
         return result
 
-    def get_cost(
+    def get_energy_cost(
         self,
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
         meter_type: MeterType,
         direction: PowerDirection,
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | None:
+        """Get energy cost rates in €/MWh. Returns None if no formulas are configured."""
         resolved = self.resolve_cost_formulas(meter_type, direction)
         result: pd.DataFrame | None = None
-        for cost_type in resolved:
-            df = resolved[cost_type].get_values(start, end, resolution)
+        for cost_type, formula in resolved.items():
+            df = formula.get_values(start, end, resolution)
             if df.empty:
                 continue
             df = df.rename(columns={"value": cost_type.value})
             result = df if result is None else result.merge(df, on="timestamp", how="outer")
 
         if result is None:
-            raise ValueError(f"No formulas for meter type '{meter_type}' and direction '{direction}' found in tariff.")
+            return None
+
+        cost_columns = [col for col in result.columns if col != "timestamp"]
+        result["total"] = result[cost_columns].sum(axis=1)
+        return result
+
+    def apply_energy_cost(
+        self,
+        data: pd.DataFrame,
+        meter_type: MeterType,
+        direction: PowerDirection,
+    ) -> pd.DataFrame | None:
+        """Apply energy cost formulas to quantity data, returning costs in €."""
+        resolved = self.resolve_cost_formulas(meter_type, direction)
+        result: pd.DataFrame | None = None
+        for cost_type, formula in resolved.items():
+            df = formula.apply(data)
+            if df.empty:
+                continue
+            df = df.rename(columns={"value": cost_type.value})
+            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+
+        if result is None:
+            return None
 
         cost_columns = [col for col in result.columns if col != "timestamp"]
         result["total"] = result[cost_columns].sum(axis=1)

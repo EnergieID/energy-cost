@@ -38,17 +38,18 @@ def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
 def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
     tariff = Tariff.from_yaml("examples/tariffs/scheduled.yml")
 
-    out = tariff.get_cost(
+    out = tariff.get_energy_cost(
         start=dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
         end=dt.datetime.fromisoformat("2025-01-06T11:00:00+01:00"),
         resolution=dt.timedelta(hours=1),
     )
 
+    assert out is not None
     assert out["energy"].tolist() == [100.0, 300.0, 300.0, 300.0, 300.0, 150.0]
     assert out["total"].tolist() == [100.0, 300.0, 300.0, 300.0, 300.0, 150.0]
 
 
-def test_get_cost_uses_correct_segment_for_time_range() -> None:
+def test_get_energy_cost_uses_correct_segment_for_time_range() -> None:
     tariff = Tariff(
         versions=[
             TariffVersion(
@@ -62,28 +63,29 @@ def test_get_cost_uses_correct_segment_for_time_range() -> None:
         ]
     )
 
-    out = tariff.get_cost(
+    out = tariff.get_energy_cost(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert out is not None
     assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=4, freq="15min"))
     assert out["energy"].tolist() == [1.0, 1.0, 2.0, 2.0]
     assert out["total"].tolist() == [1.0, 1.0, 2.0, 2.0]
 
 
-def test_get_cost_raises_when_no_formulas_found() -> None:
+def test_get_energy_cost_returns_none_when_no_formulas_found() -> None:
     tariff = Tariff(versions=[TariffVersion(start=dt.datetime(2025, 1, 1, 0, 0))])
 
-    with pytest.raises(ValueError, match="No formulas for meter type 'single_rate' and direction 'consumption'"):
-        tariff.get_cost(
-            start=dt.datetime(2025, 1, 1, 0, 0),
-            end=dt.datetime(2025, 1, 1, 1, 0),
-        )
+    result = tariff.get_energy_cost(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+    )
+    assert result is None
 
 
-def test_get_cost_raises_when_no_versions_overlap_interval() -> None:
+def test_get_energy_cost_returns_none_when_no_versions_overlap_interval() -> None:
     tariff = Tariff(
         versions=[
             TariffVersion(
@@ -93,11 +95,11 @@ def test_get_cost_raises_when_no_versions_overlap_interval() -> None:
         ]
     )
 
-    with pytest.raises(ValueError, match="No active versions with formulas"):
-        tariff.get_cost(
-            start=dt.datetime(2025, 1, 1, 0, 0),
-            end=dt.datetime(2025, 1, 1, 1, 0),
-        )
+    result = tariff.get_energy_cost(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+    )
+    assert result is None
 
 
 def test_get_periodic_cost_spans_multiple_segments() -> None:

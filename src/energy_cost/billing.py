@@ -82,27 +82,24 @@ class Billing(BaseModel):
             meter_type=meter_type,
         )
 
-        provider_df = self.provider.apply(**kwargs).set_index("timestamp")
-        distributor_df = self.distributor.apply(**kwargs).set_index("timestamp")
-        fees_df = self.fees.apply(**kwargs).set_index("timestamp")
+        frames = []
+        for role in ["provider", "distributor", "fees"]:
+            tariff = getattr(self, role)
+            optional_frame = tariff.apply(**kwargs)
+            if optional_frame is not None:
+                optional_frame = optional_frame.set_index("timestamp")
+                optional_frame.columns = pd.MultiIndex.from_tuples([(role,) + col for col in optional_frame.columns])
+                frames.append(optional_frame)
 
-        # Promote each tariff's 2-level columns to 3-level by prepending the role name.
-        provider_df.columns = pd.MultiIndex.from_tuples([("provider",) + tuple(c) for c in provider_df.columns])
-        distributor_df.columns = pd.MultiIndex.from_tuples(
-            [("distributor",) + tuple(c) for c in distributor_df.columns]
-        )
-        fees_df.columns = pd.MultiIndex.from_tuples([("fees",) + tuple(c) for c in fees_df.columns])
-
-        result = pd.concat([provider_df, distributor_df, fees_df], axis=1)
+        result = pd.concat(frames, axis=1)
 
         # Taxes apply to provider + distributor totals only.
         provider_total = result[("provider", "total", "total")]
         distributor_total = result[("distributor", "total", "total")]
-        taxes = (provider_total + distributor_total) * self.tax_rate
-        result[("taxes", "taxes", "taxes")] = taxes
+        result[("taxes", "total", "total")] = (provider_total + distributor_total) * self.tax_rate
 
-        # Grand total: provider + distributor + fees (if any) + taxes.
-        fees_total = result[("fees", "total", "total")]
-        result[("total", "total", "total")] = provider_total + distributor_total + fees_total + taxes
+        # Final total includes fees and taxes.
+        total_cols = [c for c in result.columns if c[-2:] == ("total", "total")]
+        result[("total", "total", "total")] = result[total_cols].sum(axis=1)
 
         return result.reset_index()
