@@ -30,20 +30,7 @@ class TieredFormula(Formula):
         end: dt.datetime,
         resolution: Resolution,
     ) -> pd.DataFrame:
-        result: pd.DataFrame | None = None
-        for index, band in enumerate(self.bands, start=1):
-            band_values = band.formula.get_values(start, end, resolution).copy()
-            rename_map = {
-                column: (f"tier_{index}" if column == "value" else f"tier_{index}_{column}")
-                for column in band_values.columns
-                if column != "timestamp"
-            }
-            band_values = band_values.rename(columns=rename_map)
-            result = band_values if result is None else result.merge(band_values, on="timestamp", how="outer")
-
-        if result is None:
-            return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]")})
-        return result
+        raise NotImplementedError("Tiered formulas cannot be represented as time series. Use apply() instead.")
 
     def apply(
         self,

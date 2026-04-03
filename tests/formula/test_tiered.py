@@ -4,6 +4,7 @@ import datetime as dt
 
 import isodate
 import pandas as pd
+import pytest
 
 from energy_cost.formula import (
     IndexFormula,
@@ -31,7 +32,7 @@ def test_tier_band_matches_values_up_to_threshold() -> None:
     assert band.matches(values).tolist() == [True, True, False]
 
 
-def test_tiered_formula_get_values_returns_one_column_per_band() -> None:
+def test_tiered_formula_get_values_raises_not_implemented() -> None:
     formula = TieredFormula(
         bands=[
             TierBand(up_to=10.0, formula=IndexFormula(constant_cost=4.0)),
@@ -39,15 +40,12 @@ def test_tiered_formula_get_values_returns_one_column_per_band() -> None:
         ]
     )
 
-    out = formula.get_values(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        end=dt.datetime(2025, 1, 1, 0, 30),
-        resolution=dt.timedelta(minutes=15),
-    )
-
-    assert list(out.columns) == ["timestamp", "tier_1", "tier_2"]
-    assert out["tier_1"].tolist() == [4.0, 4.0]
-    assert out["tier_2"].tolist() == [6.0, 6.0]
+    with pytest.raises(NotImplementedError):
+        formula.get_values(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 1, 1, 0, 30),
+            resolution=dt.timedelta(minutes=15),
+        )
 
 
 def test_tiered_formula_apply_uses_first_matching_band() -> None:
@@ -116,16 +114,15 @@ def test_tiered_formula_apply_supports_scheduled_formula_band() -> None:
     assert out["value"].tolist() == [15.0, 16.0]
 
 
-def test_get_values_returns_empty_dataframe_for_tiered_formula_with_no_bands() -> None:
+def test_tiered_formula_get_values_raises_not_implemented_with_no_bands() -> None:
     formula = TieredFormula(bands=[])
 
-    out = formula.get_values(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        end=dt.datetime(2025, 1, 1, 0, 30),
-        resolution=dt.timedelta(minutes=15),
-    )
-
-    assert out.empty
+    with pytest.raises(NotImplementedError):
+        formula.get_values(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 1, 1, 0, 30),
+            resolution=dt.timedelta(minutes=15),
+        )
 
 
 def test_tiered_formula_apply_skips_band_that_matches_no_rows() -> None:

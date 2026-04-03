@@ -4,6 +4,7 @@ import datetime as dt
 
 import isodate
 import pandas as pd
+import pytest
 
 from energy_cost.formula import PeriodicFormula
 from energy_cost.fractional_periods import Period
@@ -20,16 +21,15 @@ def test_periodic_formula_get_cost_for_interval_is_prorated() -> None:
     assert out == 1.0
 
 
-def test_periodic_formula_get_values_returns_cost_per_interval() -> None:
+def test_periodic_formula_get_values_raises_not_implemented() -> None:
     formula = PeriodicFormula(period=Period.DAILY, constant_cost=24.0)
 
-    out = formula.get_values(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
-    )
-
-    assert out["value"].tolist() == [0.25, 0.25, 0.25, 0.25]
+    with pytest.raises(NotImplementedError):
+        formula.get_values(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 1, 1, 1, 0),
+            resolution=dt.timedelta(minutes=15),
+        )
 
 
 def test_periodic_formula_apply_uses_input_resolution() -> None:
