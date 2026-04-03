@@ -126,3 +126,26 @@ def test_get_values_returns_empty_dataframe_for_tiered_formula_with_no_bands() -
     )
 
     assert out.empty
+
+
+def test_tiered_formula_apply_skips_band_that_matches_no_rows() -> None:
+    """When a band's threshold matches none of the data rows the band is skipped
+    and remaining rows continue to the next band."""
+    formula = TieredFormula(
+        bands=[
+            # This band only covers values <= 5; all test values are > 5, so it is skipped.
+            TierBand(up_to=5.0, formula=IndexFormula(constant_cost=1.0)),
+            TierBand(formula=IndexFormula(constant_cost=10.0)),
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "value": [8.0, 12.0],
+        }
+    )
+
+    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+
+    # Both rows fall through to the catch-all band (constant_cost=10).
+    assert out["value"].tolist() == [80.0, 120.0]

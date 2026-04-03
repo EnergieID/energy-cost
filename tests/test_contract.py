@@ -539,3 +539,65 @@ def test_contract_with_injection_and_tou_meters() -> None:
     assert result[("distributor", "consumption_tou_offpeak", "energy")].iloc[0] == pytest.approx(16.0)
     # total: provider(64+16) + distributor(16) = 96 €
     assert result[("total", "total", "total")].iloc[0] == pytest.approx(96.0)
+
+
+# ---------------------------------------------------------------------------
+# meter.as_single_meter – error path
+# ---------------------------------------------------------------------------
+
+
+def test_as_single_meter_raises_when_no_matching_direction() -> None:
+    """as_single_meter raises ValueError when no meter matches the requested direction."""
+    from energy_cost.meter import as_single_meter
+
+    meters = [
+        Meter(
+            data=pd.DataFrame({"timestamp": pd.Series([], dtype="datetime64[ns]"), "value": pd.Series([], dtype=float)})
+        )
+    ]
+    with pytest.raises(ValueError, match="No meters found for direction"):
+        as_single_meter(meters, PowerDirection.INJECTION)
+
+
+# ---------------------------------------------------------------------------
+# Tariff._apply_capacity_costs – empty-after-filter path
+# ---------------------------------------------------------------------------
+
+
+def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path) -> None:
+    """_apply_capacity_costs returns None when the capacity row timestamps lie entirely
+    outside [billing_start, billing_end).
+
+    With an annual billing period the capacity component produces a single row
+    timestamped at the start of the year (2025-01-01).  When the billing window
+    is restricted to February the Jan row is excluded → filtered is empty → None.
+    """
+    cap_yaml = tmp_path / "cap_annual.yml"
+    cap_yaml.write_text(
+        "- start: 2025-01-01T00:00:00\n"
+        "  capacity:\n"
+        "    measurement_period: PT15M\n"
+        "    billing_period: P1Y\n"
+        "    formula:\n"
+        "      constant_cost: 1.0\n",
+        encoding="utf-8",
+    )
+    tariff = Tariff.from_yaml(cap_yaml)
+
+    # Data spans Jan + Feb so the Feb slice is non-empty (no energy formula, so the
+    # direction-cost frame is None, but detect_resolution_and_range won't error).
+    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min")
+    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min")
+    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
+    consumption = pd.DataFrame({"timestamp": all_ts, "value": 5.0})
+
+    # Billing window is February only → annual capacity row at 2025-01-01 is outside
+    # [2025-02-01, 2025-03-01) → _apply_capacity_costs returns None.
+    result = tariff.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 2, 1, 0, 0),
+        end=dt.datetime(2025, 3, 1, 0, 0),
+    )
+
+    # No energy formula and no in-window capacity → nothing to report.
+    assert result is None
