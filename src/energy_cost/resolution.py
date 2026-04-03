@@ -6,6 +6,14 @@ import pandas as pd
 from pydantic import BeforeValidator
 
 
+def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
+    if tz is None:
+        return d.replace(tzinfo=None) if d.tzinfo is not None else d
+    if d.tzinfo is None:
+        return d.replace(tzinfo=tz)
+    return pd.Timestamp(d).tz_convert(tz).to_pydatetime()
+
+
 def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
     if isinstance(value, str):
         return isodate.parse_duration(value)

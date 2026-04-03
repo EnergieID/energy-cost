@@ -1,9 +1,13 @@
 - start: 2024-01-01T00:00:00+01:00
   consumption:
     constant_cost: 100.0
+  injection:
+    constant_cost: -20.0
 - start: 2025-01-01T00:00:00+01:00
   consumption:
     constant_cost: 90.0
+  injection:
+    constant_cost: -15.0
   periodic:
     fixed_fee:
       period: monthly
@@ -11,6 +15,8 @@
 - start: 2026-01-01T00:00:00+01:00
   consumption:
     constant_cost: 120.0
+  injection:
+    constant_cost: -25.0
   periodic:
     fixed_fee:
       period: monthly

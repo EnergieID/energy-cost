@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
@@ -340,3 +341,57 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     assert d == pytest.approx(400.0)
     assert taxes == pytest.approx((800.0 + 400.0) * 0.21)
     assert total == pytest.approx(p + d + taxes)
+
+
+# ---------------------------------------------------------------------------
+# Contract.calculate_cost — timezone-aware start / end
+# ---------------------------------------------------------------------------
+
+_CET = dt.timezone(dt.timedelta(hours=1))
+
+
+def _tz_contract(
+    *,
+    energy_rate: float = 100.0,
+    daily_fixed: float | None = None,
+) -> Contract:
+    """Contract with tz-aware version starts, matching real YAML-based tariffs."""
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET)
+    consumption: dict = {"all": {CostType.ENERGY: IndexFormula(constant_cost=energy_rate)}}
+    periodic: dict = (
+        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+    )
+    version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
+    tariff = Tariff(versions=[version])
+    return Contract(provider=tariff, distributor=tariff)
+
+
+def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
+    """Timestamps in the result must retain the input data's timezone, not shift to UTC."""
+    contract = _tz_contract(energy_rate=10.0)
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = contract.calculate_cost(consumption)
+
+    assert result["timestamp"].dt.tz is not None
+    # Midnight CET must appear as 2025-01-01 00:00 +01:00, not 2024-12-31 23:00 UTC
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
+
+
+def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
+    """zoneinfo-aware start/end must be accepted without any loss of precision."""
+    contract = _tz_contract(energy_rate=5.0)
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=8, freq="15min")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 2.0})
+
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
+    end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
+
+    result = contract.calculate_cost(consumption, start=start, end=end)
+
+    assert result is not None
+    # 8 intervals × 2 MWh × 5 €/MWh = 80 €
+    assert result[("provider", "total", "total")].iloc[0] == pytest.approx(80.0)
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")

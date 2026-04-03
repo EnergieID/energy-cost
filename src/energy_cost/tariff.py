@@ -8,7 +8,12 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
-from .resolution import Resolution, detect_resolution_and_range, to_pandas_freq
+from .resolution import (
+    Resolution,
+    align_datetime_to_tz,
+    detect_resolution_and_range,
+    to_pandas_freq,
+)
 from .tariff_version import MeterType, PowerDirection, TariffVersion
 
 
@@ -136,6 +141,15 @@ class Tariff(BaseModel):
         """
         if resolution is None:
             resolution = isodate.Duration(months=1)
+
+        # Align start/end to the data's timezone so all intermediate frames share one
+        # timezone object and pd.concat does not convert to UTC.
+        data_tz = consumption["timestamp"].dt.tz
+        if start is not None:
+            start = align_datetime_to_tz(start, data_tz)
+        if end is not None:
+            end = align_datetime_to_tz(end, data_tz)
+
         billing_start: dt.datetime = start if start is not None else consumption["timestamp"].min()
         if end is not None:
             billing_end: dt.datetime = end

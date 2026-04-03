@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pandas as pd
-import pytz
 
 from energy_cost.formula import IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
 
 
 def test_index_formula_merges_with_timezone_conversion():
-    # Create index data in Europe/Brussels timezone
-    tz_brussels = pytz.timezone("Europe/Brussels")
-    timestamps_brussels = pd.date_range(tz_brussels.localize(dt.datetime(2025, 1, 1, 1, 0)), periods=3, freq="15min")
+    # Create index data in Europe/Brussels timezone using ZoneInfo
+    z = ZoneInfo("Europe/Brussels")
+    timestamps_brussels = pd.date_range(dt.datetime(2025, 1, 1, 1, 0, tzinfo=z), periods=3, freq="15min")
     index_df = pd.DataFrame({"timestamp": timestamps_brussels, "value": [1.0, 2.0, 3.0]})
     Index.register("tztest", DataFrameIndex(index_df))
     # Request with UTC datetimes

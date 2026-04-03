@@ -56,7 +56,7 @@ class Formula(ABC, BaseModel):
         start, end, resolution = detect_resolution_and_range(data, resolution)
         formula_values = self.get_values(start, end, resolution)
 
-        result = data.copy()
+        result = data.reset_index(drop=True)
         merged = result.merge(formula_values, on="timestamp", how="left", suffixes=("", "_formula"))
         result["value"] = merged["value_formula"].mul(merged["value"])
         return result

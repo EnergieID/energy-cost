@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
@@ -162,3 +163,102 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_cap
         )
         is None
     )
+
+
+# ---------------------------------------------------------------------------
+# Timezone-aware start / end — Tariff.apply
+# ---------------------------------------------------------------------------
+
+_CET = dt.timezone(dt.timedelta(hours=1))
+
+
+def _tz_tariff(*, energy_rate: float = 100.0, daily_fixed: float | None = None) -> Tariff:
+    """Tariff whose version start is tz-aware (matches real YAML files)."""
+    periodic: dict = (
+        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+    )
+    return Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
+                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=energy_rate)}},
+                periodic=periodic,
+            )
+        ]
+    )
+
+
+def test_apply_output_timestamps_match_input_timezone() -> None:
+    """The output index timezone must equal the input data timezone."""
+    tariff = _tz_tariff(energy_rate=10.0)
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = tariff.apply(consumption)
+
+    assert result is not None
+    assert result["timestamp"].dt.tz is not None
+    # Must show local midnight, not UTC midnight
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
+
+
+def test_apply_zoneinfo_start_preserves_timezone_in_output() -> None:
+    """zoneinfo-based start/end are accepted and output tz matches the data."""
+    tariff = _tz_tariff(energy_rate=10.0)
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
+    end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
+
+    result = tariff.apply(consumption, start=start, end=end)
+
+    assert result is not None
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
+
+
+def test_apply_fixed_costs_timestamps_are_at_billing_start_not_utc() -> None:
+    """Fixed-cost rows must be labelled at local midnight."""
+    tariff = _tz_tariff(energy_rate=0.0, daily_fixed=24.0)
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=48, freq="h")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 0.0})
+
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
+    result = tariff.apply(consumption, start=start)
+
+    assert result is not None
+    assert ("fixed", "total") in result.columns
+    first_ts = result["timestamp"].iloc[0]
+    assert first_ts == pd.Timestamp("2025-01-01T00:00:00+01:00")
+
+
+def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_path: Path) -> None:
+    """Capacity for the first billing month must not be lost when start is tz-aware."""
+    cap_yaml = tmp_path / "cap.yml"
+    cap_yaml.write_text(
+        "- start: 2025-01-01T00:00:00+01:00\n"
+        "  capacity:\n"
+        "    measurement_period: PT15M\n"
+        "    billing_period: P1M\n"
+        "    formula:\n"
+        "      constant_cost: 1.0\n",
+        encoding="utf-8",
+    )
+    tariff = Tariff.from_yaml(cap_yaml)
+
+    ts = pd.date_range("2025-01-01T00:00:00+01:00", "2026-01-01T00:00:00+01:00", freq="15min")
+    consumption = pd.DataFrame({"timestamp": ts[:-1], "value": 5.0})
+
+    z = ZoneInfo("Europe/Brussels")
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
+    end = dt.datetime(2026, 1, 1, 0, 0, tzinfo=z)
+
+    result = tariff.apply(consumption, start=start, end=end)
+
+    assert result is not None
+    assert len(result) == 12
+    assert ("capacity", "total") in result.columns
+    first_ts = result["timestamp"].iloc[0]
+    assert first_ts.month == 1
