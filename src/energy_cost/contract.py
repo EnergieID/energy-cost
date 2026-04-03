@@ -3,9 +3,9 @@ import datetime as dt
 import pandas as pd
 from pydantic import BaseModel
 
+from .meter import Meter
 from .resolution import Resolution
 from .tariff import Tariff
-from .tariff_version import MeterType
 
 
 class Contract(BaseModel):
@@ -16,44 +16,22 @@ class Contract(BaseModel):
 
     def calculate_cost(
         self,
-        consumption: pd.DataFrame,
-        injection: pd.DataFrame | None = None,
+        meters: list[Meter],
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         resolution: Resolution | None = None,
-        meter_type: MeterType = MeterType.SINGLE_RATE,
     ) -> pd.DataFrame:
-        """Calculate the full energy bill.
-        Parameters
-        ----------
-        consumption:
-            DataFrame with ``timestamp`` and ``value`` columns (quantity per interval, e.g. MWh).
-            May extend beyond ``start``/``end`` to supply capacity-cost history.
-        injection:
-            Optional injection quantities in the same format as ``consumption``.
-        start:
-            Billing period start (inclusive).  Defaults to the earliest timestamp in ``consumption``.
-        end:
-            Billing period end (exclusive).  Defaults to one data-resolution step after the last
-            timestamp in ``consumption``.
-        resolution:
-            Output resolution.  Defaults to P1M (calendar-monthly).
-        meter_type:
-            Meter type used when looking up consumption/injection formulas.
-        """
-        kwargs: dict = dict(
-            consumption=consumption,
-            injection=injection,
-            start=start,
-            end=end,
-            resolution=resolution,
-            meter_type=meter_type,
-        )
+        """Calculate the full energy bill."""
 
         frames = []
         for role in ["provider", "distributor", "fees"]:
             tariff = getattr(self, role)
-            optional_frame = tariff.apply(**kwargs)
+            optional_frame = tariff.apply(
+                meters=meters,
+                start=start,
+                end=end,
+                resolution=resolution,
+            )
             if optional_frame is not None:
                 optional_frame = optional_frame.set_index("timestamp")
                 optional_frame.columns = pd.MultiIndex.from_tuples([(role,) + col for col in optional_frame.columns])

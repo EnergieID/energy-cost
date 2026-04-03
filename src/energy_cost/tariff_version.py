@@ -8,20 +8,8 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
+from .meter import MeterType, PowerDirection
 from .resolution import Resolution
-
-
-class MeterType(StrEnum):
-    SINGLE_RATE = "single_rate"
-    TOU_PEAK = "tou_peak"
-    TOU_OFFPEAK = "tou_offpeak"
-    NIGHT_ONLY = "night_only"
-    ALL = "all"  # The "all" meter type is used for formulas that apply to all meter types.
-
-
-class PowerDirection(StrEnum):
-    CONSUMPTION = "consumption"
-    INJECTION = "injection"
 
 
 class CostType(StrEnum):

@@ -8,13 +8,14 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
+from .meter import Meter, MeterType, PowerDirection, as_single_meter
 from .resolution import (
     Resolution,
     align_datetime_to_tz,
     detect_resolution_and_range,
     to_pandas_freq,
 )
-from .tariff_version import MeterType, PowerDirection, TariffVersion
+from .tariff_version import TariffVersion
 
 
 class Tariff(BaseModel):
@@ -110,69 +111,43 @@ class Tariff(BaseModel):
 
     def apply(
         self,
-        consumption: pd.DataFrame,
-        injection: pd.DataFrame | None = None,
+        meters: list[Meter],
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         resolution: Resolution | None = None,
-        meter_type: MeterType = MeterType.SINGLE_RATE,
     ) -> pd.DataFrame | None:
-        """Apply the tariff to consumption (and optionally injection) data.
-
-        Parameters
-        ----------
-        consumption:
-            DataFrame with ``timestamp`` and ``value`` columns (quantity per interval, e.g. MWh).
-            May extend beyond ``start``/``end`` to provide capacity-cost history (e.g. 12 months
-            of prior data for the Flemish peak-demand calculation).
-        injection:
-            Optional DataFrame with the same ``timestamp``/``value`` schema for injection quantities.
-        start:
-            Start of the billing period (inclusive).  Defaults to the earliest timestamp in
-            ``consumption``.
-        end:
-            End of the billing period (exclusive).  Defaults to one data-resolution step after the
-            last timestamp in ``consumption``.
-        resolution:
-            Output resolution; costs are summed into buckets of this width.  Defaults to P1M
-            (calendar-monthly).
-        meter_type:
-            Meter type used when looking up consumption/injection formulas.
-        """
         if resolution is None:
             resolution = isodate.Duration(months=1)
 
+        # used for start and end if not given, but also capacity cost, which don't differentiate by metertype
+        combined_consumption = as_single_meter(meters, PowerDirection.CONSUMPTION).data
+
         # Align start/end to the data's timezone so all intermediate frames share one
         # timezone object and pd.concat does not convert to UTC.
-        data_tz = consumption["timestamp"].dt.tz
+        data_tz = combined_consumption["timestamp"].dt.tz
         if start is not None:
             start = align_datetime_to_tz(start, data_tz)
         if end is not None:
             end = align_datetime_to_tz(end, data_tz)
 
-        billing_start: dt.datetime = start if start is not None else consumption["timestamp"].min()
+        billing_start: dt.datetime = start if start is not None else combined_consumption["timestamp"].min()
         if end is not None:
             billing_end: dt.datetime = end
         else:
-            data_resolution = detect_resolution_and_range(consumption)[2]
-            billing_end = consumption["timestamp"].max() + data_resolution
+            data_resolution = detect_resolution_and_range(combined_consumption)[2]
+            billing_end = combined_consumption["timestamp"].max() + data_resolution
         output_freq = to_pandas_freq(resolution)
 
         frames: list[pd.DataFrame] = []
-        for direction, direction_data in [
-            (PowerDirection.CONSUMPTION, consumption),
-            (PowerDirection.INJECTION, injection),
-        ]:
-            if direction_data is None:
-                continue
+        for meter in meters:
             frame = self._apply_direction_costs(
-                direction_data, billing_start, billing_end, meter_type, direction, output_freq
+                meter.data, billing_start, billing_end, meter.type, meter.direction, output_freq
             )
             if frame is not None:
                 frames.append(frame)
 
         for optional_frame in [
-            self._apply_capacity_costs(consumption, billing_start, billing_end, output_freq),
+            self._apply_capacity_costs(combined_consumption, billing_start, billing_end, output_freq),
             self._apply_fixed_costs(billing_start, billing_end, output_freq),
         ]:
             if optional_frame is not None:
@@ -202,7 +177,10 @@ class Tariff(BaseModel):
         agg = costs.set_index("timestamp").resample(output_freq).sum()
         cost_cols = [c for c in agg.columns if c != "total"]
         agg[("total")] = agg[cost_cols].sum(axis=1)
-        agg.columns = pd.MultiIndex.from_tuples([(direction.value, c) for c in agg.columns])
+        frame_name = direction.value
+        if meter_type != MeterType.SINGLE_RATE:
+            frame_name += f"_{meter_type.value}"
+        agg.columns = pd.MultiIndex.from_tuples([(frame_name, c) for c in agg.columns])
         return agg
 
     def _apply_capacity_costs(
