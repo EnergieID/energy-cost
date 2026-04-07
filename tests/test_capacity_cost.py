@@ -15,6 +15,7 @@ from energy_cost.formula import (
     ScheduledFormulas,
     TierBand,
     TieredFormula,
+    TieringMode,
     WhenClause,
 )
 from energy_cost.fractional_periods import Period
@@ -46,10 +47,11 @@ def test_capacity_component_applies_banded_tiered_formula() -> None:
         measurement_period=isodate.parse_duration("P1M"),
         billing_period=isodate.parse_duration("P1M"),
         formula=TieredFormula(
+            mode=TieringMode.BANDED,
             bands=[
                 TierBand(up_to=10.0, formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=100.0)),
                 TierBand(formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=180.0)),
-            ]
+            ],
         ),
     )
     capacity_data = pd.DataFrame(
@@ -145,6 +147,7 @@ def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
 
     out = tariff.apply_capacity_cost(capacity_data)
 
+    assert out is not None
     assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]))
     assert out["value"].tolist() == [50.0, 100.0]
 
