@@ -26,13 +26,6 @@ def test_tier_band_coerces_nested_formula_dict() -> None:
     assert band.formula.constant_cost == 4.0
 
 
-def test_tier_band_matches_values_up_to_threshold() -> None:
-    band = TierBand(up_to=10.0, formula=IndexFormula(constant_cost=1.0))
-    values = pd.Series([5.0, 10.0, 12.0])
-
-    assert band.matches(values).tolist() == [True, True, False]
-
-
 def test_tiered_formula_get_values_raises_not_implemented() -> None:
     formula = TieredFormula(
         bands=[
@@ -333,3 +326,27 @@ def test_tiered_formula_progressive_with_band_period_notebook_scenario() -> None
 
     # blended rate = (3*5 + 2*7 + 7*10) / 12 = (15 + 14 + 70) / 12 = 99/12 = 8.25
     assert out["value"].tolist() == pytest.approx([99 / 12] * 12)
+
+
+def test_banded_tiers_raises_when_no_band_matches_estimated_total() -> None:
+    """In banded mode, if all bands have an up_to threshold and the period total exceeds
+    the last one, _apply_banded_group has no matching band and must raise ValueError."""
+    formula = TieredFormula(
+        mode=TieringMode.BANDED,
+        band_period=isodate.parse_duration("P1Y"),
+        bands=[
+            TierBand(up_to=5.0, formula=IndexFormula(constant_cost=2.0)),
+            TierBand(up_to=10.0, formula=IndexFormula(constant_cost=4.0)),
+            # no catch-all band
+        ],
+    )
+    # 12 MWh/year — exceeds the highest up_to of 10 MWh with no catch-all to fall back on
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS"),
+            "value": [1.0] * 12,
+        }
+    )
+
+    with pytest.raises(ValueError, match="No tier band matches"):
+        formula.apply(data, resolution=isodate.parse_duration("P1M"))

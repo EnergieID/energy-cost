@@ -195,7 +195,7 @@ def test_apply_column_structure_is_two_level_multiindex() -> None:
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
-    assert all(isinstance(c, tuple) and len(c) == 2 for c in data_cols)  # type: ignore[arg-type]
+    assert all(isinstance(c, tuple) and len(c) == 2 for c in data_cols)
     assert ("consumption", "energy") in result.columns
     assert ("total", "total") in result.columns
 
@@ -322,7 +322,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
     result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
 
     data_cols = [c for c in result.columns if c != "timestamp"]
-    assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)  # type: ignore[arg-type]
+    assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
 
 
 def test_contract_total_cost_equals_manual_sum() -> None:

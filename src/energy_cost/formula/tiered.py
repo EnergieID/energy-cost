@@ -20,11 +20,6 @@ class TierBand(BaseModel):
     up_to: float | None = None
     formula: Formula
 
-    def matches(self, values: pd.Series) -> pd.Series:
-        if self.up_to is None:
-            return pd.Series([True] * len(values), index=values.index)
-        return values <= self.up_to
-
 
 class TieredFormula(Formula):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -58,9 +53,6 @@ class TieredFormula(Formula):
         groups = indexed.groupby(pd.Grouper(freq=to_pandas_freq(self.band_period or resolution)))
 
         for period_start_key, group in groups:
-            if group.empty:
-                continue
-
             period_start = pd.Timestamp(period_start_key)  # type: ignore[arg-type]
             estimated_total = self._estimate_total_for_period(group, period_start, resolution)
             group_frame = pd.DataFrame({"timestamp": group.index, "value": group["value"].values})
@@ -88,7 +80,7 @@ class TieredFormula(Formula):
             None,
         )
         if matched_band is None:
-            return group_frame.assign(value=float("nan"))
+            raise ValueError("No tier band matches the estimated total for the period.")
         return matched_band.formula.apply(group_frame.copy(), resolution=resolution)
 
     def _apply_progressive_group(
