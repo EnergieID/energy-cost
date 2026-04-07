@@ -11,7 +11,7 @@ from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
 from energy_cost.meter import Meter, MeterType, PowerDirection
 from energy_cost.tariff import Tariff
-from energy_cost.tariff_version import CostType, TariffVersion
+from energy_cost.tariff_version import TariffVersion
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,9 +27,9 @@ def _tariff(
 ) -> Tariff:
     """Build a simple constant-cost tariff."""
     version_start = start or dt.datetime(2025, 1, 1, 0, 0)
-    consumption: dict = {"all": {CostType.ENERGY: IndexFormula(constant_cost=energy_rate)}}
+    consumption: dict = {"all": {"energy": IndexFormula(constant_cost=energy_rate)}}
     injection: dict = (
-        {"all": {CostType.ENERGY: IndexFormula(constant_cost=injection_rate)}} if injection_rate is not None else {}
+        {"all": {"energy": IndexFormula(constant_cost=injection_rate)}} if injection_rate is not None else {}
     )
     periodic: dict = (
         {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
@@ -257,8 +257,7 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
 def test_contract_combines_provider_and_distributor() -> None:
     """calculate() returns a single DataFrame with provider + distributor data."""
     contract = Contract(
-        provider=_tariff(energy_rate=100.0),
-        distributor=_tariff(energy_rate=50.0),
+        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
@@ -269,12 +268,14 @@ def test_contract_combines_provider_and_distributor() -> None:
     assert ("distributor", "consumption", "energy") in result.columns
 
 
-def test_contract_taxes_applied_to_provider_and_distributor_not_fees() -> None:
-    """Taxes are computed on provider + distributor totals only; fees total is excluded."""
+def test_contract_taxes_applied_to_all_tariffs() -> None:
+    """Taxes are computed on the sum of ALL tariff totals, including fees."""
     contract = Contract(
-        provider=_tariff(energy_rate=100.0),
-        distributor=_tariff(energy_rate=100.0),
-        fees=_tariff(energy_rate=50.0),
+        tariffs={
+            "provider": _tariff(energy_rate=100.0),
+            "distributor": _tariff(energy_rate=100.0),
+            "fees": _tariff(energy_rate=50.0),
+        },
         tax_rate=0.10,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
@@ -293,17 +294,16 @@ def test_contract_taxes_applied_to_provider_and_distributor_not_fees() -> None:
     assert provider_total == pytest.approx(200.0)
     assert distributor_total == pytest.approx(200.0)
     assert fees_total == pytest.approx(100.0)
-    # taxes = (200 + 200) × 0.10 = 40 (fees excluded)
-    assert taxes == pytest.approx(40.0)
-    # total = 200 + 200 + 100 + 40 = 540
-    assert total_cost == pytest.approx(540.0)
+    # taxes = (200 + 200 + 100) × 0.10 = 50 (fees now included in tax base)
+    assert taxes == pytest.approx(50.0)
+    # total = 200 + 200 + 100 + 50 = 550
+    assert total_cost == pytest.approx(550.0)
 
 
 def test_contract_no_fees_omits_fees_columns() -> None:
-    """When fees produces no output the result has no fees columns."""
+    """When no fees tariff is present the result has no fees columns."""
     contract = Contract(
-        provider=_tariff(energy_rate=100.0),
-        distributor=_tariff(energy_rate=50.0),
+        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
@@ -314,8 +314,7 @@ def test_contract_no_fees_omits_fees_columns() -> None:
 def test_contract_column_structure_is_three_level_multiindex() -> None:
     """Data columns form a three-level MultiIndex; timestamp is a plain column."""
     contract = Contract(
-        provider=_tariff(energy_rate=10.0),
-        distributor=_tariff(energy_rate=5.0),
+        tariffs={"provider": _tariff(energy_rate=10.0), "distributor": _tariff(energy_rate=5.0)},
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
@@ -328,8 +327,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
 def test_contract_total_cost_equals_manual_sum() -> None:
     """total_cost == provider_total + distributor_total + taxes (no fees case)."""
     contract = Contract(
-        provider=_tariff(energy_rate=100.0),
-        distributor=_tariff(energy_rate=50.0),
+        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
@@ -363,13 +361,13 @@ def _tz_contract(
 ) -> Contract:
     """Contract with tz-aware version starts, matching real YAML-based tariffs."""
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET)
-    consumption: dict = {"all": {CostType.ENERGY: IndexFormula(constant_cost=energy_rate)}}
+    consumption: dict = {"all": {"energy": IndexFormula(constant_cost=energy_rate)}}
     periodic: dict = (
         {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
     tariff = Tariff(versions=[version])
-    return Contract(provider=tariff, distributor=tariff)
+    return Contract(tariffs={"provider": tariff, "distributor": tariff})
 
 
 def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
@@ -416,8 +414,8 @@ def test_apply_tou_peak_meter_billed_under_tou_column() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
-                    "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=10.0)},
-                    "tou_peak": {CostType.ENERGY: IndexFormula(constant_cost=30.0)},
+                    "single_rate": {"energy": IndexFormula(constant_cost=10.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=30.0)},
                 },
             )
         ]
@@ -443,8 +441,8 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
-                    "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=10.0)},
-                    "tou_peak": {CostType.ENERGY: IndexFormula(constant_cost=20.0)},
+                    "single_rate": {"energy": IndexFormula(constant_cost=10.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=20.0)},
                 },
             )
         ]
@@ -476,12 +474,12 @@ def test_contract_with_tou_meter_routes_cost_correctly() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
-                    "tou_peak": {CostType.ENERGY: IndexFormula(constant_cost=50.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=50.0)},
                 },
             )
         ]
     )
-    contract = Contract(provider=tou_tariff, distributor=tou_tariff)
+    contract = Contract(tariffs={"provider": tou_tariff, "distributor": tou_tariff})
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     data = _consumption(timestamps, value=1.0)
 
@@ -501,10 +499,10 @@ def test_contract_with_injection_and_tou_meters() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
-                    "tou_offpeak": {CostType.ENERGY: IndexFormula(constant_cost=8.0)},
+                    "tou_offpeak": {"energy": IndexFormula(constant_cost=8.0)},
                 },
                 injection={
-                    "all": {CostType.ENERGY: IndexFormula(constant_cost=4.0)},
+                    "all": {"energy": IndexFormula(constant_cost=4.0)},
                 },
             )
         ]
@@ -514,12 +512,12 @@ def test_contract_with_injection_and_tou_meters() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
-                    "tou_offpeak": {CostType.ENERGY: IndexFormula(constant_cost=2.0)},
+                    "tou_offpeak": {"energy": IndexFormula(constant_cost=2.0)},
                 },
             )
         ]
     )
-    contract = Contract(provider=provider_tariff, distributor=distributor_tariff)
+    contract = Contract(tariffs={"provider": provider_tariff, "distributor": distributor_tariff})
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     cons_data = _consumption(timestamps, value=2.0)
     inj_data = _consumption(timestamps, value=1.0)

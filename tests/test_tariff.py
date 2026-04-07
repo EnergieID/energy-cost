@@ -11,7 +11,7 @@ from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
 from energy_cost.meter import Meter, MeterType, PowerDirection
 from energy_cost.tariff import Tariff
-from energy_cost.tariff_version import CostType, TariffVersion
+from energy_cost.tariff_version import TariffVersion
 
 
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
@@ -56,11 +56,11 @@ def test_get_energy_cost_uses_correct_segment_for_time_range() -> None:
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
             ),
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 30),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=2.0)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=2.0)}},
             ),
         ]
     )
@@ -92,7 +92,7 @@ def test_get_energy_cost_returns_none_when_no_versions_overlap_interval() -> Non
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 2, 0, 0),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
             )
         ]
     )
@@ -131,7 +131,7 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> Non
         versions=[
             TariffVersion(
                 start=dt.datetime(2026, 1, 1, 0, 0),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
             )
         ]
     )
@@ -151,7 +151,7 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_cap
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
             )
         ]
     )
@@ -182,7 +182,7 @@ def _tz_tariff(*, energy_rate: float = 100.0, daily_fixed: float | None = None) 
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
-                consumption={"all": {CostType.ENERGY: IndexFormula(constant_cost=energy_rate)}},
+                consumption={"all": {"energy": IndexFormula(constant_cost=energy_rate)}},
                 periodic=periodic,
             )
         ]
@@ -277,8 +277,8 @@ def test_apply_tou_peak_meter_uses_tou_formula() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
-                    "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=10.0)},
-                    "tou_peak": {CostType.ENERGY: IndexFormula(constant_cost=20.0)},
+                    "single_rate": {"energy": IndexFormula(constant_cost=10.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=20.0)},
                 },
             )
         ]
@@ -303,8 +303,8 @@ def test_apply_mixed_meter_types_produce_separate_columns() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
-                    "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=10.0)},
-                    "tou_peak": {CostType.ENERGY: IndexFormula(constant_cost=20.0)},
+                    "single_rate": {"energy": IndexFormula(constant_cost=10.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=20.0)},
                 },
             )
         ]
@@ -336,10 +336,10 @@ def test_apply_tou_offpeak_and_injection_meters() -> None:
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
-                    "tou_offpeak": {CostType.ENERGY: IndexFormula(constant_cost=5.0)},
+                    "tou_offpeak": {"energy": IndexFormula(constant_cost=5.0)},
                 },
                 injection={
-                    "all": {CostType.ENERGY: IndexFormula(constant_cost=3.0)},
+                    "all": {"energy": IndexFormula(constant_cost=3.0)},
                 },
             )
         ]

@@ -1,0 +1,96 @@
+- start: 2022-01-01T00:00:00+01:00
+  consumption:
+    excise:
+        band_period: P1Y
+        bands:
+        - up_to: 20
+          formula: 
+            constant_cost: 13.6
+        - up_to: 50
+          formula: 
+            constant_cost: 11.58
+        - up_to: 1000
+          formula: 
+            constant_cost: 10.9
+        - up_to: 25000
+          formula: 
+            constant_cost: 10.23
+        - up_to: 100000
+          formula: 
+            constant_cost: 2.4
+        - formula:
+            constant_cost: 1
+    energy_contribution:
+        constant_cost: 1.9261
+- start: 2022-11-01T00:00:00+01:00
+  consumption:
+    excise:
+        band_period: P1Y
+        bands:
+        - up_to: 20
+          formula: 
+            constant_cost: 13.6
+        - up_to: 50
+          formula: 
+            constant_cost: 11.58
+        - up_to: 1000
+          formula: 
+            constant_cost: 10.9
+        - up_to: 25000
+          formula: 
+            constant_cost: 10.23
+        - up_to: 100000
+          formula: 
+            constant_cost: 2.4
+        - formula:
+            constant_cost: 1
+    energy_contribution:
+        constant_cost: 1.9261
+- start: 2023-04-01T00:00:00+02:00
+  consumption:
+    excise:
+        band_period: P1Y
+        bands:
+        - up_to: 3
+          formula: 
+            constant_cost: 42.5755
+        - up_to: 20
+          formula: 
+            constant_cost: 47.48
+        - up_to: 50
+          formula: 
+            constant_cost: 45.46
+        - up_to: 1000
+          formula: 
+            constant_cost: 44.78
+        - up_to: 25000
+          formula: 
+            constant_cost: 44.11
+        - formula:
+            constant_cost: 36.28
+    energy_contribution:
+        constant_cost: 1.9261
+- start: 2023-07-01T00:00:00+02:00
+  consumption:
+    excise:
+        band_period: P1Y
+        bands:
+        - up_to: 3
+          formula: 
+            constant_cost: 47.48
+        - up_to: 20
+          formula: 
+            constant_cost: 47.48
+        - up_to: 50
+          formula: 
+            constant_cost: 45.46
+        - up_to: 1000
+          formula: 
+            constant_cost: 44.78
+        - up_to: 25000
+          formula: 
+            constant_cost: 44.11
+        - formula:
+            constant_cost: 36.28
+    energy_contribution:
+        constant_cost: 1.9261

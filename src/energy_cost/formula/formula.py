@@ -33,7 +33,8 @@ class Formula(ABC, BaseModel):
                 return PeriodicFormula.model_validate(value)
             if value.get("kind") == "scheduled" or "schedule" in value:
                 return ScheduledFormulas.model_validate(value)
-            return IndexFormula.model_validate(value)
+            if value.get("kind") == "index" or "constant_cost" in value or "variable_costs" in value:
+                return IndexFormula.model_validate(value)
         raise ValueError(f"Cannot coerce {value!r} to Formula")
 
     @abstractmethod

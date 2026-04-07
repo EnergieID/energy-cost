@@ -9,12 +9,11 @@ from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, Schedule
 from energy_cost.fractional_periods import Period
 from energy_cost.resolution import Resolution
 from energy_cost.tariff_version import (
-    CostType,
     MeterType,
     PowerDirection,
     TariffVersion,
-    _coerce_cost_type_formulas,
     _coerce_meter_formulas,
+    _coerce_named_formulas,
 )
 
 
@@ -26,50 +25,50 @@ def _constant_cost(formula: Formula) -> float:
 def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
+        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
     )
 
     single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
 
-    assert _constant_cost(single[CostType.ENERGY]) == -5.0
+    assert _constant_cost(single["energy"]) == -5.0
 
 
 def test_all_meter_type_formula_is_used_for_tou_peak_injection() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
+        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
     )
 
     tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
 
-    assert _constant_cost(tou[CostType.ENERGY]) == -5.0
+    assert _constant_cost(tou["energy"]) == -5.0
 
 
 def test_meter_specific_formula_overrides_all_formula_for_single_rate_consumption() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
-            "all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)},
-            "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=99.0)},
+            "all": {"energy": IndexFormula(constant_cost=1.0)},
+            "single_rate": {"energy": IndexFormula(constant_cost=99.0)},
         },
     )
 
     single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-    assert _constant_cost(single[CostType.ENERGY]) == 99.0
+    assert _constant_cost(single["energy"]) == 99.0
 
 
 def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
-            "all": {CostType.ENERGY: IndexFormula(constant_cost=1.0)},
-            "single_rate": {CostType.ENERGY: IndexFormula(constant_cost=99.0)},
+            "all": {"energy": IndexFormula(constant_cost=1.0)},
+            "single_rate": {"energy": IndexFormula(constant_cost=99.0)},
         },
     )
 
     tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
-    assert _constant_cost(tou[CostType.ENERGY]) == 1.0
+    assert _constant_cost(tou["energy"]) == 1.0
 
 
 def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
@@ -77,9 +76,9 @@ def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
             "all": {
-                CostType.ENERGY: IndexFormula(constant_cost=10.0),
-                CostType.CHP_CERTIFICATES: IndexFormula(constant_cost=2.0),
-                CostType.RENEWABLE_CERTIFICATES: IndexFormula(constant_cost=3.0),
+                "energy": IndexFormula(constant_cost=10.0),
+                "chp_certificates": IndexFormula(constant_cost=2.0),
+                "renewable_certificates": IndexFormula(constant_cost=3.0),
             }
         },
     )
@@ -127,7 +126,7 @@ def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_ener
 
     resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
-    assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
+    assert _constant_cost(resolved["energy"]) == 1.0
 
 
 def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types() -> None:
@@ -143,8 +142,8 @@ def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types(
 
     resolved = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
 
-    assert _constant_cost(resolved[CostType.ENERGY]) == 1.0
-    assert _constant_cost(resolved[CostType.CHP_CERTIFICATES]) == 2.0
+    assert _constant_cost(resolved["energy"]) == 1.0
+    assert _constant_cost(resolved["chp_certificates"]) == 2.0
 
 
 def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy() -> None:
@@ -165,7 +164,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy
     )
 
     resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-    formula = resolved[CostType.ENERGY]
+    formula = resolved["energy"]
 
     assert isinstance(formula, ScheduledFormulas)
 
@@ -180,7 +179,10 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy
 def test_cost_type_formula_coercion_wraps_bare_formula_as_energy_cost() -> None:
     bare_formula = {"constant_cost": 1.0}
 
-    assert _coerce_cost_type_formulas(bare_formula) == {CostType.ENERGY: bare_formula}
+    result = _coerce_named_formulas(bare_formula)
+
+    assert list(result.keys()) == ["energy"]
+    assert result["energy"] == IndexFormula(constant_cost=1.0)
 
 
 def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
@@ -196,7 +198,7 @@ def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_se
 
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={"all": {CostType.ENERGY: EmptyIndexFormula()}},
+        consumption={"all": {"energy": EmptyIndexFormula()}},
     )
 
     result = segment.get_energy_cost(
@@ -212,7 +214,7 @@ def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_se
 def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {CostType.ENERGY: IndexFormula(constant_cost=-5.0)}},
+        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
     )
 
     assert (
