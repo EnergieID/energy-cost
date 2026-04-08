@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Annotated
+from typing import Annotated, cast
 
 import isodate
 import pandas as pd
@@ -73,8 +73,10 @@ def is_divisor(root: Resolution, divisor: Resolution) -> bool:
 
     if root_is_calendar and divisor_is_calendar:
         # Normalise both to months
-        root_months = int(root.years * 12 + root.months)  # type: ignore[union-attr]
-        divisor_months = int(divisor.years * 12 + divisor.months)  # type: ignore[union-attr]
+        root_dur = cast(isodate.Duration, root)
+        divisor_dur = cast(isodate.Duration, divisor)
+        root_months = int(root_dur.years * 12 + root_dur.months)
+        divisor_months = int(divisor_dur.years * 12 + divisor_dur.months)
         return divisor_months > 0 and root_months % divisor_months == 0
 
     # divisor is calendar, root is fixed timedelta — nonsensical subdivision

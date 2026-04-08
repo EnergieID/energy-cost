@@ -53,7 +53,7 @@ class TieredFormula(Formula):
         groups = indexed.groupby(pd.Grouper(freq=to_pandas_freq(self.band_period or resolution)))
 
         for period_start_key, group in groups:
-            period_start = pd.Timestamp(period_start_key)  # type: ignore[arg-type]
+            period_start = pd.Timestamp(str(period_start_key))
             estimated_total = self._estimate_total_for_period(group, period_start, resolution)
             group_frame = pd.DataFrame({"timestamp": group.index, "value": group["value"].values})
 
