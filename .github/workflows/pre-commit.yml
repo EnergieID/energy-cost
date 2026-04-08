@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
+      - name: Show lock file
+        run: grep -B1 -A22 '^name = "ty"' uv.lock
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
