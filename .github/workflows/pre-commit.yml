@@ -20,7 +20,7 @@ jobs:
         with:
           version: '0.9.21'
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --locked
       - name: Install pre-commit
         run: uv tool install pre-commit
       - name: Install poethepoet
