@@ -19,6 +19,8 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: false
+      - name: Show lock file
+        run: grep -B1 -A22 '^name = "ty"' uv.lock
       - name: Install dependencies
         run: uv sync --locked
       - name: Install pre-commit
