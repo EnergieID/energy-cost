@@ -19,6 +19,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           version: '0.9.21'
+          enable-cache: false
       - name: Install dependencies
         run: uv sync --locked
       - name: Install pre-commit
