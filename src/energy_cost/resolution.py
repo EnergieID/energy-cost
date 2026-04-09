@@ -11,7 +11,7 @@ def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
         return d.replace(tzinfo=None) if d.tzinfo is not None else d
     if d.tzinfo is None:
         return d.replace(tzinfo=tz)
-    return pd.Timestamp(d).tz_convert(tz).to_pydatetime()
+    return cast(dt.datetime, pd.Timestamp(d).tz_convert(tz).to_pydatetime())
 
 
 def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
@@ -128,8 +128,6 @@ def snap_billing_period(
     """
     offset = pd.tseries.frequencies.to_offset(output_freq)
     assert offset is not None
-    ts_start = pd.Timestamp(billing_start)
-    ts_end = pd.Timestamp(billing_end)
 
     if not isinstance(offset, pd.tseries.offsets.Tick):
         # Calendar offsets (MonthBegin, YearBegin, …) consider any day-1 timestamp
@@ -137,16 +135,16 @@ def snap_billing_period(
         # non-midnight times. Normalize to midnight first, then handle the ceiling
         # case: if the original ts_end was after midnight on a day that rollforward
         # considers already on-offset, advance one extra period.
-        snapped_start = pd.Timestamp(offset.rollback(ts_start)).normalize()
-        ts_end_norm = ts_end.normalize()
-        snapped_end = pd.Timestamp(offset.rollforward(ts_end_norm))
-        if ts_end_norm < ts_end and snapped_end == ts_end_norm:
-            snapped_end = pd.Timestamp(snapped_end + offset)
+        snapped_start = offset.rollback(billing_start).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_norm = billing_end.replace(hour=0, minute=0, second=0, microsecond=0)
+        snapped_end = offset.rollforward(end_norm)
+        if end_norm < billing_end and snapped_end == end_norm:
+            snapped_end = snapped_end + offset
     else:
-        snapped_start = pd.Timestamp(offset.rollback(ts_start))
-        snapped_end = pd.Timestamp(offset.rollforward(ts_end))
+        snapped_start = offset.rollback(billing_start)
+        snapped_end = offset.rollforward(billing_end)
 
-    return snapped_start.to_pydatetime(), snapped_end.to_pydatetime()
+    return snapped_start, snapped_end
 
 
 def detect_resolution_and_range(
