@@ -103,6 +103,7 @@ def test_apply_explicit_start_end_restricts_billing_period() -> None:
         [Meter(data=consumption)],
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 0, 30),
+        resolution=dt.timedelta(minutes=30),
     )
 
     assert result is not None
@@ -235,18 +236,18 @@ def test_apply_with_injection_adds_injection_columns() -> None:
 
 
 def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
-    """Periodic costs appear under the ``fixed`` group, prorated to the output period."""
+    """Periodic costs appear under the ``fixed`` group for the full snapped billing period."""
     tariff = _tariff(energy_rate=0.0, daily_fixed=24.0)
-    # Exactly 2 hours of data inside one day
+    # 2 hours of data inside January 2025; billing is snapped to the full month
     timestamps = pd.date_range("2025-01-01", periods=8, freq="15min")
     consumption = _consumption(timestamps)
 
     result = tariff.apply([Meter(data=consumption)])
 
     assert result is not None
-    # The billing period is 2 h of a 24 h day → fraction = 2/24 → 24 * (2/24) = 2.0 €
+    # Billing period is snapped to full January (31 days) → 24 * 31 = 744 €
     assert ("fixed", "total") in result.columns
-    assert result[("fixed", "total")].iloc[0] == pytest.approx(2.0)
+    assert result[("fixed", "total")].iloc[0] == pytest.approx(744.0)
 
 
 # ---------------------------------------------------------------------------
@@ -599,3 +600,63 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
 
     # No energy formula and no in-window capacity → nothing to report.
     assert result is None
+
+
+def test_avoid_regression_on_real_world_data() -> None:
+    import yaml
+
+    from energy_cost.data.be import distributors, fees, tax_rate
+    from energy_cost.index import DataFrameIndex, Index
+
+    Index.register(
+        "Belpex15min",
+        DataFrameIndex(
+            pd.DataFrame(
+                {
+                    "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz="UTC"),
+                    "value": [50.0, 55.0, 60.0, 65.0],
+                }
+            )
+        ),
+    )
+
+    tariff = """
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 10.0
+    variable_costs:
+    - index: Belpex15min
+      scalar: 1.05
+- start: 2026-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 12.0
+    variable_costs:
+    - index: Belpex15min
+      scalar: 1.10
+"""
+    contract = Contract(
+        tariffs={
+            "provider": Tariff.model_validate({"versions": yaml.safe_load(tariff)}),
+            "distributor": distributors["fluvius_antwerpen"],
+            "belgian_fees": fees["be_residential"],
+            "flemish_fees": fees["flanders_residential"],
+        },
+        tax_rate=tax_rate,
+    )
+    meters = [
+        Meter(
+            direction=PowerDirection.CONSUMPTION,
+            type=MeterType.SINGLE_RATE,
+            data=pd.DataFrame(
+                {
+                    "timestamp": pd.date_range("2026-04-09", periods=3, freq="15min", tz="UTC"),
+                    "value": [0.005, 0.005, 0.005],
+                }
+            ),
+        )
+    ]
+    result = contract.calculate_cost(meters)
+    assert result is not None
+    # dataframe has one row starting on 2026-04-01 (monthly resolution)
+    assert len(result) == 1
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2026-04-01T00:00:00+00:00")
