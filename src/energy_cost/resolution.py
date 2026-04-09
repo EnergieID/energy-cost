@@ -116,6 +116,39 @@ def detect_resolution(timestamps: pd.Series) -> Resolution:
     return pd.to_timedelta(mode_delta)
 
 
+def snap_billing_period(
+    billing_start: dt.datetime,
+    billing_end: dt.datetime,
+    output_freq: str,
+) -> tuple[dt.datetime, dt.datetime]:
+    """Snap billing start/end to clean output-period boundaries (floor start, ceil end).
+
+    For example, with monthly output and data starting on 2026-04-09, billing_start
+    is snapped back to 2026-04-01 and billing_end forward to the next month start.
+    """
+    offset = pd.tseries.frequencies.to_offset(output_freq)
+    assert offset is not None
+    ts_start = pd.Timestamp(billing_start)
+    ts_end = pd.Timestamp(billing_end)
+
+    if not isinstance(offset, pd.tseries.offsets.Tick):
+        # Calendar offsets (MonthBegin, YearBegin, …) consider any day-1 timestamp
+        # "on-offset" regardless of time-of-day, so rollforward/rollback preserve
+        # non-midnight times. Normalize to midnight first, then handle the ceiling
+        # case: if the original ts_end was after midnight on a day that rollforward
+        # considers already on-offset, advance one extra period.
+        snapped_start = pd.Timestamp(offset.rollback(ts_start)).normalize()
+        ts_end_norm = ts_end.normalize()
+        snapped_end = pd.Timestamp(offset.rollforward(ts_end_norm))
+        if ts_end_norm < ts_end and snapped_end == ts_end_norm:
+            snapped_end = pd.Timestamp(snapped_end + offset)
+    else:
+        snapped_start = pd.Timestamp(offset.rollback(ts_start))
+        snapped_end = pd.Timestamp(offset.rollforward(ts_end))
+
+    return snapped_start.to_pydatetime(), snapped_end.to_pydatetime()
+
+
 def detect_resolution_and_range(
     data: pd.DataFrame,
     resolution: Resolution | None = None,

@@ -13,6 +13,7 @@ from .resolution import (
     Resolution,
     align_datetime_to_tz,
     detect_resolution_and_range,
+    snap_billing_period,
     to_pandas_freq,
 )
 from .tariff_version import TariffVersion
@@ -137,6 +138,8 @@ class Tariff(BaseModel):
             data_resolution = detect_resolution_and_range(combined_consumption)[2]
             billing_end = combined_consumption["timestamp"].max() + data_resolution
         output_freq = to_pandas_freq(resolution)
+
+        billing_start, billing_end = snap_billing_period(billing_start, billing_end, output_freq)
 
         frames: list[pd.DataFrame] = []
         for meter in meters:
