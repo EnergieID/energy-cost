@@ -179,7 +179,8 @@ class Tariff(BaseModel):
             return None
         agg = costs.set_index("timestamp").resample(output_freq).sum()
         cost_cols = [c for c in agg.columns if c != "total"]
-        agg["total"] = agg[cost_cols].sum(axis=1)
+        if cost_cols:
+            agg["total"] = agg[cost_cols].sum(axis=1)
         cost_group = CostGroup.CONSUMPTION if direction == PowerDirection.CONSUMPTION else CostGroup.INJECTION
         agg.columns = pd.MultiIndex.from_tuples([(cost_group, meter_type, c) for c in agg.columns])
         return agg

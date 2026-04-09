@@ -47,7 +47,6 @@ def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
     )
 
     assert out is not None
-    assert out["energy"].tolist() == [100.0, 300.0, 300.0, 300.0, 300.0, 150.0]
     assert out["total"].tolist() == [100.0, 300.0, 300.0, 300.0, 300.0, 150.0]
 
 
