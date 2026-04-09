@@ -6,10 +6,10 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 
-from energy_cost.contract import Contract
+from energy_cost.contract import Contract, TariffCategory
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
-from energy_cost.meter import Meter, MeterType, PowerDirection
+from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
 
@@ -66,8 +66,8 @@ def test_apply_consumption_multiplies_rate_and_sums_to_month() -> None:
     assert result is not None
     assert len(result) == 1
     # 4 intervals × 2 MWh × 10 €/MWh = 80 €
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(80.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(80.0)
 
 
 def test_apply_two_months_produces_two_rows() -> None:
@@ -87,9 +87,9 @@ def test_apply_two_months_produces_two_rows() -> None:
     assert result is not None
     assert len(result) == 2
     # Jan: 2 × 1 × 5 = 10 €
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(10.0)
     # Feb: 3 × 1 × 5 = 15 €
-    assert result[("consumption", "energy")].iloc[1] == pytest.approx(15.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[1] == pytest.approx(15.0)
 
 
 def test_apply_explicit_start_end_restricts_billing_period() -> None:
@@ -108,7 +108,7 @@ def test_apply_explicit_start_end_restricts_billing_period() -> None:
 
     assert result is not None
     assert len(result) == 1
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(20.0)  # 2 × 1 × 10
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(20.0)  # 2 × 1 × 10
 
 
 def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) -> None:
@@ -147,8 +147,8 @@ def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) ->
     assert len(result) == 1
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-02-01")
     # Capacity column should be present with a non-NaN value.
-    assert ("capacity", "total") in result.columns
-    assert pd.notna(result[("capacity", "total")].iloc[0])
+    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
+    assert pd.notna(result[(CostGroup.CAPACITY, MeterType.ALL, "total")].iloc[0])
 
 
 def test_apply_custom_output_resolution() -> None:
@@ -162,7 +162,7 @@ def test_apply_custom_output_resolution() -> None:
     assert result is not None
     assert len(result) == 1
     # 8 intervals × 1 MWh × 10 €/MWh = 80 €
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(80.0)
 
 
 def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(tmp_path) -> None:
@@ -183,22 +183,22 @@ def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(t
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
-    assert not any(c[0] == "consumption" for c in data_cols)
-    assert ("capacity", "total") in result.columns
-    assert ("total", "total") in result.columns
+    assert not any(c[0] == CostGroup.CONSUMPTION for c in data_cols)
+    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
+    assert (CostGroup.TOTAL, MeterType.ALL, "total") in result.columns
 
 
-def test_apply_column_structure_is_two_level_multiindex() -> None:
-    """The output columns form a two-level MultiIndex (excluding the timestamp column)."""
+def test_apply_column_structure_is_three_level_multiindex() -> None:
+    """The output columns form a three-level MultiIndex (excluding the timestamp column)."""
     tariff = _tariff(energy_rate=10.0)
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     result = tariff.apply([Meter(data=_consumption(timestamps))])
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
-    assert all(isinstance(c, tuple) and len(c) == 2 for c in data_cols)
-    assert ("consumption", "energy") in result.columns
-    assert ("total", "total") in result.columns
+    assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
+    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") in result.columns
+    assert (CostGroup.TOTAL, MeterType.ALL, "total") in result.columns
 
 
 # ---------------------------------------------------------------------------
@@ -221,13 +221,13 @@ def test_apply_with_injection_adds_injection_columns() -> None:
     )
 
     assert result is not None
-    assert ("injection", "energy") in result.columns
+    assert (CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy") in result.columns
     # Consumption: 2 × 2 × 10 = 40; Injection: 2 × 1 × 5 = 10; Total = 50
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(40.0)
-    assert result[("injection", "energy")].iloc[0] == pytest.approx(10.0)
-    assert result[("consumption", "total")].iloc[0] == pytest.approx(40.0)
-    assert result[("injection", "total")].iloc[0] == pytest.approx(10.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(50.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "total")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "total")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(50.0)
 
 
 # ---------------------------------------------------------------------------
@@ -246,8 +246,8 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
 
     assert result is not None
     # Billing period is snapped to full January (31 days) → 24 * 31 = 744 €
-    assert ("fixed", "total") in result.columns
-    assert result[("fixed", "total")].iloc[0] == pytest.approx(744.0)
+    assert (CostGroup.FIXED, MeterType.ALL, "total") in result.columns
+    assert result[(CostGroup.FIXED, MeterType.ALL, "total")].iloc[0] == pytest.approx(744.0)
 
 
 # ---------------------------------------------------------------------------
@@ -258,25 +258,24 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
 def test_contract_combines_provider_and_distributor() -> None:
     """calculate() returns a single DataFrame with provider + distributor data."""
     contract = Contract(
-        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
+        provider=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.calculate_cost([Meter(data=consumption)])
 
-    assert ("provider", "consumption", "energy") in result.columns
-    assert ("distributor", "consumption", "energy") in result.columns
+    assert (TariffCategory.PROVIDER, CostGroup.CONSUMPTION, "energy") in result.columns
+    assert (TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, "energy") in result.columns
 
 
 def test_contract_taxes_applied_to_all_tariffs() -> None:
     """Taxes are computed on the sum of ALL tariff totals, including fees."""
     contract = Contract(
-        tariffs={
-            "provider": _tariff(energy_rate=100.0),
-            "distributor": _tariff(energy_rate=100.0),
-            "fees": _tariff(energy_rate=50.0),
-        },
+        provider=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=100.0),
+        fees=_tariff(energy_rate=50.0),
         tax_rate=0.10,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
@@ -285,11 +284,11 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
 
     result = contract.calculate_cost([Meter(data=consumption)])
 
-    provider_total = result[("provider", "total", "total")].iloc[0]
-    distributor_total = result[("distributor", "total", "total")].iloc[0]
-    fees_total = result[("fees", "total", "total")].iloc[0]
-    taxes = result[("taxes", "total", "total")].iloc[0]
-    total_cost = result[("total", "total", "total")].iloc[0]
+    provider_total = result[(TariffCategory.PROVIDER, CostGroup.TOTAL, "total")].iloc[0]
+    distributor_total = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
+    fees_total = result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0]
+    taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
+    total_cost = result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0]
 
     # provider: 2 × 100 = 200; distributor: 2 × 100 = 200; fees: 2 × 50 = 100
     assert provider_total == pytest.approx(200.0)
@@ -304,18 +303,20 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
 def test_contract_no_fees_omits_fees_columns() -> None:
     """When no fees tariff is present the result has no fees columns."""
     contract = Contract(
-        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
+        provider=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
 
-    assert not any(isinstance(c, tuple) and c[0] == "fees" for c in result.columns)
+    assert not any(isinstance(c, tuple) and c[0] == TariffCategory.FEES for c in result.columns)
 
 
 def test_contract_column_structure_is_three_level_multiindex() -> None:
-    """Data columns form a three-level MultiIndex; timestamp is a plain column."""
+    """Data columns form a three-level MultiIndex by default (collapsed); timestamp is a plain column."""
     contract = Contract(
-        tariffs={"provider": _tariff(energy_rate=10.0), "distributor": _tariff(energy_rate=5.0)},
+        provider=_tariff(energy_rate=10.0),
+        distributor=_tariff(energy_rate=5.0),
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
@@ -325,10 +326,25 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
 
 
+def test_contract_expand_meter_types_gives_four_level_multiindex() -> None:
+    """With expand_meter_types=True, data columns form a four-level MultiIndex."""
+    contract = Contract(
+        provider=_tariff(energy_rate=10.0),
+        distributor=_tariff(energy_rate=5.0),
+        tax_rate=0.21,
+    )
+    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
+    result = contract.calculate_cost([Meter(data=_consumption(timestamps))], expand_meter_types=True)
+
+    data_cols = [c for c in result.columns if c != "timestamp"]
+    assert all(isinstance(c, tuple) and len(c) == 4 for c in data_cols)
+
+
 def test_contract_total_cost_equals_manual_sum() -> None:
     """total_cost == provider_total + distributor_total + taxes (no fees case)."""
     contract = Contract(
-        tariffs={"provider": _tariff(energy_rate=100.0), "distributor": _tariff(energy_rate=50.0)},
+        provider=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=50.0),
         tax_rate=0.21,
     )
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
@@ -336,10 +352,10 @@ def test_contract_total_cost_equals_manual_sum() -> None:
 
     result = contract.calculate_cost([Meter(data=consumption)])
 
-    p = result[("provider", "total", "total")].iloc[0]
-    d = result[("distributor", "total", "total")].iloc[0]
-    taxes = result[("taxes", "total", "total")].iloc[0]
-    total = result[("total", "total", "total")].iloc[0]
+    p = result[(TariffCategory.PROVIDER, CostGroup.TOTAL, "total")].iloc[0]
+    d = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
+    taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
+    total = result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0]
 
     # provider: 4 × 2 × 100 = 800; distributor: 4 × 2 × 50 = 400
     assert p == pytest.approx(800.0)
@@ -368,7 +384,7 @@ def _tz_contract(
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
     tariff = Tariff(versions=[version])
-    return Contract(tariffs={"provider": tariff, "distributor": tariff})
+    return Contract(provider=tariff, distributor=tariff)
 
 
 def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
@@ -398,7 +414,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
 
     assert result is not None
     # 8 intervals × 2 MWh × 5 €/MWh = 80 €
-    assert result[("provider", "total", "total")].iloc[0] == pytest.approx(80.0)
+    assert result[(TariffCategory.PROVIDER, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(80.0)
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
 
 
@@ -427,12 +443,12 @@ def test_apply_tou_peak_meter_billed_under_tou_column() -> None:
     result = tou_tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
 
     assert result is not None
-    # The output column must be ``consumption_tou_peak``, not ``consumption``.
-    assert ("consumption_tou_peak", "energy") in result.columns
-    assert ("consumption", "energy") not in result.columns
+    # The output column must use MeterType.TOU_PEAK, not MeterType.SINGLE_RATE.
+    assert (CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") not in result.columns
     # 4 intervals × 1 MWh × 30 €/MWh = 120 €
-    assert result[("consumption_tou_peak", "energy")].iloc[0] == pytest.approx(120.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(120.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[0] == pytest.approx(120.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(120.0)
 
 
 def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
@@ -460,12 +476,12 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
     )
 
     assert result is not None
-    assert ("consumption", "energy") in result.columns
-    assert ("consumption_tou_peak", "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
     # single_rate: 4 × 2 × 10 = 80 €; tou_peak: 4 × 3 × 20 = 240 €
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(80.0)
-    assert result[("consumption_tou_peak", "energy")].iloc[0] == pytest.approx(240.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(320.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[0] == pytest.approx(240.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(320.0)
 
 
 def test_contract_with_tou_meter_routes_cost_correctly() -> None:
@@ -480,17 +496,21 @@ def test_contract_with_tou_meter_routes_cost_correctly() -> None:
             )
         ]
     )
-    contract = Contract(tariffs={"provider": tou_tariff, "distributor": tou_tariff})
+    contract = Contract(provider=tou_tariff, distributor=tou_tariff)
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     data = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=data, type=MeterType.TOU_PEAK)])
+    result = contract.calculate_cost([Meter(data=data, type=MeterType.TOU_PEAK)], expand_meter_types=True)
 
     assert result is not None
     # provider + distributor each: 4 × 1 × 50 = 200 €
-    assert result[("provider", "consumption_tou_peak", "energy")].iloc[0] == pytest.approx(200.0)
-    assert result[("distributor", "consumption_tou_peak", "energy")].iloc[0] == pytest.approx(200.0)
-    assert result[("total", "total", "total")].iloc[0] == pytest.approx(400.0)
+    assert result[(TariffCategory.PROVIDER, CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[
+        0
+    ] == pytest.approx(200.0)
+    assert result[(TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[
+        0
+    ] == pytest.approx(200.0)
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(400.0)
 
 
 def test_contract_with_injection_and_tou_meters() -> None:
@@ -518,7 +538,7 @@ def test_contract_with_injection_and_tou_meters() -> None:
             )
         ]
     )
-    contract = Contract(tariffs={"provider": provider_tariff, "distributor": distributor_tariff})
+    contract = Contract(provider=provider_tariff, distributor=distributor_tariff)
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     cons_data = _consumption(timestamps, value=2.0)
     inj_data = _consumption(timestamps, value=1.0)
@@ -527,17 +547,24 @@ def test_contract_with_injection_and_tou_meters() -> None:
         [
             Meter(data=cons_data, type=MeterType.TOU_OFFPEAK),
             Meter(data=inj_data, direction=PowerDirection.INJECTION),
-        ]
+        ],
+        expand_meter_types=True,
     )
 
     assert result is not None
     # provider consumption_tou_offpeak: 4 × 2 × 8 = 64 €; injection: 4 × 1 × 4 = 16 €
-    assert result[("provider", "consumption_tou_offpeak", "energy")].iloc[0] == pytest.approx(64.0)
-    assert result[("provider", "injection", "energy")].iloc[0] == pytest.approx(16.0)
+    assert result[(TariffCategory.PROVIDER, CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy")].iloc[
+        0
+    ] == pytest.approx(64.0)
+    assert result[(TariffCategory.PROVIDER, CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy")].iloc[
+        0
+    ] == pytest.approx(16.0)
     # distributor consumption_tou_offpeak: 4 × 2 × 2 = 16 €
-    assert result[("distributor", "consumption_tou_offpeak", "energy")].iloc[0] == pytest.approx(16.0)
+    assert result[(TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy")].iloc[
+        0
+    ] == pytest.approx(16.0)
     # total: provider(64+16) + distributor(16) = 96 €
-    assert result[("total", "total", "total")].iloc[0] == pytest.approx(96.0)
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(96.0)
 
 
 # ---------------------------------------------------------------------------
@@ -635,12 +662,9 @@ def test_avoid_regression_on_real_world_data() -> None:
       scalar: 1.10
 """
     contract = Contract(
-        tariffs={
-            "provider": Tariff.model_validate({"versions": yaml.safe_load(tariff)}),
-            "distributor": distributors["fluvius_antwerpen"],
-            "belgian_fees": fees["be_residential"],
-            "flemish_fees": fees["flanders_residential"],
-        },
+        provider=Tariff.model_validate({"versions": yaml.safe_load(tariff)}),
+        distributor=distributors["fluvius_antwerpen"],
+        fees=[fees["be_residential"], fees["flanders_residential"]],
         tax_rate=tax_rate,
     )
     meters = [
@@ -660,3 +684,59 @@ def test_avoid_regression_on_real_world_data() -> None:
     # dataframe has one row starting on 2026-04-01 (monthly resolution)
     assert len(result) == 1
     assert result["timestamp"].iloc[0] == pd.Timestamp("2026-04-01T00:00:00+00:00")
+
+
+# ---------------------------------------------------------------------------
+# Contract — list[Tariff] merging
+# ---------------------------------------------------------------------------
+
+
+def test_contract_merges_list_of_tariffs_under_same_category() -> None:
+    """When multiple tariffs are provided as a list under one category, their outputs are summed."""
+    tariff_a = _tariff(energy_rate=100.0)
+    tariff_b = _tariff(energy_rate=50.0)
+    contract = Contract(
+        provider=_tariff(energy_rate=10.0),
+        fees=[tariff_a, tariff_b],
+    )
+    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.calculate_cost([Meter(data=consumption)])
+
+    # fees: (2 × 100) + (2 × 50) = 300
+    assert result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(300.0)
+
+
+# ---------------------------------------------------------------------------
+# Default MeterType collapsing
+# ---------------------------------------------------------------------------
+
+
+def test_contract_collapses_meter_types_by_default() -> None:
+    """contract.calculate_cost collapses MeterType by default (3-level output)."""
+    tou_tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={
+                    "single_rate": {"energy": IndexFormula(constant_cost=10.0)},
+                    "tou_peak": {"energy": IndexFormula(constant_cost=20.0)},
+                },
+            )
+        ]
+    )
+    contract = Contract(provider=tou_tariff)
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
+    result = contract.calculate_cost(
+        [
+            Meter(data=_consumption(timestamps, value=1.0), type=MeterType.SINGLE_RATE),
+            Meter(data=_consumption(timestamps, value=1.0), type=MeterType.TOU_PEAK),
+        ]
+    )
+
+    data_cols = [c for c in result.columns if c != "timestamp"]
+    assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
+    # single_rate energy (4*10=40) + tou_peak energy (4*20=80) = 120
+    assert result[(TariffCategory.PROVIDER, CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(120.0)
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(120.0)

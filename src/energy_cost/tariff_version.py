@@ -14,9 +14,9 @@ _METER_KEYS = {e.value for e in MeterType}
 
 
 def _coerce_named_formulas(value: Any) -> Any:
-    """Allow a bare Formula dict to be shorthand for ``{energy: it}``."""
+    """Allow a bare Formula dict to be shorthand for ``{total: it}``."""
     try:
-        return {"energy": Formula.model_validate(value)}
+        return {"total": Formula.model_validate(value)}
     except ValueError:
         return value
 
@@ -81,8 +81,9 @@ class TariffVersion(BaseModel):
         if result is None:
             return None
 
-        cost_columns = [col for col in result.columns if col != "timestamp"]
-        result["total"] = result[cost_columns].sum(axis=1)
+        cost_columns = [col for col in result.columns if col not in ("timestamp", "total")]
+        if cost_columns:
+            result["total"] = result[cost_columns].sum(axis=1)
         return result
 
     def get_energy_cost(

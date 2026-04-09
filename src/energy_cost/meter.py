@@ -4,6 +4,14 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 
+class CostGroup(StrEnum):
+    CONSUMPTION = "consumption"
+    INJECTION = "injection"
+    CAPACITY = "capacity"
+    FIXED = "fixed"
+    TOTAL = "total"
+
+
 class MeterType(StrEnum):
     SINGLE_RATE = "single_rate"
     TOU_PEAK = "tou_peak"

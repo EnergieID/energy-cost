@@ -116,7 +116,7 @@ def test_get_periodic_cost_returns_prorated_cost_for_each_periodic_entry() -> No
     assert costs == pytest.approx({"admin": 1.0, "billing": 0.5})
 
 
-def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_energy() -> None:
+def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_total() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00",
@@ -126,7 +126,7 @@ def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_ener
 
     resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
 
-    assert _constant_cost(resolved["energy"]) == 1.0
+    assert _constant_cost(resolved["total"]) == 1.0
 
 
 def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types() -> None:
@@ -146,7 +146,7 @@ def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types(
     assert _constant_cost(resolved["chp_certificates"]) == 2.0
 
 
-def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy() -> None:
+def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_total() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00+01:00",
@@ -164,7 +164,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy
     )
 
     resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-    formula = resolved["energy"]
+    formula = resolved["total"]
 
     assert isinstance(formula, ScheduledFormulas)
 
@@ -176,13 +176,13 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_energy
     assert out["value"].tolist() == [100.0, 300.0]
 
 
-def test_cost_type_formula_coercion_wraps_bare_formula_as_energy_cost() -> None:
+def test_cost_type_formula_coercion_wraps_bare_formula_as_total_cost() -> None:
     bare_formula = {"constant_cost": 1.0}
 
     result = _coerce_named_formulas(bare_formula)
 
-    assert list(result.keys()) == ["energy"]
-    assert result["energy"] == IndexFormula(constant_cost=1.0)
+    assert list(result.keys()) == ["total"]
+    assert result["total"] == IndexFormula(constant_cost=1.0)
 
 
 def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
