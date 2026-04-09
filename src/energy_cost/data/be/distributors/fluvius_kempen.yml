@@ -1,0 +1,44 @@
+- start: '2025-01-01T00:00:00+01:00'
+  capacity:
+    measurement_period: PT15M
+    billing_period: P1M
+    window_periods: 12
+    formula:
+      bands:
+      - up_to: 0.0025
+        formula:
+          period: monthly
+          constant_cost: 11.0649913
+      - formula:
+          constant_cost: 4425.9965333
+  consumption:
+    all:
+      constant_cost: 60.7412
+    night_only:
+      constant_cost: 50.3452
+  periodic:
+    data_manangement:
+      period: yearly
+      constant_cost: 17.51
+- start: '2026-01-01T00:00:00+01:00'
+  capacity:
+    measurement_period: PT15M
+    billing_period: P1M
+    window_periods: 12
+    formula:
+      bands:
+      - up_to: 0.0025
+        formula:
+          period: monthly
+          constant_cost: 11.7097887
+      - formula:
+          constant_cost: 4683.915475
+  consumption:
+    all:
+      constant_cost: 59.7838
+    night_only:
+      constant_cost: 53.4019
+  periodic:
+    data_manangement:
+      period: yearly
+      constant_cost: 17.85

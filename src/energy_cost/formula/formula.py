@@ -33,7 +33,8 @@ class Formula(ABC, BaseModel):
                 return PeriodicFormula.model_validate(value)
             if value.get("kind") == "scheduled" or "schedule" in value:
                 return ScheduledFormulas.model_validate(value)
-            return IndexFormula.model_validate(value)
+            if value.get("kind") == "index" or "constant_cost" in value or "variable_costs" in value:
+                return IndexFormula.model_validate(value)
         raise ValueError(f"Cannot coerce {value!r} to Formula")
 
     @abstractmethod
@@ -56,7 +57,7 @@ class Formula(ABC, BaseModel):
         start, end, resolution = detect_resolution_and_range(data, resolution)
         formula_values = self.get_values(start, end, resolution)
 
-        result = data.copy()
+        result = data.reset_index(drop=True)
         merged = result.merge(formula_values, on="timestamp", how="left", suffixes=("", "_formula"))
         result["value"] = merged["value_formula"].mul(merged["value"])
         return result

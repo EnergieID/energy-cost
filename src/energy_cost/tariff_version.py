@@ -1,5 +1,5 @@
 import datetime as dt
-from enum import StrEnum
+from collections.abc import Callable
 from typing import Annotated, Any
 
 import pandas as pd
@@ -7,44 +7,23 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
+from .meter import MeterType, PowerDirection
 from .resolution import Resolution
 
-
-class MeterType(StrEnum):
-    SINGLE_RATE = "single_rate"
-    TOU_PEAK = "tou_peak"
-    TOU_OFFPEAK = "tou_offpeak"
-    NIGHT_ONLY = "night_only"
-    ALL = "all"  # The "all" meter type is used for formulas that apply to all meter types.
-
-
-class PowerDirection(StrEnum):
-    CONSUMPTION = "consumption"
-    INJECTION = "injection"
-
-
-class CostType(StrEnum):
-    ENERGY = "energy"
-    # Combined Heat and Power certificates, a type of subsidy for efficient cogeneration plants
-    CHP_CERTIFICATES = "chp_certificates"
-    # Renewable Energy certificates, a type of subsidy for renewable energy generation
-    RENEWABLE_CERTIFICATES = "renewable_certificates"
-
-
-_COST_TYPE_VALUES = {e.value for e in CostType}
 _METER_KEYS = {e.value for e in MeterType}
 
 
-def _coerce_cost_type_formulas(value: Any) -> Any:
+def _coerce_named_formulas(value: Any) -> Any:
     """Allow a bare Formula dict to be shorthand for ``{energy: it}``."""
-    if isinstance(value, dict) and not value.keys() <= _COST_TYPE_VALUES:
-        return {CostType.ENERGY: value}
-    return value
+    try:
+        return {"energy": Formula.model_validate(value)}
+    except ValueError:
+        return value
 
 
-CostTypeFormulas = Annotated[
-    dict[CostType, Formula],
-    BeforeValidator(_coerce_cost_type_formulas),
+NamedFormulas = Annotated[
+    dict[str, Formula],
+    BeforeValidator(_coerce_named_formulas),
 ]
 
 
@@ -52,15 +31,14 @@ def _coerce_meter_formulas(value: Any) -> Any:
     """Coerce shorthand MeterFormulas values."""
     if not isinstance(value, dict):
         return value
-    if value.keys() <= _COST_TYPE_VALUES:
-        return {MeterType.ALL: value}
-    if not value.keys() <= _METER_KEYS:
-        return {MeterType.ALL: {CostType.ENERGY: value}}
+    if not any(key in value for key in _METER_KEYS):
+        # No meter keys, assume it's a shorthand for ALL meters
+        return {MeterType.ALL.value: _coerce_named_formulas(value)}
     return value
 
 
 MeterFormulas = Annotated[
-    dict[str, CostTypeFormulas],
+    dict[str, NamedFormulas],
     BeforeValidator(_coerce_meter_formulas),
 ]
 
@@ -72,46 +50,72 @@ class TariffVersion(BaseModel):
     capacity: CapacityComponent | None = None
     periodic: dict[str, PeriodicFormula] = Field(default_factory=dict)
 
-    def resolve_cost_formulas(
+    def _resolve_energy_formulas(
         self,
         meter_type: MeterType,
         direction: PowerDirection,
-    ) -> dict[CostType, Formula]:
+    ) -> dict[str, Formula]:
         direction_formulas: MeterFormulas = getattr(self, direction)
-        result: dict[CostType, Formula] = {}
+        result: dict[str, Formula] = {}
         if MeterType.ALL in direction_formulas:
             result.update(direction_formulas[MeterType.ALL])
         if meter_type in direction_formulas:
             result.update(direction_formulas[meter_type])
         return result
 
-    def get_cost(
+    def _combine_energy_formulas(
+        self,
+        meter_type: MeterType,
+        direction: PowerDirection,
+        get_df: Callable[[Formula], pd.DataFrame],
+    ) -> pd.DataFrame | None:
+        resolved = self._resolve_energy_formulas(meter_type, direction)
+        result: pd.DataFrame | None = None
+        for cost_type, formula in resolved.items():
+            df = get_df(formula)
+            if df.empty:
+                continue
+            df = df.rename(columns={"value": cost_type})
+            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+
+        if result is None:
+            return None
+
+        cost_columns = [col for col in result.columns if col != "timestamp"]
+        result["total"] = result[cost_columns].sum(axis=1)
+        return result
+
+    def get_energy_cost(
         self,
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
         meter_type: MeterType,
         direction: PowerDirection,
-    ) -> pd.DataFrame:
-        resolved = self.resolve_cost_formulas(meter_type, direction)
-        result: pd.DataFrame | None = None
-        for cost_type in resolved:
-            df = resolved[cost_type].get_values(start, end, resolution)
-            if df.empty:
-                continue
-            df = df.rename(columns={"value": cost_type.value})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+    ) -> pd.DataFrame | None:
+        """Get energy cost rates in €/MWh. Returns None if no formulas are configured."""
+        return self._combine_energy_formulas(
+            meter_type,
+            direction,
+            lambda formula: formula.get_values(start, end, resolution),
+        )
 
-        if result is None:
-            raise ValueError(f"No formulas for meter type '{meter_type}' and direction '{direction}' found in tariff.")
+    def apply_energy_cost(
+        self,
+        data: pd.DataFrame,
+        meter_type: MeterType,
+        direction: PowerDirection,
+    ) -> pd.DataFrame | None:
+        """Apply energy cost formulas to quantity data, returning costs in €."""
+        return self._combine_energy_formulas(
+            meter_type,
+            direction,
+            lambda formula: formula.apply(data),
+        )
 
-        cost_columns = [col for col in result.columns if col != "timestamp"]
-        result["total"] = result[cost_columns].sum(axis=1)
-        return result
-
-    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame:
+    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame | None:
         if self.capacity is None:
-            return pd.DataFrame(columns=["timestamp", "value"])
+            return None
         return self.capacity.apply(capacity_data)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:

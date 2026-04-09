@@ -1,0 +1,13 @@
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    band_period: P1M # monthly bands, meaning that the band boundaries are applied to the consumption in each month separately
+    mode: banded # apply the formula for a given tier on the full consumption if the total consumption fits in the bounds of that tier
+    bands:
+    - up_to: 5 # if consumption in a month does not exceed 5 MWh, it is billed according to this formula
+      formula: 
+        constant_cost: 5.0 # usage based costs of 5 €/MWh
+    - up_to: 15 # if consumption in a month is between 5 and 15 MWh, it is billed according to this formula
+      formula: 
+        constant_cost: 10 # usage based costs of 10 €/MWh
+    - formula: # if consumption in a month exceeds 15 MWh, it is billed according to this formula
+        constant_cost: 15.0 # usage based costs of 15 €/MWh

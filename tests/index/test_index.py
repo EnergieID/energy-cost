@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
-import pytz
 
 from energy_cost.index import DataFrameIndex, Index
 
@@ -109,8 +109,8 @@ def test_index_ger_values_return_in_timezone_of_input_for_dumy_index() -> None:
 
     index = DumIndex()
     df = index.get_values(
-        start=dt.datetime(2020, 1, 1, 0, 30, tzinfo=pytz.timezone("Europe/Amsterdam")),
-        end=dt.datetime(2020, 1, 1, 7, 0, tzinfo=pytz.timezone("Europe/Amsterdam")),
+        start=dt.datetime(2020, 1, 1, 0, 30, tzinfo=ZoneInfo("Europe/Amsterdam")),
+        end=dt.datetime(2020, 1, 1, 7, 0, tzinfo=ZoneInfo("Europe/Amsterdam")),
         resolution=dt.timedelta(minutes=15),
     )
 

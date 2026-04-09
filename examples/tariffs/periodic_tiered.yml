@@ -1,0 +1,12 @@
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    band_period: P1Y # the period over which bands boundries are applied, in this case 1 year
+    bands:
+    - up_to: 5 # the first 5 MWh/Year , it is billed according to this formula
+      formula: 
+        constant_cost: 5.0 # usage based costs of 5 €/MWh
+    - up_to: 15 # the next 10 MWh/Year (from 5 to 15 MWh/Year), it is billed according to this formula
+      formula: 
+        constant_cost: 10 # usage based costs of 10 €/MWh
+    - formula: # the consumption above 15 MWh/Year is billed according to this formula
+        constant_cost: 15.0 # usage based costs of 15 €/MWh

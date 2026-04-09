@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 
 from energy_cost.fractional_periods import Period
-from energy_cost.resolution import Resolution, detect_resolution_and_range, to_pandas_freq
+from energy_cost.resolution import Resolution, detect_resolution_and_range, to_pandas_freq, to_pandas_offset
 
 from .formula import Formula
 
@@ -21,13 +21,7 @@ class PeriodicFormula(Formula):
         end: dt.datetime,
         resolution: Resolution,
     ) -> pd.DataFrame:
-        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
-        return pd.DataFrame(
-            {
-                "timestamp": timestamps,
-                "value": timestamps.to_series().apply(lambda ts: self.get_cost_for_interval(ts, ts + resolution)),
-            }
-        )
+        raise NotImplementedError("Periodic formulas cannot be represented as time series. Use apply() instead.")
 
     def get_cost_for_interval(self, start: dt.datetime, end: dt.datetime) -> float:
         return self.constant_cost * self.period.fractional_periods(start, end)
@@ -38,4 +32,12 @@ class PeriodicFormula(Formula):
         resolution: Resolution | None = None,
     ) -> pd.DataFrame:
         start, end, resolution = detect_resolution_and_range(data, resolution)
-        return self.get_values(start, end, resolution)
+        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
+        return pd.DataFrame(
+            {
+                "timestamp": timestamps,
+                "value": timestamps.to_series().apply(
+                    lambda ts: self.get_cost_for_interval(ts, ts + to_pandas_offset(resolution))
+                ),
+            }
+        )

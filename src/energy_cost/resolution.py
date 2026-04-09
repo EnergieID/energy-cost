@@ -1,9 +1,17 @@
 import datetime as dt
-from typing import Annotated
+from typing import Annotated, cast
 
 import isodate
 import pandas as pd
 from pydantic import BeforeValidator
+
+
+def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
+    if tz is None:
+        return d.replace(tzinfo=None) if d.tzinfo is not None else d
+    if d.tzinfo is None:
+        return d.replace(tzinfo=tz)
+    return pd.Timestamp(d).tz_convert(tz).to_pydatetime()
 
 
 def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
@@ -65,8 +73,10 @@ def is_divisor(root: Resolution, divisor: Resolution) -> bool:
 
     if root_is_calendar and divisor_is_calendar:
         # Normalise both to months
-        root_months = int(root.years * 12 + root.months)  # type: ignore[union-attr]
-        divisor_months = int(divisor.years * 12 + divisor.months)  # type: ignore[union-attr]
+        root_dur = cast(isodate.Duration, root)
+        divisor_dur = cast(isodate.Duration, divisor)
+        root_months = int(root_dur.years * 12 + root_dur.months)
+        divisor_months = int(divisor_dur.years * 12 + divisor_dur.months)
         return divisor_months > 0 and root_months % divisor_months == 0
 
     # divisor is calendar, root is fixed timedelta — nonsensical subdivision
@@ -115,5 +125,5 @@ def detect_resolution_and_range(
             raise ValueError("A resolution is required when applying a formula to fewer than 2 timestamps.")
         resolution = detect_resolution(data["timestamp"])
     start = data["timestamp"].min()
-    end = data["timestamp"].max() + resolution
+    end = data["timestamp"].max() + to_pandas_offset(resolution)
     return start, end, resolution

@@ -1,10 +1,17 @@
 import datetime
+import datetime as dt
 
 import isodate
 import pandas as pd
 import pytest
 
-from energy_cost.resolution import detect_resolution_and_range, is_divisor, parse_resolution, to_pandas_freq
+from energy_cost.resolution import (
+    align_datetime_to_tz,
+    detect_resolution_and_range,
+    is_divisor,
+    parse_resolution,
+    to_pandas_freq,
+)
 
 
 def test_to_pandas_freq_correctly_handles_monthly_durations():
@@ -110,3 +117,39 @@ def test_parse_resolution_correctly_parses_iso_strings():
 def test_detect_resolution_and_range_raises_when_no_timestamps():
     with pytest.raises(ValueError):
         detect_resolution_and_range(pd.DataFrame(columns=["timestamp", "value"]))
+
+
+# ---------------------------------------------------------------------------
+# align_datetime_to_tz
+# ---------------------------------------------------------------------------
+
+
+def test_align_datetime_to_tz_with_none_tz_returns_naive_unchanged() -> None:
+    d = dt.datetime(2025, 3, 1, 12, 0)
+    assert align_datetime_to_tz(d, None) == d
+
+
+def test_align_datetime_to_tz_with_none_tz_strips_timezone_from_aware_datetime() -> None:
+    tz = dt.timezone(dt.timedelta(hours=1))
+    d = dt.datetime(2025, 3, 1, 12, 0, tzinfo=tz)
+    result = align_datetime_to_tz(d, None)
+    assert result == dt.datetime(2025, 3, 1, 12, 0)
+    assert result.tzinfo is None
+
+
+def test_align_datetime_to_tz_localizes_naive_to_given_tz() -> None:
+    tz = dt.timezone(dt.timedelta(hours=1))
+    d = dt.datetime(2025, 3, 1, 12, 0)
+    result = align_datetime_to_tz(d, tz)
+    assert result.tzinfo is not None
+    assert result.utcoffset() == dt.timedelta(hours=1)
+
+
+def test_align_datetime_to_tz_converts_aware_to_target_tz() -> None:
+    utc = dt.UTC
+    cet = dt.timezone(dt.timedelta(hours=1))
+    d = dt.datetime(2025, 1, 1, 0, 0, tzinfo=utc)  # midnight UTC
+    result = align_datetime_to_tz(d, cet)
+    # UTC midnight is 01:00 CET
+    assert result.replace(tzinfo=None) == dt.datetime(2025, 1, 1, 1, 0)
+    assert result.utcoffset() == dt.timedelta(hours=1)

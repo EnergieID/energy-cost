@@ -2,12 +2,56 @@
 
 Python package to model your energy bill based on your energy consumption.
 
-This package is currently under construction, with many features still incomplete or missing.
-See [issues](https://github.com/EnergieID/energy-cost/issues) for future planned work and feel free to contribute!
+To use this library, you first specify the `Tariff` applicable to you in a yaml file. See the `examples/tariffs` directory for inspiration, with `notebooks/tariffs.ipynb` for a detailed walkthrough.
 
-Currently implemented features are documented using notebooks in the `notebooks/` directory.
+A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy. We have built in support for fetching these prices from ENTSOE or defining them in a data file, see `notebooks/index.ipynb` for more info.
+
+Then, you can use the `Contract` class to calculate your costs based on your consumption data. See `notebooks/contract.ipynb` for an example.
+
+We already have some built in tariffs for the Belgian market, which you can find in `src/energy_cost/data/be/`. These are the distributor tariffs for the main Belgian distributors, as well as the government fees and taxes. We plan to expand this to other European countries in the future, feel free to contribute if you want to see your country's tariffs in the library!
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
+
+## Example usage
+First define the tariff from your distributor in a yaml file, for example:
+
+```yaml
+- start: 2024-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 100.0
+  injection:
+    constant_cost: -20.0
+```
+
+Then, you can use the `Contract` class to calculate your costs based on your consumption data:
+
+```python
+from energy_cost import Contract, Meter, Tariff
+from energy_cost.data.be import distributors, fees, tax_rate
+
+contract = Contract(
+    tariffs={
+        "provider": Tariff.from_yaml("foo.yml"),
+        "distributor": distributors["fluvius_imewo"],
+        "flanders_fees": fees["flanders_residential"],
+        "belgian_fees": fees["be_residential"],
+    },
+    tax_rate=tax_rate,
+)
+
+consumption = Meter(
+    data=pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2024-01-01T00:00:00+01:00", "2024-03-01T00:00:00+01:00", freq="15min"),
+            "value": 0.0002,
+        }
+    )
+)
+
+contract.calculate_cost([consumption])
+```
+
+For more detailed examples, see the notebooks in the `notebooks` directory.
 
 ## Development
 

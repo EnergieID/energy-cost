@@ -53,7 +53,7 @@ def test_single_segment_single_rate_consumption(tmp_path: Path, fake_indexes: No
     )
 
     tariff = Tariff.from_yaml(path)
-    out = tariff.get_cost(
+    out = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -61,6 +61,7 @@ def test_single_segment_single_rate_consumption(tmp_path: Path, fake_indexes: No
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert out is not None
     assert out["energy"].tolist() == [2.0, 3.0, 4.0, 5.0]
     assert out["total"].tolist() == [2.0, 3.0, 4.0, 5.0]
 
@@ -91,14 +92,14 @@ def test_injection_and_consumption_separate_formulas(tmp_path: Path, fake_indexe
 
     tariff = Tariff.from_yaml(path)
 
-    consumption_out = tariff.get_cost(
+    consumption_out = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
         resolution=dt.timedelta(minutes=15),
     )
-    injection_out = tariff.get_cost(
+    injection_out = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.INJECTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -106,6 +107,8 @@ def test_injection_and_consumption_separate_formulas(tmp_path: Path, fake_indexe
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert consumption_out is not None
+    assert injection_out is not None
     assert consumption_out["energy"].tolist() == [2.0, 3.0, 4.0, 5.0]
     assert consumption_out["total"].tolist() == [2.0, 3.0, 4.0, 5.0]
     assert injection_out["energy"].tolist() == [0.5, 1.5, 2.5, 3.5]
@@ -137,14 +140,14 @@ def test_multiple_meter_types_with_different_formulas(tmp_path: Path, fake_index
 
     tariff = Tariff.from_yaml(path)
 
-    single_rate_out = tariff.get_cost(
+    single_rate_out = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
         resolution=dt.timedelta(minutes=15),
     )
-    tou_peak_out = tariff.get_cost(
+    tou_peak_out = tariff.get_energy_cost(
         meter_type=MeterType.TOU_PEAK,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -152,6 +155,8 @@ def test_multiple_meter_types_with_different_formulas(tmp_path: Path, fake_index
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert single_rate_out is not None
+    assert tou_peak_out is not None
     assert single_rate_out["energy"].tolist() == [2.0, 3.0, 4.0, 5.0]
     assert single_rate_out["total"].tolist() == [2.0, 3.0, 4.0, 5.0]
     assert tou_peak_out["energy"].tolist() == [2.5, 4.5, 6.5, 8.5]
@@ -184,7 +189,7 @@ def test_versioned_segments_switch_at_boundary(tmp_path: Path, fake_indexes: Non
     )
 
     tariff = Tariff.from_yaml(path)
-    out = tariff.get_cost(
+    out = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -192,6 +197,7 @@ def test_versioned_segments_switch_at_boundary(tmp_path: Path, fake_indexes: Non
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert out is not None
     assert out["energy"].tolist() == [2.0, 3.0, 3.5, 4.0]
     assert out["total"].tolist() == [2.0, 3.0, 3.5, 4.0]
 
@@ -217,12 +223,13 @@ def test_multiple_variable_cost_indexes(tmp_path: Path, fake_indexes: None) -> N
     )
 
     tariff = Tariff.from_yaml(path)
-    out = tariff.get_cost(
+    out = tariff.get_energy_cost(
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert out is not None
     assert out["energy"].tolist() == pytest.approx([1.45, 2.4, 3.35, 4.3])
     assert out["total"].tolist() == pytest.approx([1.45, 2.4, 3.35, 4.3])
 
@@ -265,14 +272,14 @@ def test_all_key_shared_costs_with_meter_specific_energy(tmp_path: Path, fake_in
     tariff = Tariff.from_yaml(path)
 
     # Injection is shared across meter types via ``all``
-    single_injection = tariff.get_cost(
+    single_injection = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.INJECTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
         resolution=dt.timedelta(minutes=15),
     )
-    tou_injection = tariff.get_cost(
+    tou_injection = tariff.get_energy_cost(
         meter_type=MeterType.TOU_PEAK,
         direction=PowerDirection.INJECTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -280,13 +287,15 @@ def test_all_key_shared_costs_with_meter_specific_energy(tmp_path: Path, fake_in
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert single_injection is not None
+    assert tou_injection is not None
     assert single_injection["energy"].tolist() == [0.5, 1.5, 2.5, 3.5]
     assert single_injection["total"].tolist() == [0.5, 1.5, 2.5, 3.5]
     assert tou_injection["energy"].tolist() == [0.5, 1.5, 2.5, 3.5]
     assert tou_injection["total"].tolist() == [0.5, 1.5, 2.5, 3.5]
 
     # Consumption: ``all`` (chp + renewable) merged with single_rate energy
-    single_consumption = tariff.get_cost(
+    single_consumption = tariff.get_energy_cost(
         meter_type=MeterType.SINGLE_RATE,
         direction=PowerDirection.CONSUMPTION,
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
@@ -294,6 +303,7 @@ def test_all_key_shared_costs_with_meter_specific_energy(tmp_path: Path, fake_in
         resolution=dt.timedelta(minutes=15),
     )
 
+    assert single_consumption is not None
     assert set(single_consumption.columns) == {
         "timestamp",
         "chp_certificates",
