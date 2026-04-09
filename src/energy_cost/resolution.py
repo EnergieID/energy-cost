@@ -128,8 +128,6 @@ def snap_billing_period(
     """
     offset = pd.tseries.frequencies.to_offset(output_freq)
     assert offset is not None
-    ts_start = cast(pd.Timestamp, pd.Timestamp(billing_start))
-    ts_end = cast(pd.Timestamp, pd.Timestamp(billing_end))
 
     if not isinstance(offset, pd.tseries.offsets.Tick):
         # Calendar offsets (MonthBegin, YearBegin, …) consider any day-1 timestamp
@@ -137,16 +135,16 @@ def snap_billing_period(
         # non-midnight times. Normalize to midnight first, then handle the ceiling
         # case: if the original ts_end was after midnight on a day that rollforward
         # considers already on-offset, advance one extra period.
-        snapped_start = cast(pd.Timestamp, pd.Timestamp(offset.rollback(ts_start))).normalize()
-        ts_end_norm = ts_end.normalize()
-        snapped_end = cast(pd.Timestamp, pd.Timestamp(offset.rollforward(ts_end_norm)))
-        if ts_end_norm < ts_end and snapped_end == ts_end_norm:
+        snapped_start = offset.rollback(billing_start).replace(hour=0, minute=0, second=0, microsecond=0)
+        end_norm = billing_end.replace(hour=0, minute=0, second=0, microsecond=0)
+        snapped_end = offset.rollforward(end_norm)
+        if end_norm < billing_end and snapped_end == end_norm:
             snapped_end = snapped_end + offset
     else:
-        snapped_start = cast(pd.Timestamp, pd.Timestamp(offset.rollback(ts_start)))
-        snapped_end = cast(pd.Timestamp, pd.Timestamp(offset.rollforward(ts_end)))
+        snapped_start = offset.rollback(billing_start)
+        snapped_end = offset.rollforward(billing_end)
 
-    return snapped_start.to_pydatetime(), snapped_end.to_pydatetime()
+    return snapped_start, snapped_end
 
 
 def detect_resolution_and_range(
