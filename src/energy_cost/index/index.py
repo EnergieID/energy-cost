@@ -1,6 +1,6 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pandas as pd
 
@@ -39,8 +39,8 @@ class Index(ABC):
                 f"of the index resolution {self.resolution!r}."
             )
 
-        start_ts = pd.Timestamp(start)
-        end_ts = pd.Timestamp(end)
+        start_ts = cast(pd.Timestamp, pd.Timestamp(start))
+        end_ts = cast(pd.Timestamp, pd.Timestamp(end))
         requested_freq = to_pandas_freq(resolution)
         native_resolution_offset = to_pandas_offset(self.resolution)
 
