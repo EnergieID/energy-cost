@@ -8,7 +8,7 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel
 
-from .meter import Meter, MeterType, PowerDirection, as_single_meter
+from .meter import CostGroup, Meter, MeterType, PowerDirection, as_single_meter
 from .resolution import (
     Resolution,
     align_datetime_to_tz,
@@ -161,7 +161,7 @@ class Tariff(BaseModel):
 
         result = pd.concat(frames, axis=1)
         total_cols = [c for c in result.columns if c[-1] == "total"]
-        result[("total", "total")] = result[total_cols].sum(axis=1)
+        result[(CostGroup.TOTAL, MeterType.ALL, "total")] = result[total_cols].sum(axis=1)
         return result.reset_index()
 
     def _apply_direction_costs(
@@ -179,11 +179,9 @@ class Tariff(BaseModel):
             return None
         agg = costs.set_index("timestamp").resample(output_freq).sum()
         cost_cols = [c for c in agg.columns if c != "total"]
-        agg[("total")] = agg[cost_cols].sum(axis=1)
-        frame_name = direction.value
-        if meter_type != MeterType.SINGLE_RATE:
-            frame_name += f"_{meter_type.value}"
-        agg.columns = pd.MultiIndex.from_tuples([(frame_name, c) for c in agg.columns])
+        agg["total"] = agg[cost_cols].sum(axis=1)
+        cost_group = CostGroup.CONSUMPTION if direction == PowerDirection.CONSUMPTION else CostGroup.INJECTION
+        agg.columns = pd.MultiIndex.from_tuples([(cost_group, meter_type, c) for c in agg.columns])
         return agg
 
     def _apply_capacity_costs(
@@ -200,7 +198,7 @@ class Tariff(BaseModel):
         if filtered.empty:
             return None
         agg = filtered.set_index("timestamp").resample(output_freq).sum().rename(columns={"value": "total"})
-        agg.columns = pd.MultiIndex.from_tuples([("capacity", c) for c in agg.columns])
+        agg.columns = pd.MultiIndex.from_tuples([(CostGroup.CAPACITY, MeterType.ALL, c) for c in agg.columns])
         return agg
 
     def _apply_fixed_costs(
@@ -221,5 +219,5 @@ class Tariff(BaseModel):
             return None
         df = pd.DataFrame(rows).set_index("timestamp").fillna(0.0)
         df["total"] = df.sum(axis=1)
-        df.columns = pd.MultiIndex.from_tuples([("fixed", c) for c in df.columns])
+        df.columns = pd.MultiIndex.from_tuples([(CostGroup.FIXED, MeterType.ALL, c) for c in df.columns])
         return df

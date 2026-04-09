@@ -9,7 +9,7 @@ import pytest
 
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
-from energy_cost.meter import Meter, MeterType, PowerDirection
+from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
 
@@ -230,7 +230,7 @@ def test_apply_fixed_costs_timestamps_are_at_billing_start_not_utc() -> None:
     result = tariff.apply([Meter(data=consumption)], start=start)
 
     assert result is not None
-    assert ("fixed", "total") in result.columns
+    assert (CostGroup.FIXED, MeterType.ALL, "total") in result.columns
     first_ts = result["timestamp"].iloc[0]
     assert first_ts == pd.Timestamp("2025-01-01T00:00:00+01:00")
 
@@ -260,7 +260,7 @@ def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_
 
     assert result is not None
     assert len(result) == 12
-    assert ("capacity", "total") in result.columns
+    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
     first_ts = result["timestamp"].iloc[0]
     assert first_ts.month == 1
 
@@ -289,11 +289,11 @@ def test_apply_tou_peak_meter_uses_tou_formula() -> None:
     result = tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
 
     assert result is not None
-    assert ("consumption_tou_peak", "energy") in result.columns
-    assert ("consumption", "energy") not in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") not in result.columns
     # 4 intervals × 1 MWh × 20 €/MWh = 80 €
-    assert result[("consumption_tou_peak", "energy")].iloc[0] == pytest.approx(80.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(80.0)
 
 
 def test_apply_mixed_meter_types_produce_separate_columns() -> None:
@@ -321,12 +321,12 @@ def test_apply_mixed_meter_types_produce_separate_columns() -> None:
     )
 
     assert result is not None
-    assert ("consumption", "energy") in result.columns
-    assert ("consumption_tou_peak", "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
     # single_rate: 4 × 1 × 10 = 40 €; tou_peak: 4 × 2 × 20 = 160 €
-    assert result[("consumption", "energy")].iloc[0] == pytest.approx(40.0)
-    assert result[("consumption_tou_peak", "energy")].iloc[0] == pytest.approx(160.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(200.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[0] == pytest.approx(160.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(200.0)
 
 
 def test_apply_tou_offpeak_and_injection_meters() -> None:
@@ -356,9 +356,9 @@ def test_apply_tou_offpeak_and_injection_meters() -> None:
     )
 
     assert result is not None
-    assert ("consumption_tou_offpeak", "energy") in result.columns
-    assert ("injection", "energy") in result.columns
+    assert (CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy") in result.columns
+    assert (CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy") in result.columns
     # consumption: 4 × 1 × 5 = 20 €; injection: 4 × 0.5 × 3 = 6 €
-    assert result[("consumption_tou_offpeak", "energy")].iloc[0] == pytest.approx(20.0)
-    assert result[("injection", "energy")].iloc[0] == pytest.approx(6.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(26.0)
+    assert result[(CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy")].iloc[0] == pytest.approx(20.0)
+    assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(6.0)
+    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(26.0)
