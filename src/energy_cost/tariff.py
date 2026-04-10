@@ -64,9 +64,13 @@ class Tariff(BaseModel):
             ),
         )
 
-    def apply_capacity_cost(self, data: pd.DataFrame) -> pd.DataFrame | None:
+    def apply_capacity_cost(
+        self, data: pd.DataFrame, start: dt.datetime | None = None, end: dt.datetime | None = None
+    ) -> pd.DataFrame | None:
         """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
-        start, end, _ = detect_resolution_and_range(data)
+        detected_start, detected_end, _ = detect_resolution_and_range(data)
+        start = start or detected_start
+        end = end or detected_end
         return self._collect_version_frames(
             self._find_active_versions(start, end),
             lambda version, seg_start, seg_end: version.apply_capacity_cost(data),
@@ -77,9 +81,13 @@ class Tariff(BaseModel):
         data: pd.DataFrame,
         meter_type: MeterType = MeterType.SINGLE_RATE,
         direction: PowerDirection = PowerDirection.CONSUMPTION,
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data across all active versions."""
-        start, end, _ = detect_resolution_and_range(data)
+        detected_start, detected_end, _ = detect_resolution_and_range(data)
+        start = start or detected_start
+        end = end or detected_end
         return self._collect_version_frames(
             self._find_active_versions(start, end),
             lambda version, seg_start, seg_end: version.apply_energy_cost(
@@ -174,7 +182,7 @@ class Tariff(BaseModel):
         output_freq: str,
     ) -> pd.DataFrame | None:
         sliced = data[(data["timestamp"] >= billing_start) & (data["timestamp"] < billing_end)].copy()
-        costs = self.apply_energy_cost(sliced, meter_type, direction)
+        costs = self.apply_energy_cost(sliced, meter_type, direction, billing_start, billing_end)
         if costs is None:
             return None
         agg = costs.set_index("timestamp").resample(output_freq).sum()
@@ -192,7 +200,7 @@ class Tariff(BaseModel):
         billing_end: dt.datetime,
         output_freq: str,
     ) -> pd.DataFrame | None:
-        capacity_df = self.apply_capacity_cost(consumption)
+        capacity_df = self.apply_capacity_cost(consumption, billing_start, billing_end)
         if capacity_df is None:
             return None
         filtered = capacity_df[(capacity_df["timestamp"] >= billing_start) & (capacity_df["timestamp"] < billing_end)]

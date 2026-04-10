@@ -640,8 +640,8 @@ def test_avoid_regression_on_real_world_data() -> None:
         DataFrameIndex(
             pd.DataFrame(
                 {
-                    "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz="UTC"),
-                    "value": [50.0, 55.0, 60.0, 65.0],
+                    "timestamp": pd.date_range("2025-01-01", periods=4 * 24 * 365 * 2, freq="15min", tz="UTC"),
+                    "value": 100,
                 }
             )
         ),
@@ -673,17 +673,40 @@ def test_avoid_regression_on_real_world_data() -> None:
             type=MeterType.SINGLE_RATE,
             data=pd.DataFrame(
                 {
-                    "timestamp": pd.date_range("2026-04-09", periods=3, freq="15min", tz="UTC"),
-                    "value": [0.005, 0.005, 0.005],
+                    "timestamp": pd.date_range("2026-04-09", periods=4, freq="15min", tz="UTC"),
+                    "value": [0.0025, 0.0025, 0.0025, 0.0025],
                 }
             ),
         )
     ]
     result = contract.calculate_cost(meters)
+    expected = {
+        TariffCategory.PROVIDER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
+        TariffCategory.DISTRIBUTOR: 12.26457,  # (capacity 0.0025) + (consumption * 50.5027) + (data_management/12) => 10.2924284 + 0.01 * 50.5027 + 17.85/12 = 12.2849 €
+        TariffCategory.FEES: 0.475554,  # consumption * (excise + energy_contribution) => 0.475554 €
+    }
+    expected[TariffCategory.TAXES] = (sum(expected.values())) * tax_rate
+    expected[TariffCategory.TOTAL] = sum(expected.values())
+
     assert result is not None
     # dataframe has one row starting on 2026-04-01 (monthly resolution)
     assert len(result) == 1
     assert result["timestamp"].iloc[0] == pd.Timestamp("2026-04-01T00:00:00+00:00")
+    assert result[(TariffCategory.PROVIDER, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(
+        expected[TariffCategory.PROVIDER]
+    )
+    assert result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(
+        expected[TariffCategory.DISTRIBUTOR]
+    )
+    assert result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(
+        expected[TariffCategory.FEES]
+    )
+    assert result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(
+        expected[TariffCategory.TAXES]
+    )
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(
+        expected[TariffCategory.TOTAL]
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -63,9 +63,9 @@ class TieredFormula(Formula):
             else:
                 applied = self._apply_banded_group(group_frame, estimated_total, resolution)
 
-            result = result.merge(applied, on="timestamp", how="left", suffixes=("", "_band"))
-            result["value"] = result["value_band"].combine_first(result["value"])
-            result = result.drop(columns=["value_band"])
+            result = result.merge(applied, on="timestamp", how="left", suffixes=("", "_group"))
+            result["value"] = result["value_group"].combine_first(result["value"])
+            result = result.drop(columns=["value_group"])
 
         return result
 

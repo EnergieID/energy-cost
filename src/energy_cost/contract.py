@@ -65,7 +65,7 @@ class Contract(BaseModel):
         result = pd.concat(frames, axis=1)
         _total = (TariffCategory.TOTAL, CostGroup.TOTAL, MeterType.ALL, "total")
         _taxes = (TariffCategory.TAXES, CostGroup.TOTAL, MeterType.ALL, "total")
-        total_cols = [c for c in result.columns if c[-2:] == (MeterType.ALL, "total")]
+        total_cols = [c for c in result.columns if c[-3:] == (CostGroup.TOTAL, MeterType.ALL, "total")]
         result[_taxes] = result[total_cols].sum(axis=1) * self.tax_rate
         total_cols += [_taxes]
         result[_total] = result[total_cols].sum(axis=1)
