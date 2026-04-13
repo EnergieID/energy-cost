@@ -55,7 +55,7 @@ def test_index_formula_constant_only() -> None:
         resolution=dt.timedelta(minutes=15),
     )
 
-    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=3, freq="15min"))
+    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=3, freq="15min", tz=dt.UTC))
     assert out["value"].tolist() == [1.5, 1.5, 1.5]
 
 

@@ -3,6 +3,8 @@ import datetime as dt
 import pandas as pd
 from entsoe.entsoe import EntsoePandasClient
 
+from energy_cost.resolution import align_timestamps_to_tz
+
 from .index import Index
 
 
@@ -14,7 +16,7 @@ class EntsoeDayAheadIndex(Index):
         self.country_code = country_code
         super().__init__(resolution=resolution)
 
-    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
         """Get the index values for the given time range in €/MWh."""
 
         df = (
@@ -28,4 +30,4 @@ class EntsoeDayAheadIndex(Index):
             .rename(columns={"index": "timestamp", 0: "value"})
         )
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        return df
+        return align_timestamps_to_tz(df, timezone)

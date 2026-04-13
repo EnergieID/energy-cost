@@ -1,11 +1,12 @@
 import datetime as dt
+from datetime import UTC
 from enum import StrEnum
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .meter import CostGroup, Meter, MeterType
-from .resolution import Resolution
+from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 
 
@@ -18,10 +19,15 @@ class TariffCategory(StrEnum):
 
 
 class Contract(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     provider: Tariff | list[Tariff] | None = None
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
     tax_rate: float = 0.0
+    timezone: dt.tzinfo = UTC
+    """All datetime operations use this timezone. Naive datetimes are treated as being
+    in this timezone; tz-aware datetimes are converted to it."""
 
     def calculate_cost(
         self,
@@ -32,6 +38,12 @@ class Contract(BaseModel):
         expand_meter_types: bool = False,
     ) -> pd.DataFrame:
         """Calculate the full energy bill."""
+
+        # Normalize start/end to the contract timezone up front
+        if start is not None:
+            start = align_datetime_to_tz(start, self.timezone)
+        if end is not None:
+            end = align_datetime_to_tz(end, self.timezone)
 
         tariffs: dict[TariffCategory, Tariff | list[Tariff]] = {}
         for category in [TariffCategory.PROVIDER, TariffCategory.DISTRIBUTOR, TariffCategory.FEES]:
@@ -49,6 +61,7 @@ class Contract(BaseModel):
                     start=start,
                     end=end,
                     resolution=resolution,
+                    timezone=self.timezone,
                 )
                 if optional_frame is not None:
                     optional_frame = optional_frame.set_index("timestamp")

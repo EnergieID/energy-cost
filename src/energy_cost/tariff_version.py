@@ -1,5 +1,6 @@
 import datetime as dt
 from collections.abc import Callable
+from datetime import UTC
 from typing import Annotated, Any
 
 import pandas as pd
@@ -93,12 +94,13 @@ class TariffVersion(BaseModel):
         resolution: Resolution,
         meter_type: MeterType,
         direction: PowerDirection,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame | None:
         """Get energy cost rates in €/MWh. Returns None if no formulas are configured."""
         return self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.get_values(start, end, resolution),
+            lambda formula: formula.get_values(start, end, resolution, timezone),
         )
 
     def apply_energy_cost(
@@ -106,18 +108,19 @@ class TariffVersion(BaseModel):
         data: pd.DataFrame,
         meter_type: MeterType,
         direction: PowerDirection,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data, returning costs in €."""
         return self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.apply(data),
+            lambda formula: formula.apply(data, timezone=timezone),
         )
 
-    def apply_capacity_cost(self, capacity_data: pd.DataFrame) -> pd.DataFrame | None:
+    def apply_capacity_cost(self, capacity_data: pd.DataFrame, timezone: dt.tzinfo = UTC) -> pd.DataFrame | None:
         if self.capacity is None:
             return None
-        return self.capacity.apply(capacity_data)
+        return self.capacity.apply(capacity_data, timezone=timezone)
 
-    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime) -> dict[str, float]:
-        return {name: entry.get_cost_for_interval(start, end) for name, entry in self.periodic.items()}
+    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
+        return {name: entry.get_cost_for_interval(start, end, timezone) for name, entry in self.periodic.items()}

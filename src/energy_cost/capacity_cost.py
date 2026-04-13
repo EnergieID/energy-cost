@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import datetime as dt
+from datetime import UTC
+
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
@@ -18,6 +21,7 @@ class CapacityComponent(BaseModel):
     def apply(
         self,
         capacity_data: pd.DataFrame,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         # 1. if resolution of capacity data is divisor of measurement_period, resample to measurement_period using sum (else continue, assuming data in higher resolution is already aggregated in a correct way)
         resolution = detect_resolution(capacity_data["timestamp"])
@@ -43,4 +47,4 @@ class CapacityComponent(BaseModel):
             capacity_data["value"] = capacity_data["value"].rolling(window=self.window_periods, min_periods=1).mean()
 
         # 4. apply pricing formula to aggregated data
-        return self.formula.apply(capacity_data, resolution=self.billing_period)
+        return self.formula.apply(capacity_data, resolution=self.billing_period, timezone=timezone)

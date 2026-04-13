@@ -9,6 +9,7 @@ In a time-series the total cost is spread equally across all resolution steps.
 
 from __future__ import annotations
 
+import datetime as dt
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -34,14 +35,16 @@ class PeriodUnit(ABC):
         """Total seconds in the period containing dt."""
         return elapsed_seconds(self.period_start(dt), self.next_period(dt))
 
-    def fractional_periods(self, start: datetime, end: datetime) -> float:
-        """Calendar-aware fractional periods for a [start, end) interval."""
+    def fractional_periods(self, start: datetime, end: datetime, timezone: dt.tzinfo = UTC) -> float:
+        """Calendar-aware fractional periods for a [start, end) interval.
 
-        # Assume UTC for naive datetimes, to avoid DST issues
+        Naive datetimes are localized to *timezone* (defaults to UTC).
+        """
+        # Localize naive datetimes to the specified timezone
         if not start.tzinfo:
-            start = start.replace(tzinfo=UTC)
+            start = start.replace(tzinfo=timezone)
         if not end.tzinfo:
-            end = end.replace(tzinfo=UTC)
+            end = end.replace(tzinfo=timezone)
 
         if start >= end:
             return 0.0
@@ -119,12 +122,12 @@ class Period(StrEnum):
     MONTHLY = "monthly"
     YEARLY = "yearly"
 
-    def fractional_periods(self, start: datetime, end: datetime) -> float:
+    def fractional_periods(self, start: datetime, end: datetime, timezone: dt.tzinfo = UTC) -> float:
         """Calendar-aware fractional periods for a [start, end) interval."""
-        return PERIOD_FRACTION_FUNCTIONS[self](start, end)
+        return PERIOD_FRACTION_FUNCTIONS[self](start, end, timezone)
 
 
-PERIOD_FRACTION_FUNCTIONS: dict[Period, Callable[[datetime, datetime], float]] = {
+PERIOD_FRACTION_FUNCTIONS: dict[Period, Callable[[datetime, datetime, dt.tzinfo], float]] = {
     Period.HOURLY: HourPeriod().fractional_periods,
     Period.DAILY: DayPeriod().fractional_periods,
     Period.MONTHLY: MonthPeriod().fractional_periods,

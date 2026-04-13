@@ -13,7 +13,7 @@ class DummyIndex(Index):
     def __init__(self):
         super().__init__(resolution=dt.timedelta(minutes=15))
 
-    def _get_values(self, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
+    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
         return pd.DataFrame(
             {
                 "timestamp": pd.date_range(start=start, end=end, freq="15min", inclusive="left"),
@@ -91,12 +91,12 @@ def test_index_ger_values_return_in_timezone_of_input() -> None:
     assert df["timestamp"].dtype == "datetime64[us, UTC]"
 
 
-def test_index_ger_values_return_in_timezone_of_input_for_dumy_index() -> None:
+def test_index_ger_values_return_in_timezone_of_the_request() -> None:
     class DumIndex(Index):
         def __init__(self):
             super().__init__(resolution=dt.timedelta(minutes=15))
 
-        def _get_values(self, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
+        def _get_values(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo) -> pd.DataFrame:
             # explicitly use naive timestamps to test that they are localized to the timezone of the input timestamps
             start = dt.datetime(2020, 1, 1, 0, 30)
             end = dt.datetime(2020, 1, 1, 7, 0)
@@ -107,11 +107,13 @@ def test_index_ger_values_return_in_timezone_of_input_for_dumy_index() -> None:
                 }
             )
 
+    z = ZoneInfo("Europe/Amsterdam")
     index = DumIndex()
     df = index.get_values(
-        start=dt.datetime(2020, 1, 1, 0, 30, tzinfo=ZoneInfo("Europe/Amsterdam")),
-        end=dt.datetime(2020, 1, 1, 7, 0, tzinfo=ZoneInfo("Europe/Amsterdam")),
+        start=dt.datetime(2020, 1, 1, 0, 30, tzinfo=z),
+        end=dt.datetime(2020, 1, 1, 7, 0, tzinfo=z),
         resolution=dt.timedelta(minutes=15),
+        timezone=z,
     )
 
     assert df["timestamp"].dtype == "datetime64[us, Europe/Amsterdam]"

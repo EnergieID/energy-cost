@@ -4,7 +4,14 @@ from typing import ClassVar, cast
 
 import pandas as pd
 
-from ..resolution import Resolution, is_divisor, to_pandas_freq, to_pandas_offset
+from ..resolution import (
+    Resolution,
+    align_datetime_to_tz,
+    align_timestamps_to_tz,
+    is_divisor,
+    to_pandas_freq,
+    to_pandas_offset,
+)
 
 
 class Index(ABC):
@@ -32,6 +39,7 @@ class Index(ABC):
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
+        timezone: dt.tzinfo = dt.UTC,
     ) -> pd.DataFrame:
         if not is_divisor(self.resolution, resolution):
             raise ValueError(
@@ -39,8 +47,9 @@ class Index(ABC):
                 f"of the index resolution {self.resolution!r}."
             )
 
-        start_ts = cast(pd.Timestamp, pd.Timestamp(start))
-        end_ts = cast(pd.Timestamp, pd.Timestamp(end))
+        start_ts = cast(pd.Timestamp, pd.Timestamp(align_datetime_to_tz(start, timezone)))
+        end_ts = cast(pd.Timestamp, pd.Timestamp(align_datetime_to_tz(end, timezone)))
+
         requested_freq = to_pandas_freq(resolution)
         native_resolution_offset = to_pandas_offset(self.resolution)
 
@@ -49,7 +58,7 @@ class Index(ABC):
         # When forward-filling, we may need the last known value that lies
         # *before* `start`, so we widen the look-back window by one native resolution period.
         fetch_start = start_ts - native_resolution_offset
-        raw = self._get_values(fetch_start, end_ts)
+        raw = self._get_values(fetch_start, end_ts, timezone)
 
         # explicitly add a timestamp one native resolution after the last raw timestamp with value `nan`
         # This way, they are not forward-filled with the last known value, but correctly marked as out-of-range.
@@ -60,11 +69,8 @@ class Index(ABC):
                 [raw, pd.DataFrame({"timestamp": [last_period_end], "value": [float("nan")]})], ignore_index=True
             )
 
-        # Convert raw timestamps to the same timezone as the input timestamps (if any) for correct merging
-        if raw["timestamp"].dt.tz is not None:
-            raw["timestamp"] = raw["timestamp"].dt.tz_convert(start_ts.tz)
-        elif start_ts.tz is not None:
-            raw["timestamp"] = raw["timestamp"].dt.tz_localize(start_ts.tz)
+        # Convert raw timestamps to the target timezone for correct merging
+        raw = align_timestamps_to_tz(raw, timezone)
 
         merged = pd.merge_asof(
             left=pd.DataFrame({"timestamp": target_index}),
@@ -76,7 +82,7 @@ class Index(ABC):
         return merged
 
     @abstractmethod
-    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
+    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
         """Return raw index values for the given range.
 
         Must return a ``pd.DataFrame`` with:

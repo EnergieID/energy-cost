@@ -12,6 +12,8 @@ We already have some built in tariffs for the Belgian market, which you can find
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
 
+> Note on timezones: every method that takes timestamps as input also takes a timezone as input. All timestamps will be aligned to this timezone, and all outputs will be in this timezone as well. This means that you can use the library with any timezone, regardless of the timezone of the input data or the tariff definitions. By default, the timezone is set to UTC.
+
 ## Example usage
 First define the tariff from your distributor in a yaml file, for example:
 
@@ -30,13 +32,11 @@ from energy_cost import Contract, Meter, Tariff
 from energy_cost.data.be import distributors, fees, tax_rate
 
 contract = Contract(
-    tariffs={
-        "provider": Tariff.from_yaml("foo.yml"),
-        "distributor": distributors["fluvius_imewo"],
-        "flanders_fees": fees["flanders_residential"],
-        "belgian_fees": fees["be_residential"],
-    },
+    provider=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
+    distributor=distributors["fluvius_imewo"],
+    fees=[fees["flanders_residential"], fees["be_residential"]],
     tax_rate=tax_rate,
+    timezone=ZoneInfo("Europe/Brussels"),
 )
 
 consumption = Meter(
