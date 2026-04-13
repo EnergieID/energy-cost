@@ -17,16 +17,16 @@ from energy_cost.tariff_version import TariffVersion
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
     path = tmp_path / "tariff.yml"
     path.write_text(
-        "- start: 2026-01-01T00:00:00\n"
-        "  consumption:\n"
-        "    all:\n"
-        "      energy:\n"
-        "        constant_cost: 2.0\n"
         "- start: 2025-01-01T00:00:00\n"
         "  consumption:\n"
         "    all:\n"
         "      energy:\n"
-        "        constant_cost: 1.0\n",
+        "        constant_cost: 1.0\n"
+        "- start: 2026-01-01T00:00:00\n"
+        "  consumption:\n"
+        "    all:\n"
+        "      energy:\n"
+        "        constant_cost: 2.0\n",
         encoding="utf-8",
     )
 
@@ -44,6 +44,7 @@ def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
         start=dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
         end=dt.datetime.fromisoformat("2025-01-06T11:00:00+01:00"),
         resolution=dt.timedelta(hours=1),
+        timezone=dt.timezone(dt.timedelta(hours=1)),
     )
 
     assert out is not None
@@ -71,7 +72,7 @@ def test_get_energy_cost_uses_correct_segment_for_time_range() -> None:
     )
 
     assert out is not None
-    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=4, freq="15min"))
+    assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC))
     assert out["energy"].tolist() == [1.0, 1.0, 2.0, 2.0]
     assert out["total"].tolist() == [1.0, 1.0, 2.0, 2.0]
 
@@ -194,7 +195,7 @@ def test_apply_output_timestamps_match_input_timezone() -> None:
     timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = tariff.apply([Meter(data=consumption)])
+    result = tariff.apply([Meter(data=consumption)], timezone=_CET)
 
     assert result is not None
     assert result["timestamp"].dt.tz is not None
@@ -212,7 +213,7 @@ def test_apply_zoneinfo_start_preserves_timezone_in_output() -> None:
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
     end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
 
-    result = tariff.apply([Meter(data=consumption)], start=start, end=end)
+    result = tariff.apply([Meter(data=consumption)], start=start, end=end, timezone=z)
 
     assert result is not None
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
@@ -226,7 +227,7 @@ def test_apply_fixed_costs_timestamps_are_at_billing_start_not_utc() -> None:
 
     z = ZoneInfo("Europe/Brussels")
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
-    result = tariff.apply([Meter(data=consumption)], start=start)
+    result = tariff.apply([Meter(data=consumption)], start=start, timezone=_CET)
 
     assert result is not None
     assert (CostGroup.FIXED, MeterType.ALL, "total") in result.columns
@@ -255,7 +256,7 @@ def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
     end = dt.datetime(2026, 1, 1, 0, 0, tzinfo=z)
 
-    result = tariff.apply([Meter(data=consumption)], start=start, end=end)
+    result = tariff.apply([Meter(data=consumption)], start=start, end=end, timezone=z)
 
     assert result is not None
     assert len(result) == 12

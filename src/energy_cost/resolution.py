@@ -10,8 +10,21 @@ def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
     if tz is None:
         return d.replace(tzinfo=None) if d.tzinfo is not None else d
     if d.tzinfo is None:
-        return d.replace(tzinfo=tz)
+        return cast(
+            dt.datetime,
+            pd.Timestamp(d).tz_localize(tz, ambiguous=False, nonexistent="shift_forward").to_pydatetime(),
+        )
     return cast(dt.datetime, pd.Timestamp(d).tz_convert(tz).to_pydatetime())
+
+
+def align_timestamps_to_tz(data: pd.DataFrame, tz: dt.tzinfo) -> pd.DataFrame:
+    """Return a copy of *data* with the ``"timestamp"`` column converted/localized to *tz*."""
+    data = data.copy()
+    if data["timestamp"].dt.tz is not None:
+        data["timestamp"] = data["timestamp"].dt.tz_convert(tz)
+    else:
+        data["timestamp"] = data["timestamp"].dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
+    return data
 
 
 def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
@@ -132,11 +145,12 @@ def snap_billing_period(
     if not isinstance(offset, pd.tseries.offsets.Tick):
         # Calendar offsets (MonthBegin, YearBegin, …) consider any day-1 timestamp
         # "on-offset" regardless of time-of-day, so rollforward/rollback preserve
-        # non-midnight times. Normalize to midnight first, then handle the ceiling
-        # case: if the original ts_end was after midnight on a day that rollforward
-        # considers already on-offset, advance one extra period.
-        snapped_start = offset.rollback(billing_start).replace(hour=0, minute=0, second=0, microsecond=0)
-        end_norm = billing_end.replace(hour=0, minute=0, second=0, microsecond=0)
+        # non-midnight times. Normalize to midnight first (pd.Timestamp.normalize()
+        # handles DST-aware timezones correctly), then handle the ceiling case: if
+        # the original ts_end was after midnight on a day that rollforward considers
+        # already on-offset, advance one extra period.
+        snapped_start = cast(pd.Timestamp, pd.Timestamp(offset.rollback(billing_start))).normalize()
+        end_norm = cast(pd.Timestamp, pd.Timestamp(billing_end)).normalize()
         snapped_end = offset.rollforward(end_norm)
         if end_norm < billing_end and snapped_end == end_norm:
             snapped_end = snapped_end + offset

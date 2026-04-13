@@ -145,7 +145,7 @@ def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) ->
     # Only February should appear in the output.
     assert result is not None
     assert len(result) == 1
-    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-02-01")
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-02-01", tz=dt.UTC)
     # Capacity column should be present with a non-NaN value.
     assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
     assert pd.notna(result[(CostGroup.CAPACITY, MeterType.ALL, "total")].iloc[0])
@@ -384,7 +384,7 @@ def _tz_contract(
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
     tariff = Tariff(versions=[version])
-    return Contract(provider=tariff, distributor=tariff)
+    return Contract(provider=tariff, distributor=tariff, timezone=_CET)
 
 
 def test_calculate_cost_output_timestamps_match_input_timezone() -> None:

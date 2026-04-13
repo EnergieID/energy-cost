@@ -172,6 +172,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_total(
         dt.datetime.fromisoformat("2025-01-06T05:00:00+01:00"),
         dt.datetime.fromisoformat("2025-01-06T07:00:00+01:00"),
         dt.timedelta(hours=1),
+        timezone=dt.timezone(dt.timedelta(hours=1)),
     )
     assert out["value"].tolist() == [100.0, 300.0]
 
@@ -193,7 +194,9 @@ def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
 
 def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_series() -> None:
     class EmptyIndexFormula(IndexFormula):
-        def get_values(self, start: dt.datetime, end: dt.datetime, resolution: Resolution) -> pd.DataFrame:
+        def get_values(
+            self, start: dt.datetime, end: dt.datetime, resolution: Resolution, timezone: dt.tzinfo = dt.UTC
+        ) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
 
     segment = TariffVersion(

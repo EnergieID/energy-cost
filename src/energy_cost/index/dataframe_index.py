@@ -1,6 +1,8 @@
+import datetime as dt
+
 import pandas as pd
 
-from energy_cost.resolution import Resolution, detect_resolution
+from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution
 
 from .index import Index
 
@@ -17,12 +19,10 @@ class DataFrameIndex(Index):
 
         super().__init__(resolution=resolution)
 
-    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
-        if self.df["timestamp"].dt.tz is not None:
-            self.df["timestamp"] = self.df["timestamp"].dt.tz_convert(start.tz)
-        elif start.tz is not None:
-            self.df["timestamp"] = self.df["timestamp"].dt.tz_localize(start.tz)
-        return self.df[(self.df["timestamp"] >= start) & (self.df["timestamp"] < end)].copy()
+    def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
+        df = self.df.copy()  # work on a copy to avoid mutating self.df
+        df = align_timestamps_to_tz(df, timezone)
+        return df[(df["timestamp"] >= start) & (df["timestamp"] < end)].copy()
 
 
 class CSVIndex(DataFrameIndex):

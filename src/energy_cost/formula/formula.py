@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import datetime as dt
 from abc import ABC, abstractmethod
+from datetime import UTC
 from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
 from pydantic_core import core_schema
 
-from energy_cost.resolution import Resolution, detect_resolution_and_range
+from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
 
 
 class Formula(ABC, BaseModel):
@@ -43,6 +44,7 @@ class Formula(ABC, BaseModel):
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         """Return time-indexed values for the formula."""
 
@@ -50,12 +52,14 @@ class Formula(ABC, BaseModel):
         self,
         data: pd.DataFrame,
         resolution: Resolution | None = None,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         """Apply formula values to a dataframe of quantities and return a single value column."""
         if data.empty:
             return data.copy()
+        data = align_timestamps_to_tz(data, timezone)
         start, end, resolution = detect_resolution_and_range(data, resolution)
-        formula_values = self.get_values(start, end, resolution)
+        formula_values = self.get_values(start, end, resolution, timezone)
 
         result = data.reset_index(drop=True)
         merged = result.merge(formula_values, on="timestamp", how="left", suffixes=("", "_formula"))

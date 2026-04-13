@@ -38,7 +38,7 @@ def test_capacity_component_applies_index_formula_to_billing_values() -> None:
 
     out = component.apply(capacity_data)
 
-    assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]))
+    assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True))
     assert out["value"].tolist() == [50.0, 70.0]
 
 
@@ -148,7 +148,7 @@ def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
     out = tariff.apply_capacity_cost(capacity_data)
 
     assert out is not None
-    assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]))
+    assert out["timestamp"].tolist() == list(pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True))
     assert out["value"].tolist() == [50.0, 100.0]
 
 

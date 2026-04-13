@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import datetime as dt
+from datetime import UTC
 from enum import StrEnum
 
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
-from energy_cost.resolution import Resolution, to_pandas_freq
+from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
 
 from .formula import Formula
 
@@ -69,8 +70,11 @@ class ScheduledFormula(Formula):
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
-        df = self.formula.get_values(start, end, resolution)
+        start = align_datetime_to_tz(start, timezone)
+        end = align_datetime_to_tz(end, timezone)
+        df = self.formula.get_values(start, end, resolution, timezone)
         if self.when is not None:
             mask = pd.Series(False, index=df.index)
             for clause in self.when:
@@ -88,10 +92,13 @@ class ScheduledFormulas(Formula):
         start: dt.datetime,
         end: dt.datetime,
         resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
+        start = align_datetime_to_tz(start, timezone)
+        end = align_datetime_to_tz(end, timezone)
         timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
         result: pd.Series = pd.Series(float("nan"), index=timestamps, dtype=float)
         for schedule in self.schedule:
-            values = schedule.get_values(start, end, resolution).set_index("timestamp")["value"]
+            values = schedule.get_values(start, end, resolution, timezone).set_index("timestamp")["value"]
             result = result.combine_first(values)
         return pd.DataFrame({"timestamp": timestamps, "value": result.to_numpy()})
