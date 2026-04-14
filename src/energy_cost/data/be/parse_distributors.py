@@ -156,6 +156,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
             "billing_period": "P1M",
             "window_periods": 12,
             "formula": {
+                "mode": "banded",
                 "bands": [
                     {
                         "up_to": MIN_CAPACITY_MW,
@@ -169,7 +170,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
                             "constant_cost": tariffs["capacity_per_month"],
                         }
                     },
-                ]
+                ],
             },
         },
         "consumption": {

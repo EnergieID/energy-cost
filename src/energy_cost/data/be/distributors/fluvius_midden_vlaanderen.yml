@@ -4,6 +4,7 @@
     billing_period: P1M
     window_periods: 12
     formula:
+      mode: banded
       bands:
       - up_to: 0.0025
         formula:
@@ -26,6 +27,7 @@
     billing_period: P1M
     window_periods: 12
     formula:
+      mode: banded
       bands:
       - up_to: 0.0025
         formula:

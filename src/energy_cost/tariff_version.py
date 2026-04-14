@@ -1,7 +1,7 @@
 import datetime as dt
 from collections.abc import Callable
 from datetime import UTC
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import pandas as pd
 from pydantic import BaseModel, BeforeValidator, Field
@@ -117,10 +117,15 @@ class TariffVersion(BaseModel):
             lambda formula: formula.apply(data, timezone=timezone),
         )
 
-    def apply_capacity_cost(self, capacity_data: pd.DataFrame, timezone: dt.tzinfo = UTC) -> pd.DataFrame | None:
+    def apply_capacity_cost(
+        self,
+        capacity_data: pd.DataFrame,
+        timezone: dt.tzinfo = UTC,
+        unit: Literal["MW", "MWh"] = "MWh",
+    ) -> pd.DataFrame | None:
         if self.capacity is None:
             return None
-        return self.capacity.apply(capacity_data, timezone=timezone)
+        return self.capacity.apply(capacity_data, timezone=timezone, unit=unit)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
         return {name: entry.get_cost_for_interval(start, end, timezone) for name, entry in self.periodic.items()}

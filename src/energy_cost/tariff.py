@@ -3,6 +3,7 @@ import datetime as dt
 from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
+from typing import Literal
 
 import isodate
 import pandas as pd
@@ -79,6 +80,7 @@ class Tariff(BaseModel):
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         timezone: dt.tzinfo = UTC,
+        unit: Literal["MW", "MWh"] = "MWh",
     ) -> pd.DataFrame | None:
         """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
         detected_start, detected_end, _ = detect_resolution_and_range(data)
@@ -86,7 +88,7 @@ class Tariff(BaseModel):
         end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
         return self._collect_version_frames(
             self._find_active_versions(start, end, timezone),
-            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone),
+            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone, unit=unit),
         )
 
     def apply_energy_cost(
