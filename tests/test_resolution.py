@@ -7,6 +7,7 @@ import pytest
 
 from energy_cost.resolution import (
     align_datetime_to_tz,
+    align_timestamps_to_tz,
     detect_resolution_and_range,
     is_divisor,
     parse_resolution,
@@ -153,3 +154,37 @@ def test_align_datetime_to_tz_converts_aware_to_target_tz() -> None:
     # UTC midnight is 01:00 CET
     assert result.replace(tzinfo=None) == dt.datetime(2025, 1, 1, 1, 0)
     assert result.utcoffset() == dt.timedelta(hours=1)
+
+
+# ---------------------------------------------------------------------------
+# align_timestamps_to_tz — mixed UTC offsets
+# ---------------------------------------------------------------------------
+
+
+def test_align_timestamps_to_tz_handles_mixed_utc_offsets():
+    """Timestamps with different UTC offsets (e.g. across a DST boundary) produce an
+    object-dtype column in pandas. align_timestamps_to_tz must handle this without
+    raising AttributeError."""
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Brussels")
+    data = pd.DataFrame(
+        {
+            "timestamp": [
+                dt.datetime.fromisoformat("2024-03-31T01:45:00+01:00"),  # CET
+                dt.datetime.fromisoformat("2024-03-31T03:00:00+02:00"),  # CEST (after spring-forward)
+            ],
+            "value": [150.5, 75.3],
+        }
+    )
+
+    # Confirm the precondition: mixed offsets produce object dtype
+    assert data["timestamp"].dtype == object
+
+    # Must not raise, and result must be datetime64 in the target timezone
+    result = align_timestamps_to_tz(data, tz)
+
+    assert result["timestamp"].dtype != object
+    assert str(result["timestamp"].dt.tz) == str(tz)
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-03-31T01:45:00", tz=tz)
+    assert result["timestamp"].iloc[1] == pd.Timestamp("2024-03-31T03:00:00", tz=tz)

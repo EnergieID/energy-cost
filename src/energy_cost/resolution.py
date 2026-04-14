@@ -20,10 +20,14 @@ def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
 def align_timestamps_to_tz(data: pd.DataFrame, tz: dt.tzinfo) -> pd.DataFrame:
     """Return a copy of *data* with the ``"timestamp"`` column converted/localized to *tz*."""
     data = data.copy()
-    if data["timestamp"].dt.tz is not None:
-        data["timestamp"] = data["timestamp"].dt.tz_convert(tz)
+    col = data["timestamp"]
+    # Coerce object columns (mixed-offset tz-aware datetimes) to a uniform datetime64
+    if col.dtype == object:
+        col = pd.to_datetime(col, utc=True)
+    if col.dt.tz is not None:
+        data["timestamp"] = col.dt.tz_convert(tz)
     else:
-        data["timestamp"] = data["timestamp"].dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
+        data["timestamp"] = col.dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
     return data
 
 
