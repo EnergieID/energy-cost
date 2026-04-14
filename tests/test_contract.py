@@ -763,3 +763,48 @@ def test_contract_collapses_meter_types_by_default() -> None:
     # single_rate energy (4*10=40) + tou_peak energy (4*20=80) = 120
     assert result[(TariffCategory.PROVIDER, CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(120.0)
     assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(120.0)
+
+
+# ---------------------------------------------------------------------------
+# Contract.calculate_cost — mixed-offset timestamps (DST boundary)
+# ---------------------------------------------------------------------------
+
+
+def test_calculate_cost_with_mixed_offset_meter_data() -> None:
+    """A billing period crossing the DST boundary where meter readings carry different
+    UTC offsets (+01:00 before, +02:00 after spring-forward) must not raise."""
+    from zoneinfo import ZoneInfo
+
+    from isodate import Duration
+
+    from energy_cost.data.be import distributors, fees, tax_rate
+
+    contract = Contract(
+        distributor=distributors["fluvius_antwerpen"],
+        fees=[fees["be_residential"], fees["flanders_residential"]],
+        tax_rate=tax_rate,
+        timezone=ZoneInfo("Europe/Brussels"),
+    )
+    meter = Meter(
+        direction=PowerDirection.CONSUMPTION,
+        type=MeterType.SINGLE_RATE,
+        data=pd.DataFrame(
+            {
+                "timestamp": [
+                    dt.datetime.fromisoformat("2024-03-31T01:45:00+01:00"),  # CET
+                    dt.datetime.fromisoformat("2024-03-31T03:00:00+02:00"),  # CEST (after spring-forward)
+                ],
+                "value": [150.5, 75.3],
+            }
+        ),
+    )
+
+    result = contract.calculate_cost(
+        meters=[meter],
+        start=dt.datetime.fromisoformat("2024-03-31T00:00:00+01:00"),
+        end=dt.datetime.fromisoformat("2024-03-31T04:00:00+02:00"),
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 1  # one monthly billing row
