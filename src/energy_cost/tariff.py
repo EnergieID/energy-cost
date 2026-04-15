@@ -1,13 +1,12 @@
-import bisect
 import datetime as dt
-from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 
 import isodate
 import pandas as pd
 import yaml
-from pydantic import BaseModel
+
+from energy_cost.versioning import VersionedCollection
 
 from .meter import CostGroup, Meter, MeterType, PowerDirection, as_single_meter
 from .resolution import (
@@ -21,9 +20,7 @@ from .resolution import (
 from .tariff_version import TariffVersion
 
 
-class Tariff(BaseModel):
-    versions: list[TariffVersion]
-
+class Tariff(VersionedCollection[TariffVersion]):
     @classmethod
     def from_yaml(cls, path: str | Path) -> "Tariff":
         """Load a tariff definition from YAML."""
@@ -32,27 +29,6 @@ class Tariff(BaseModel):
 
         tariff = cls.model_validate({"versions": raw_data})
         return tariff
-
-    def _find_active_versions(
-        self,
-        start: dt.datetime,
-        end: dt.datetime,
-        timezone: dt.tzinfo = UTC,
-    ) -> list[tuple[TariffVersion, dt.datetime, dt.datetime]]:
-        """Return each segment that overlaps ``[start, end)`` together with the effective sub-range."""
-
-        def norm(v: TariffVersion) -> dt.datetime:
-            return align_datetime_to_tz(v.start, timezone)
-
-        start_index = max(0, bisect.bisect_right(self.versions, start, key=norm) - 1)
-        end_index = bisect.bisect_right(self.versions, end, key=norm)
-        segments = self.versions[start_index:end_index]
-        if not segments:
-            return []
-
-        starts = [max(norm(segment), start) for segment in segments]
-        ends = [norm(segment) for segment in segments[1:]] + [end]
-        return list(zip(segments, starts, ends, strict=True))
 
     def get_energy_cost(
         self,
@@ -66,11 +42,13 @@ class Tariff(BaseModel):
         """Get energy cost rates in €/MWh. Returns None if no active versions have formulas."""
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
-        return self._collect_version_frames(
-            self._find_active_versions(start, end, timezone),
+        return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.get_energy_cost(
                 seg_start, seg_end, resolution, meter_type, direction, timezone
             ),
+            start,
+            end,
+            timezone,
         )
 
     def apply_capacity_cost(
@@ -84,9 +62,8 @@ class Tariff(BaseModel):
         detected_start, detected_end, _ = detect_resolution_and_range(data)
         start = align_datetime_to_tz(start if start is not None else detected_start, timezone)
         end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
-        return self._collect_version_frames(
-            self._find_active_versions(start, end, timezone),
-            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone),
+        return self.collect_version_frames(
+            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone), start, end, timezone
         )
 
     def apply_energy_cost(
@@ -102,35 +79,23 @@ class Tariff(BaseModel):
         detected_start, detected_end, _ = detect_resolution_and_range(data)
         start = align_datetime_to_tz(start if start is not None else detected_start, timezone)
         end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
-        return self._collect_version_frames(
-            self._find_active_versions(start, end, timezone),
+        return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_energy_cost(
                 data,
                 meter_type,
                 direction,
                 timezone,
             ),
+            start,
+            end,
+            timezone,
         )
-
-    @staticmethod
-    def _collect_version_frames(
-        segments: list[tuple[TariffVersion, dt.datetime, dt.datetime]],
-        get_frame: "Callable[[TariffVersion, dt.datetime, dt.datetime], pd.DataFrame | None]",
-    ) -> pd.DataFrame | None:
-        frames = [
-            df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
-            for version, seg_start, seg_end in segments
-            if (df := get_frame(version, seg_start, seg_end)) is not None and not df.empty
-        ]
-        if not frames:
-            return None
-        return pd.concat(frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
         totals: dict[str, float] = {}
-        for version, seg_start, seg_end in self._find_active_versions(start, end, timezone):
+        for version, seg_start, seg_end in self.find_active_versions(start, end, timezone):
             for name, cost in version.get_periodic_cost(seg_start, seg_end, timezone).items():
                 totals[name] = totals.get(name, 0.0) + cost
         return totals
