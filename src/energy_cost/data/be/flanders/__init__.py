@@ -1,5 +1,9 @@
 from energy_cost.data.models import ConnectionType
 
-from .electricity import data as flanders_electricity_data
+from .electricity import data as electricity_data
+from .gas import data as gas_data
 
-data = {ConnectionType.ELECTRICITY: flanders_electricity_data}
+data = {
+    ConnectionType.ELECTRICITY: electricity_data,
+    ConnectionType.GAS: gas_data,
+}

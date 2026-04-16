@@ -3,6 +3,7 @@
     energy_contribution:
       constant_cost: 0.9978
     excise:
+      band_period: P1Y
       bands:
         - up_to: 20000
           formula:

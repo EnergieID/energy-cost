@@ -5,7 +5,7 @@ from energy_cost.tariff import Tariff
 from energy_cost.tax import Tax
 
 _DIR = Path(__file__).parent
-_BELGIAN_DIR = _DIR.parent.parent / "electricity"
+_BELGIAN_DIR = _DIR.parent.parent / "gas"
 _BELGIAN_FEES_DIR = _BELGIAN_DIR / "fees"
 _DISTRIBUTORS_DIR = _DIR / "distributors"
 

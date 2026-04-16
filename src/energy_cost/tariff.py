@@ -158,7 +158,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         if not frames:
             return None
 
-        result = pd.concat(frames, axis=1)
+        result = pd.concat(frames, axis=1, sort=False)
         total_cols = [c for c in result.columns if c[-1] == "total"]
         result[(CostGroup.TOTAL, MeterType.ALL, "total")] = result[total_cols].sum(axis=1)
         if not include_meter_type:
