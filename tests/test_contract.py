@@ -67,8 +67,8 @@ def test_apply_consumption_multiplies_rate_and_sums_to_month() -> None:
     assert result is not None
     assert len(result) == 1
     # 4 intervals × 2 MWh × 10 €/MWh = 80 €
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(80.0)
-    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(80.0)
 
 
 def test_apply_two_months_produces_two_rows() -> None:
@@ -88,9 +88,9 @@ def test_apply_two_months_produces_two_rows() -> None:
     assert result is not None
     assert len(result) == 2
     # Jan: 2 × 1 × 5 = 10 €
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(10.0)
     # Feb: 3 × 1 × 5 = 15 €
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[1] == pytest.approx(15.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[1] == pytest.approx(15.0)
 
 
 def test_apply_explicit_start_end_restricts_billing_period() -> None:
@@ -109,7 +109,7 @@ def test_apply_explicit_start_end_restricts_billing_period() -> None:
 
     assert result is not None
     assert len(result) == 1
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(20.0)  # 2 × 1 × 10
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(20.0)  # 2 × 1 × 10
 
 
 def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) -> None:
@@ -148,8 +148,8 @@ def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) ->
     assert len(result) == 1
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-02-01", tz=dt.UTC)
     # Capacity column should be present with a non-NaN value.
-    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
-    assert pd.notna(result[(CostGroup.CAPACITY, MeterType.ALL, "total")].iloc[0])
+    assert (CostGroup.CAPACITY, "total") in result.columns
+    assert pd.notna(result[(CostGroup.CAPACITY, "total")].iloc[0])
 
 
 def test_apply_custom_output_resolution() -> None:
@@ -163,7 +163,7 @@ def test_apply_custom_output_resolution() -> None:
     assert result is not None
     assert len(result) == 1
     # 8 intervals × 1 MWh × 10 €/MWh = 80 €
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(80.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(80.0)
 
 
 def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(tmp_path) -> None:
@@ -185,21 +185,21 @@ def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(t
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert not any(c[0] == CostGroup.CONSUMPTION for c in data_cols)
-    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
-    assert (CostGroup.TOTAL, MeterType.ALL, "total") in result.columns
+    assert (CostGroup.CAPACITY, "total") in result.columns
+    assert (CostGroup.TOTAL, "total") in result.columns
 
 
-def test_apply_column_structure_is_three_level_multiindex() -> None:
-    """The output columns form a three-level MultiIndex (excluding the timestamp column)."""
+def test_apply_column_structure_is_two_level_multiindex() -> None:
+    """The output columns form a two-level MultiIndex by default (excluding the timestamp column)."""
     tariff = _tariff(energy_rate=10.0)
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     result = tariff.apply([Meter(data=_consumption(timestamps))])
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
-    assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
-    assert (CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy") in result.columns
-    assert (CostGroup.TOTAL, MeterType.ALL, "total") in result.columns
+    assert all(isinstance(c, tuple) and len(c) == 2 for c in data_cols)
+    assert (CostGroup.CONSUMPTION, "energy") in result.columns
+    assert (CostGroup.TOTAL, "total") in result.columns
 
 
 # ---------------------------------------------------------------------------
@@ -222,13 +222,13 @@ def test_apply_with_injection_adds_injection_columns() -> None:
     )
 
     assert result is not None
-    assert (CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy") in result.columns
+    assert (CostGroup.INJECTION, "energy") in result.columns
     # Consumption: 2 × 2 × 10 = 40; Injection: 2 × 1 × 5 = 10; Total = 50
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(40.0)
-    assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(10.0)
-    assert result[(CostGroup.CONSUMPTION, MeterType.SINGLE_RATE, "total")].iloc[0] == pytest.approx(40.0)
-    assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "total")].iloc[0] == pytest.approx(10.0)
-    assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(50.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.CONSUMPTION, "total")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.INJECTION, "total")].iloc[0] == pytest.approx(10.0)
+    assert result[(CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(50.0)
 
 
 # ---------------------------------------------------------------------------
@@ -247,8 +247,8 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
 
     assert result is not None
     # Billing period is snapped to full January (31 days) → 24 * 31 = 744 €
-    assert (CostGroup.FIXED, MeterType.ALL, "total") in result.columns
-    assert result[(CostGroup.FIXED, MeterType.ALL, "total")].iloc[0] == pytest.approx(744.0)
+    assert (CostGroup.FIXED, "total") in result.columns
+    assert result[(CostGroup.FIXED, "total")].iloc[0] == pytest.approx(744.0)
 
 
 # ---------------------------------------------------------------------------
@@ -445,7 +445,7 @@ def test_apply_tou_peak_meter_billed_under_tou_column() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     data = _consumption(timestamps, value=1.0)
 
-    result = tou_tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
+    result = tou_tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)], include_meter_type=True)
 
     assert result is not None
     # The output column must use MeterType.TOU_PEAK, not MeterType.SINGLE_RATE.
@@ -477,7 +477,8 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
         [
             Meter(data=single_data, type=MeterType.SINGLE_RATE),
             Meter(data=tou_data, type=MeterType.TOU_PEAK),
-        ]
+        ],
+        include_meter_type=True,
     )
 
     assert result is not None

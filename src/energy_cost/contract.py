@@ -71,9 +71,6 @@ class Contract(BaseModel):
 
         result = pd.concat(frames, axis=1)
 
-        # Collapse MeterType before taxes — taxes operate on 3-level columns
-        result = _collapse_meter_type(result)
-
         result = result.reset_index()
         _total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")
 
@@ -97,11 +94,3 @@ class Contract(BaseModel):
         result[_total] = result[total_cols].sum(axis=1)
 
         return result
-
-
-def _collapse_meter_type(df: pd.DataFrame) -> pd.DataFrame:
-    """Collapse 4-level contract columns (TariffCategory, CostGroup, MeterType, cost_type)
-    to 3-level (TariffCategory, CostGroup, cost_type) by summing across MeterType."""
-    collapsed = df.T.groupby(level=[0, 1, 3]).sum().T
-    collapsed.columns = pd.MultiIndex.from_tuples(collapsed.columns)
-    return collapsed

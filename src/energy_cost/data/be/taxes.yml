@@ -4,3 +4,4 @@
     - rate: 0.0
       columns:
         - ["fees", "fixed", "energy_fund"]
+        - ["*", "injection", "*"]

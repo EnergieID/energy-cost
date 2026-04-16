@@ -8,7 +8,7 @@ import yaml
 
 from energy_cost.versioning import VersionedCollection
 
-from .meter import CostGroup, Meter, MeterType, PowerDirection, as_single_meter
+from .meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory, as_single_meter
 from .resolution import (
     Resolution,
     align_datetime_to_tz,
@@ -107,6 +107,8 @@ class Tariff(VersionedCollection[TariffVersion]):
         end: dt.datetime | None = None,
         resolution: Resolution | None = None,
         timezone: dt.tzinfo = UTC,
+        include_meter_type: bool = False,
+        tariff_category: TariffCategory | None = None,
     ) -> pd.DataFrame | None:
         if resolution is None:
             resolution = isodate.Duration(months=1)
@@ -154,6 +156,18 @@ class Tariff(VersionedCollection[TariffVersion]):
         result = pd.concat(frames, axis=1)
         total_cols = [c for c in result.columns if c[-1] == "total"]
         result[(CostGroup.TOTAL, MeterType.ALL, "total")] = result[total_cols].sum(axis=1)
+        if not include_meter_type:
+            result = _collapse_meter_type(result)
+        if tariff_category is not None:
+            result.columns = pd.MultiIndex.from_tuples([(tariff_category,) + col for col in result.columns])
+            if include_meter_type:
+                result[(TariffCategory.TOTAL, CostGroup.TOTAL, MeterType.ALL, "total")] = result[
+                    (tariff_category, CostGroup.TOTAL, MeterType.ALL, "total")
+                ]
+            else:
+                result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")] = result[
+                    (tariff_category, CostGroup.TOTAL, "total")
+                ]
         return result.reset_index()
 
     def _apply_direction_costs(
@@ -217,3 +231,10 @@ class Tariff(VersionedCollection[TariffVersion]):
         df["total"] = df.sum(axis=1)
         df.columns = pd.MultiIndex.from_tuples([(CostGroup.FIXED, MeterType.ALL, c) for c in df.columns])
         return df
+
+
+def _collapse_meter_type(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse (CostGroup, MeterType, cost_type) → (CostGroup, cost_type) by summing across MeterType."""
+    collapsed = df.T.groupby(level=[0, 2]).sum().T
+    collapsed.columns = pd.MultiIndex.from_tuples(collapsed.columns)
+    return collapsed
