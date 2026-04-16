@@ -1,6 +1,7 @@
 import datetime as dt
 from datetime import UTC
 from pathlib import Path
+from typing import Literal
 
 import isodate
 import pandas as pd
@@ -57,13 +58,17 @@ class Tariff(VersionedCollection[TariffVersion]):
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         timezone: dt.tzinfo = UTC,
+        unit: Literal["MW", "MWh"] = "MWh",
     ) -> pd.DataFrame | None:
         """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
         detected_start, detected_end, _ = detect_resolution_and_range(data)
         start = align_datetime_to_tz(start if start is not None else detected_start, timezone)
         end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
         return self.collect_version_frames(
-            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone), start, end, timezone
+            lambda version, seg_start, seg_end: version.apply_capacity_cost(data, timezone, unit=unit),
+            start,
+            end,
+            timezone,
         )
 
     def apply_energy_cost(
