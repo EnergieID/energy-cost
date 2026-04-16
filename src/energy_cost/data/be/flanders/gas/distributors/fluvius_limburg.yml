@@ -1,7 +1,7 @@
 - start: '2024-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: P1Y
+      period: yearly
       constant_cost: 13.16
   consumption:
     fixed_distribution_fee:
@@ -86,7 +86,7 @@
 - start: '2025-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: P1Y
+      period: yearly
       constant_cost: 17.51
   consumption:
     fixed_distribution_fee:
@@ -171,7 +171,7 @@
 - start: '2026-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: P1Y
+      period: yearly
       constant_cost: 17.85
   consumption:
     fixed_distribution_fee:

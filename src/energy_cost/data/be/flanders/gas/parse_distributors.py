@@ -159,7 +159,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "periodic": {
             "data_management": {
-                "period": "P1Y",
+                "period": "yearly",
                 "constant_cost": tariffs["databeheer"],
             }
         },
