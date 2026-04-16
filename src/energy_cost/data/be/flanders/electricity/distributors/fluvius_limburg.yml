@@ -14,9 +14,15 @@
           constant_cost: 3247.5363667
   consumption:
     all:
-      constant_cost: 46.5986
+      transmission:
+        constant_cost: 10.198
+      public_service_fee:
+        constant_cost: 32.0912
+      levies:
+        constant_cost: 4.3094
     night_only:
-      constant_cost: 33.7621
+      public_service_fee:
+        constant_cost: 19.2547
   periodic:
     data_management:
       period: yearly
@@ -37,9 +43,15 @@
           constant_cost: 4072.7769333
   consumption:
     all:
-      constant_cost: 64.1263
+      transmission:
+        constant_cost: 22.7614
+      public_service_fee:
+        constant_cost: 36.5973
+      levies:
+        constant_cost: 4.7676
     night_only:
-      constant_cost: 53.1471
+      public_service_fee:
+        constant_cost: 25.6181
   periodic:
     data_management:
       period: yearly
@@ -60,9 +72,15 @@
           constant_cost: 4087.2448667
   consumption:
     all:
-      constant_cost: 54.2695
+      transmission:
+        constant_cost: 23.2082
+      public_service_fee:
+        constant_cost: 26.6707
+      levies:
+        constant_cost: 4.3906
     night_only:
-      constant_cost: 48.9353
+      public_service_fee:
+        constant_cost: 21.3365
   periodic:
     data_management:
       period: yearly
