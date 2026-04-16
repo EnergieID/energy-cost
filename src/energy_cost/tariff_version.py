@@ -4,7 +4,9 @@ from datetime import UTC
 from typing import Annotated, Any, Literal
 
 import pandas as pd
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BeforeValidator, Field
+
+from energy_cost.versioning import Versioned
 
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
@@ -44,8 +46,7 @@ MeterFormulas = Annotated[
 ]
 
 
-class TariffVersion(BaseModel):
-    start: dt.datetime
+class TariffVersion(Versioned):
     injection: MeterFormulas = Field(default_factory=dict)
     consumption: MeterFormulas = Field(default_factory=dict)
     capacity: CapacityComponent | None = None

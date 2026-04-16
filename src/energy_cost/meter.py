@@ -25,6 +25,14 @@ class PowerDirection(StrEnum):
     INJECTION = "injection"
 
 
+class TariffCategory(StrEnum):
+    PROVIDER = "provider"
+    DISTRIBUTOR = "distributor"
+    FEES = "fees"
+    TAXES = "taxes"
+    TOTAL = "total"
+
+
 class Meter(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

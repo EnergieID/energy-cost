@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from energy_cost.tariff import Tariff
+from energy_cost.tax import Tax
 
 _DISTRIBUTORS_DIR = Path(__file__).parent / "distributors"
 
@@ -12,4 +13,4 @@ _FEES_DIR = Path(__file__).parent / "fees"
 
 fees: dict[str, Tariff] = {path.stem: Tariff.from_yaml(path) for path in sorted(_FEES_DIR.glob("*.yml"))}
 
-tax_rate = 0.06
+tax_rate = Tax.from_yaml(Path(__file__).parent / "taxes.yml")

@@ -9,7 +9,7 @@ import pytest
 
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
-from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection
+from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
 
@@ -230,7 +230,7 @@ def test_apply_fixed_costs_timestamps_are_at_billing_start_not_utc() -> None:
     result = tariff.apply([Meter(data=consumption)], start=start, timezone=_CET)
 
     assert result is not None
-    assert (CostGroup.FIXED, MeterType.ALL, "total") in result.columns
+    assert (CostGroup.FIXED, "total") in result.columns
     first_ts = result["timestamp"].iloc[0]
     assert first_ts == pd.Timestamp("2025-01-01T00:00:00+01:00")
 
@@ -260,7 +260,7 @@ def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_
 
     assert result is not None
     assert len(result) == 12
-    assert (CostGroup.CAPACITY, MeterType.ALL, "total") in result.columns
+    assert (CostGroup.CAPACITY, "total") in result.columns
     first_ts = result["timestamp"].iloc[0]
     assert first_ts.month == 1
 
@@ -286,7 +286,7 @@ def test_apply_tou_peak_meter_uses_tou_formula() -> None:
     timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
     data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
+    result = tariff.apply([Meter(data=data, type=MeterType.TOU_PEAK)], include_meter_type=True)
 
     assert result is not None
     assert (CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
@@ -317,7 +317,8 @@ def test_apply_mixed_meter_types_produce_separate_columns() -> None:
         [
             Meter(data=single_data, type=MeterType.SINGLE_RATE),
             Meter(data=tou_data, type=MeterType.TOU_PEAK),
-        ]
+        ],
+        include_meter_type=True,
     )
 
     assert result is not None
@@ -352,7 +353,8 @@ def test_apply_tou_offpeak_and_injection_meters() -> None:
         [
             Meter(data=cons_data, type=MeterType.TOU_OFFPEAK),
             Meter(data=inj_data, direction=PowerDirection.INJECTION),
-        ]
+        ],
+        include_meter_type=True,
     )
 
     assert result is not None
@@ -362,3 +364,64 @@ def test_apply_tou_offpeak_and_injection_meters() -> None:
     assert result[(CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy")].iloc[0] == pytest.approx(20.0)
     assert result[(CostGroup.INJECTION, MeterType.SINGLE_RATE, "energy")].iloc[0] == pytest.approx(6.0)
     assert result[(CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(26.0)
+
+
+# ---------------------------------------------------------------------------
+# TariffVersion – apply with Tariff category
+# ---------------------------------------------------------------------------
+
+
+def test_apply_returns_extra_index_level_and_total_if_tariff_category_provided() -> None:
+    """If a tariff category is provided, the output columns get an extra index level and a total column."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+            )
+        ]
+    )
+    timestamps = pd.date_range("2025-01-01T00:00:00", periods=4, freq="15min")
+    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = tariff.apply([Meter(data=data)], include_meter_type=False, tariff_category=TariffCategory.FEES)
+
+    assert result is not None
+    assert (TariffCategory.FEES, CostGroup.CONSUMPTION, "energy") in result.columns
+    assert (TariffCategory.FEES, CostGroup.TOTAL, "total") in result.columns
+    # 4 intervals × 1 MWh × 10 €/MWh = 40 €
+    assert result[(TariffCategory.FEES, CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(40.0)
+    assert result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(40.0)
+
+
+def test_apply_correctly_returns_four_index_levels_when_include_meter_type_and_tariff_category() -> None:
+    """When both include_meter_type and tariff_category are set, the output columns have four index levels."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+            )
+        ]
+    )
+    timestamps = pd.date_range("2025-01-01T00:00:00", periods=4, freq="15min")
+    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = tariff.apply(
+        [Meter(data=data, type=MeterType.TOU_PEAK), Meter(data=data, type=MeterType.TOU_OFFPEAK)],
+        include_meter_type=True,
+        tariff_category=TariffCategory.FEES,
+    )
+
+    assert result is not None
+    assert (TariffCategory.FEES, CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy") in result.columns
+    assert (TariffCategory.FEES, CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy") in result.columns
+    assert (TariffCategory.FEES, CostGroup.TOTAL, MeterType.ALL, "total") in result.columns
+    # Each meter: 4 intervals × 1 MWh × 10 €/MWh = 40 €; two meters = 80 € total
+    assert result[(TariffCategory.FEES, CostGroup.CONSUMPTION, MeterType.TOU_PEAK, "energy")].iloc[0] == pytest.approx(
+        40.0
+    )
+    assert result[(TariffCategory.FEES, CostGroup.CONSUMPTION, MeterType.TOU_OFFPEAK, "energy")].iloc[
+        0
+    ] == pytest.approx(40.0)
+    assert result[(TariffCategory.FEES, CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(80.0)
