@@ -1,0 +1,34 @@
+- start: "2024-01-01T00:00:00+01:00"
+  periodic:
+    data_management:
+      period: "P1Y"
+      constant_cost: 13.16
+  consumption:
+    fixed:
+      mode: "banded"
+      band_period: "P1Y"
+      bands:
+        - up_to: 5
+          formula:
+            period: "yearly"
+            constant_cost: 15.07
+        - up_to: 150
+          formula:
+            period: "yearly"
+            constant_cost: 94.22
+        - formula:
+            period: "yearly"
+            constant_cost: 376.89
+    proportional:
+      mode: "banded"
+      band_period: "P1Y"
+      bands:
+        - up_to: 5
+          formula:
+            constant_cost: 21.9726
+        - up_to: 150
+          formula:
+            constant_cost: 6.1422
+        - formula:
+            constant_cost: 4.2577
+    
