@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
+from energy_cost.data.models import CustomerType
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.fractional_periods import Period
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
@@ -627,7 +628,7 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
 def test_avoid_regression_on_real_world_data() -> None:
     import yaml
 
-    from energy_cost.data.be import distributors, fees, tax_rate
+    from energy_cost.data.be.flanders.electricity import data
     from energy_cost.index import DataFrameIndex, Index
 
     Index.register(
@@ -658,9 +659,9 @@ def test_avoid_regression_on_real_world_data() -> None:
 """
     contract = Contract(
         provider=Tariff.model_validate({"versions": yaml.safe_load(tariff)}),
-        distributor=distributors["fluvius_antwerpen"],
-        fees=[fees["be_residential"], fees["flanders_residential"]],
-        taxes=tax_rate,
+        distributor=data.distributors["fluvius_antwerpen"],
+        fees=data.fees[CustomerType.RESIDENTIAL],
+        taxes=data.taxes,
     )
     meters = [
         Meter(
@@ -772,12 +773,12 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 
     from isodate import Duration
 
-    from energy_cost.data.be import distributors, fees, tax_rate
+    from energy_cost.data.be.flanders.electricity import data
 
     contract = Contract(
-        distributor=distributors["fluvius_antwerpen"],
-        fees=[fees["be_residential"], fees["flanders_residential"]],
-        taxes=tax_rate,
+        distributor=data.distributors["fluvius_antwerpen"],
+        fees=data.fees[CustomerType.RESIDENTIAL],
+        taxes=data.taxes,
         timezone=ZoneInfo("Europe/Brussels"),
     )
     meter = Meter(
