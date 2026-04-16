@@ -3,6 +3,10 @@
 This directory contains info on the Belgian energy market.
 This includes distributor tariffs, government fees and taxes.
 
+## Choices
+curently we only support residential and small business (laagspanningsnet en niet telegemetered gas).
+We also only support the digital meter (slimme meter).
+
 ## Sources
 More info on how the Belgian energy market is structured: https://www.creg.be/nl/consumenten/energiemarkt/hoe-de-energieprijs-opgebouwd
 
