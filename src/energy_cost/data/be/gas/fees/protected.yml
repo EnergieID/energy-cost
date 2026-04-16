@@ -1,0 +1,28 @@
+- start: "2022-01-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 20000
+          formula:
+            constant_cost: 0.54
+        - up_to: 50000
+          formula:
+            constant_cost: 0.46
+        - up_to: 250000
+          formula:
+            constant_cost: 0.44
+        - up_to: 1000000
+          formula:
+            constant_cost: 0.34
+        - up_to: 2500000
+          formula:
+            constant_cost: 0.18
+        - formula:
+            constant_cost: 0.15
+- start: "2023-04-01T00:00:00+02:00"
+- start: "2023-07-01T00:00:00+02:00"
+  consumption:
+    excise:
+      constant_cost: 2.77

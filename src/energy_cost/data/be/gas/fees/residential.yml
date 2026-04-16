@@ -1,0 +1,161 @@
+- start: "2022-01-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 20000
+          formula:
+            constant_cost: 0.54
+        - up_to: 50000
+          formula:
+            constant_cost: 0.46
+        - up_to: 250000
+          formula:
+            constant_cost: 0.44
+        - up_to: 1000000
+          formula:
+            constant_cost: 0.34
+        - up_to: 2500000
+          formula:
+            constant_cost: 0.18
+        - formula:
+            constant_cost: 0.15
+- start: "2023-04-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 5.0591
+        - formula:
+            constant_cost: 8.23
+- start: "2023-07-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      constant_cost: 8.23
+- start: "2023-10-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.5697
+- start: "2024-01-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.9925
+- start: "2024-04-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.4507
+- start: "2024-07-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.2027
+- start: "2024-10-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.2894
+- start: "2025-01-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.9393
+- start: "2025-04-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.7266
+- start: "2025-07-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.2752
+- start: "2025-10-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 8.8971
+- start: "2026-01-01T00:00:00+01:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.0782
+- start: "2026-04-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.3061
