@@ -27,7 +27,7 @@ class TestMatchesPattern:
 
     def test_wildcard_first(self) -> None:
         assert _matches_pattern(
-            ("*", CostGroup.CONSUMPTION, "excise"), (TariffCategory.PROVIDER, CostGroup.CONSUMPTION, "excise")
+            ("*", CostGroup.CONSUMPTION, "excise"), (TariffCategory.SUPPLIER, CostGroup.CONSUMPTION, "excise")
         )
 
     def test_wildcard_middle(self) -> None:
@@ -97,9 +97,9 @@ class TestTaxVersionApply:
         timestamps = pd.date_range("2025-01-01", periods=2, freq="MS", tz="UTC")
         df = pd.DataFrame(
             {
-                ("provider", "consumption", "energy"): [100.0, 200.0],
-                ("provider", "consumption", "total"): [100.0, 200.0],
-                ("provider", "total", "total"): [100.0, 200.0],
+                ("supplier", "consumption", "energy"): [100.0, 200.0],
+                ("supplier", "consumption", "total"): [100.0, 200.0],
+                ("supplier", "total", "total"): [100.0, 200.0],
                 ("total", "total", "total"): [100.0, 200.0],
             }
         )
@@ -118,10 +118,10 @@ class TestTaxVersionApply:
         )
         df = pd.DataFrame(
             {
-                ("provider", "consumption", "energy"): [100.0],
-                ("provider", "consumption", "total"): [100.0],
-                ("provider", "capacity", "total"): [50.0],
-                ("provider", "total", "total"): [150.0],
+                ("supplier", "consumption", "energy"): [100.0],
+                ("supplier", "consumption", "total"): [100.0],
+                ("supplier", "capacity", "total"): [50.0],
+                ("supplier", "total", "total"): [150.0],
                 ("total", "total", "total"): [150.0],
             }
         )
@@ -141,11 +141,11 @@ class TestTaxVersionApply:
         )
         df = pd.DataFrame(
             {
-                ("provider", "consumption", "energy"): [100.0],
-                ("provider", "consumption", "total"): [100.0],
-                ("provider", "injection", "energy"): [30.0],
-                ("provider", "injection", "total"): [30.0],
-                ("provider", "total", "total"): [130.0],
+                ("supplier", "consumption", "energy"): [100.0],
+                ("supplier", "consumption", "total"): [100.0],
+                ("supplier", "injection", "energy"): [30.0],
+                ("supplier", "injection", "total"): [30.0],
+                ("supplier", "total", "total"): [130.0],
                 ("total", "total", "total"): [130.0],
             }
         )
@@ -156,7 +156,7 @@ class TestTaxVersionApply:
         assert result[("taxes", "total", "total")].iloc[0] == pytest.approx(10.0)
 
     def test_multiple_categories(self) -> None:
-        """Tax works correctly across provider + distributor categories."""
+        """Tax works correctly across supplier + distributor categories."""
         v = TaxVersion(
             start=dt.datetime(2025, 1, 1),
             default=0.06,
@@ -164,9 +164,9 @@ class TestTaxVersionApply:
         )
         df = pd.DataFrame(
             {
-                ("provider", "consumption", "energy"): [100.0],
-                ("provider", "consumption", "total"): [100.0],
-                ("provider", "total", "total"): [100.0],
+                ("supplier", "consumption", "energy"): [100.0],
+                ("supplier", "consumption", "total"): [100.0],
+                ("supplier", "total", "total"): [100.0],
                 ("distributor", "capacity", "total"): [50.0],
                 ("distributor", "consumption", "energy"): [40.0],
                 ("distributor", "consumption", "total"): [40.0],

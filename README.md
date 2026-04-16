@@ -32,7 +32,7 @@ from energy_cost import Contract, Meter, Tariff
 from energy_cost.data.be import distributors, fees, tax_rate
 
 contract = Contract(
-    provider=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
+    supplier=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
     distributor=distributors["fluvius_imewo"],
     fees=[fees["flanders_residential"], fees["be_residential"]],
     tax_rate=tax_rate,

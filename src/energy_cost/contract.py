@@ -14,7 +14,7 @@ from .tax import Tax
 class Contract(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    provider: Tariff | list[Tariff] | None = None
+    supplier: Tariff | list[Tariff] | None = None
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
     taxes: Tax | list[Tax] | None = None
@@ -40,7 +40,7 @@ class Contract(BaseModel):
             resolution = Duration(months=1)
 
         tariffs: dict[TariffCategory, Tariff | list[Tariff]] = {}
-        for category in [TariffCategory.PROVIDER, TariffCategory.DISTRIBUTOR, TariffCategory.FEES]:
+        for category in [TariffCategory.SUPPLIER, TariffCategory.DISTRIBUTOR, TariffCategory.FEES]:
             tariff = getattr(self, category.value)
             if tariff is not None:
                 tariffs[category] = tariff
