@@ -682,7 +682,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     result = contract.calculate_cost(meters)
     expected = {
         TariffCategory.PROVIDER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
-        TariffCategory.DISTRIBUTOR: 12.26457,  # (capacity 0.0025) + (consumption * 50.5027) + (data_management/12) => 10.2924284 + 0.01 * 50.5027 + 17.85/12 = 12.2849 €
+        TariffCategory.DISTRIBUTOR: 43.14186387067,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
         TariffCategory.FEES: 0.475554,  # consumption * (excise + energy_contribution) => 0.475554 €
     }
     expected[TariffCategory.TAXES] = (sum(expected.values())) * tax_rate
