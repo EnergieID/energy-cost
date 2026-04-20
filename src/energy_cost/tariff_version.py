@@ -111,19 +111,22 @@ class TariffVersion(Versioned):
         direction: PowerDirection,
         start: dt.datetime,
         end: dt.datetime,
+        input_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
-        input_resolution: Resolution | None = None,
         output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data in [start, end), returning costs in €."""
         data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
+        if data.empty:
+            return None
+
         result = self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.apply(data, timezone=timezone),
+            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution),
         )
 
-        if output_resolution is not None and result is not None and input_resolution is not None:
+        if output_resolution is not None and result is not None:
             result = resample_or_distribute(result, input_resolution, output_resolution, start, end)
         return result
 
