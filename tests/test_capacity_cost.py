@@ -255,7 +255,12 @@ def test_tariff_version_apply_capacity_cost_accepts_unit_param() -> None:
         }
     )
 
-    out = version.apply_capacity_cost(capacity_data, unit="MW")
+    out = version.apply_capacity_cost(
+        capacity_data,
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
+        unit="MW",
+    )
 
     assert out is not None
     assert out["value"].tolist() == [30.0, 60.0]

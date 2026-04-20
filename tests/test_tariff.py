@@ -425,3 +425,130 @@ def test_apply_correctly_returns_four_index_levels_when_include_meter_type_and_t
         0
     ] == pytest.approx(40.0)
     assert result[(TariffCategory.FEES, CostGroup.TOTAL, MeterType.ALL, "total")].iloc[0] == pytest.approx(80.0)
+
+
+# ---------------------------------------------------------------------------
+# resample_or_distribute: direction costs
+# ---------------------------------------------------------------------------
+
+
+def test_direction_cost_redistributed_evenly_to_finer_resolution() -> None:
+    """15-min cost split into 3 equal 5-min rows; their sum equals the original 15-min cost."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+            )
+        ]
+    )
+    # 4 × 15-min intervals; each has 1 MWh → cost = 10 € per 15-min slot
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = tariff.apply([Meter(data=data)], resolution=dt.timedelta(minutes=5))
+
+    assert result is not None
+    # Each 15-min slot becomes 3 equal 5-min rows → sum over those 3 should equal original 10 €
+    energy_col = (CostGroup.CONSUMPTION, "energy")
+    assert energy_col in result.columns
+    # 4 intervals × 3 sub-slots = 12 rows
+    assert len(result) == 12
+    # All rows should have the same non-zero value (10 / 3 ≈ 3.333… €)
+    assert result[energy_col].iloc[0] == pytest.approx(10.0 / 3, rel=1e-6)
+    assert result[energy_col].iloc[1] == pytest.approx(10.0 / 3, rel=1e-6)
+    assert result[energy_col].iloc[2] == pytest.approx(10.0 / 3, rel=1e-6)
+    # Grand total must equal the sum had we used the 15-min resolution
+    assert result[energy_col].sum() == pytest.approx(4 * 10.0, rel=1e-6)
+
+
+def test_direction_cost_aggregated_correctly_to_coarser_resolution() -> None:
+    """15-min costs summed to hourly buckets."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+            )
+        ]
+    )
+    timestamps = pd.date_range("2025-01-01", periods=8, freq="15min", tz=dt.UTC)
+    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = tariff.apply([Meter(data=data)], resolution=dt.timedelta(hours=1))
+
+    assert result is not None
+    # 8 intervals → 2 hourly buckets; each hour = 4 × 10 = 40 €
+    assert len(result) == 2
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(40.0)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[1] == pytest.approx(40.0)
+
+
+# ---------------------------------------------------------------------------
+# resample_or_distribute: capacity costs
+# ---------------------------------------------------------------------------
+
+
+def test_capacity_cost_redistributed_evenly_to_finer_resolution(tmp_path) -> None:
+    """Monthly capacity cost is split uniformly across all 5-min output slots of that month."""
+    cap_yaml = tmp_path / "cap.yml"
+    cap_yaml.write_text(
+        "- start: 2025-01-01T00:00:00\n"
+        "  capacity:\n"
+        "    measurement_period: PT15M\n"
+        "    billing_period: P1M\n"
+        "    formula:\n"
+        "      constant_cost: 1.0\n",
+        encoding="utf-8",
+    )
+    tariff = Tariff.from_yaml(cap_yaml)
+
+    # 15-min readings for all of January; peak = 1 MW → capacity cost = 1.0 €
+    jan_ts = pd.date_range("2025-01-01", "2025-02-01", freq="15min", tz=dt.UTC, inclusive="left")
+    consumption = pd.DataFrame({"timestamp": jan_ts, "value": 1.0})
+
+    result = tariff.apply([Meter(data=consumption)], resolution=dt.timedelta(minutes=5))
+
+    assert result is not None
+    cap_col = (CostGroup.CAPACITY, "total")
+    assert cap_col in result.columns
+    # Every 5-min slot should carry a small non-zero (uniformly distributed) capacity cost
+    assert (result[cap_col] > 0).all(), "All 5-min capacity slots should be non-zero"
+    # Peak = 1 MWh / 0.25 h = 4 MW; cost = 4 MW × 1.0 €/MW = 4.0 € for Jan
+    # Sum over all 5-min slots must equal that monthly total
+    assert result[cap_col].sum() == pytest.approx(4.0, rel=1e-6)
+
+
+def test_capacity_cost_aggregated_to_yearly_output(tmp_path) -> None:
+    """Two monthly capacity rows aggregate into a single yearly output row."""
+    cap_yaml = tmp_path / "cap.yml"
+    cap_yaml.write_text(
+        "- start: 2025-01-01T00:00:00\n"
+        "  capacity:\n"
+        "    measurement_period: PT15M\n"
+        "    billing_period: P1M\n"
+        "    formula:\n"
+        "      constant_cost: 1.0\n",
+        encoding="utf-8",
+    )
+    tariff = Tariff.from_yaml(cap_yaml)
+
+    import isodate
+
+    jan_feb_ts = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
+    consumption = pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})
+
+    result = tariff.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
+        resolution=isodate.parse_duration("P1Y"),
+    )
+
+    assert result is not None
+    cap_col = (CostGroup.CAPACITY, "total")
+    assert cap_col in result.columns
+    # Peak = 4 MW each month; cost = 4 × 1.0 = 4.0 € per month
+    # Jan + Feb = 2 × 4.0 = 8.0 €
+    assert len(result) == 1
+    assert result[cap_col].iloc[0] == pytest.approx(8.0, rel=1e-6)

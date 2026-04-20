@@ -11,7 +11,7 @@ from energy_cost.versioning import Versioned
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
 from .meter import MeterType, PowerDirection
-from .resolution import Resolution
+from .resolution import Resolution, resample_or_distribute
 
 _METER_KEYS = {e.value for e in MeterType}
 
@@ -109,24 +109,43 @@ class TariffVersion(Versioned):
         data: pd.DataFrame,
         meter_type: MeterType,
         direction: PowerDirection,
+        start: dt.datetime,
+        end: dt.datetime,
         timezone: dt.tzinfo = UTC,
+        input_resolution: Resolution | None = None,
+        output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
-        """Apply energy cost formulas to quantity data, returning costs in €."""
-        return self._combine_energy_formulas(
+        """Apply energy cost formulas to quantity data in [start, end), returning costs in €."""
+        data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
+        result = self._combine_energy_formulas(
             meter_type,
             direction,
             lambda formula: formula.apply(data, timezone=timezone),
         )
 
+        if output_resolution is not None and result is not None and input_resolution is not None:
+            result = resample_or_distribute(result, input_resolution, output_resolution, start, end)
+        return result
+
     def apply_capacity_cost(
         self,
         capacity_data: pd.DataFrame,
+        start: dt.datetime,
+        end: dt.datetime,
         timezone: dt.tzinfo = UTC,
         unit: Literal["MW", "MWh"] = "MWh",
+        output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
+        """Apply capacity cost formula in [start, end), returning costs in €."""
         if self.capacity is None:
             return None
-        return self.capacity.apply(capacity_data, timezone=timezone, unit=unit)
+
+        result = self.capacity.apply(capacity_data, timezone=timezone, unit=unit)
+        result = result[(result["timestamp"] >= start) & (result["timestamp"] < end)].copy()
+
+        if output_resolution is not None and not result.empty:
+            result = resample_or_distribute(result, self.capacity.billing_period, output_resolution, start, end)
+        return result
 
     def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
         return {name: entry.get_cost_for_interval(start, end, timezone) for name, entry in self.periodic.items()}

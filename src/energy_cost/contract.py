@@ -69,7 +69,7 @@ class Contract(BaseModel):
                 )
                 frames.append(category_frame)
 
-        result = pd.concat(frames, axis=1)
+        result = pd.concat(frames, axis=1, sort=True)
 
         result = result.reset_index()
         _total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")

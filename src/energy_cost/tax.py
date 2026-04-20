@@ -40,15 +40,16 @@ class TaxVersion(Versioned):
         result: list[tuple[float, ColumnPattern]] = [(rule.rate, pattern) for rule in rates for pattern in rule.columns]
         return sorted(result, key=lambda x: _specificity(x[1]), reverse=True)
 
-    def apply(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Compute total tax for each row in *df*.
+    def apply(self, data: pd.DataFrame, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
+        """Compute total tax for each row in *data* within [start, end).
 
-        *df* has a ``timestamp`` column and a 3-level MultiIndex on the remaining
-        columns: ``(TariffCategory, CostGroup, cost_type)``.
+        *data* has a ``timestamp`` column and a 3-level MultiIndex on the
+        remaining columns: ``(TariffCategory, CostGroup, cost_type)``.
 
         Returns a DataFrame with a ``timestamp`` column and a
         ``("taxes", "total", "total")`` column.
         """
+        data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
         # Work on a mutable copy of totals so we can subtract handled amounts
         remaining = data.copy().set_index("timestamp")
         tax = pd.Series(0.0, index=remaining.index)
@@ -107,5 +108,5 @@ class Tax(VersionedCollection[TaxVersion]):
         data = align_timestamps_to_tz(data, timezone)
 
         return self.collect_version_frames(
-            lambda version, seg_start, seg_end: version.apply(data), start, end, timezone
+            lambda version, seg_start, seg_end: version.apply(data, start=seg_start, end=seg_end), start, end, timezone
         )

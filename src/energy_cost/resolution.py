@@ -165,6 +165,52 @@ def snap_billing_period(
     return snapped_start, snapped_end
 
 
+def resample_or_distribute(
+    df: pd.DataFrame,
+    source_resolution: Resolution,
+    output_resolution: Resolution,
+    start: dt.datetime,
+    end: dt.datetime,
+) -> pd.DataFrame:
+    output_freq = to_pandas_freq(output_resolution)
+
+    if is_divisor(source_resolution, output_resolution):
+        # output is finer — distribute each coarse value evenly across sub-periods
+        target_index = pd.date_range(
+            start=start,
+            end=end,
+            freq=output_freq,
+            inclusive="left",
+        )
+        target_df = pd.DataFrame({"timestamp": target_index})
+
+        # backward merge: each fine period picks up the most recent coarse value
+        merged = pd.merge_asof(target_df, df, on="timestamp", direction="backward")
+        merged = merged.rename(columns={"timestamp": "__fine_ts"})
+
+        # find the coarse timestamp each fine period belongs to
+        coarse_ts_df = pd.merge_asof(
+            target_df,
+            df[["timestamp"]].rename(columns={"timestamp": "__coarse_ts"}),
+            left_on="timestamp",
+            right_on="__coarse_ts",
+            direction="backward",
+        )
+        merged["__coarse_ts"] = coarse_ts_df["__coarse_ts"].values
+
+        # count how many fine periods share the same coarse slot
+        merged["__n"] = merged.groupby("__coarse_ts")["__fine_ts"].transform("count")
+
+        value_cols = [c for c in merged.columns if c not in ("__fine_ts", "__coarse_ts", "__n")]
+        merged[value_cols] = merged[value_cols].div(merged["__n"], axis=0)
+
+        result = merged.drop(columns=["__coarse_ts", "__n"]).rename(columns={"__fine_ts": "timestamp"})
+        return result
+
+    # output is coarser or equal — aggregate
+    return df.set_index("timestamp").resample(output_freq).sum().reset_index()
+
+
 def detect_resolution_and_range(
     data: pd.DataFrame,
     resolution: Resolution | None = None,

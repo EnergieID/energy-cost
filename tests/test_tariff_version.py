@@ -222,7 +222,9 @@ def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured(
 
     assert (
         segment.apply_capacity_cost(
-            pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]})
+            pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]}),
+            start=dt.datetime(2025, 1, 1),
+            end=dt.datetime(2025, 2, 1),
         )
         is None
     )
