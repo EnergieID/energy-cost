@@ -173,42 +173,34 @@ def resample_or_distribute(
     end: dt.datetime,
 ) -> pd.DataFrame:
     output_freq = to_pandas_freq(output_resolution)
+    source_freq = to_pandas_freq(source_resolution)
 
-    if is_divisor(source_resolution, output_resolution):
-        # output is finer — distribute each coarse value evenly across sub-periods
-        target_index = pd.date_range(
-            start=start,
-            end=end,
-            freq=output_freq,
-            inclusive="left",
-        )
-        target_df = pd.DataFrame({"timestamp": target_index})
+    if source_freq == output_freq or not is_divisor(source_resolution, output_resolution):
+        return df.set_index("timestamp").resample(output_freq).sum().reset_index()
 
-        # backward merge: each fine period picks up the most recent coarse value
-        merged = pd.merge_asof(target_df, df, on="timestamp", direction="backward")
-        merged = merged.rename(columns={"timestamp": "__fine_ts"})
+    # Snap to full source periods so every coarse slot is fully populated in the target index.
+    snapped_start, snapped_end = snap_billing_period(start, end, source_freq)
 
-        # find the coarse timestamp each fine period belongs to
-        coarse_ts_df = pd.merge_asof(
-            target_df,
-            df[["timestamp"]].rename(columns={"timestamp": "__coarse_ts"}),
-            left_on="timestamp",
-            right_on="__coarse_ts",
-            direction="backward",
-        )
-        merged["__coarse_ts"] = coarse_ts_df["__coarse_ts"].values
+    # Build fine-grained target index over the full snapped range.
+    target_df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range(start=snapped_start, end=snapped_end, freq=output_freq, inclusive="left"),
+        }
+    )
 
-        # count how many fine periods share the same coarse slot
-        merged["__n"] = merged.groupby("__coarse_ts")["__fine_ts"].transform("count")
+    # Backward merge: each fine slot inherits the coarse value and its coarse timestamp.
+    src = df.rename(columns={"timestamp": "__coarse_ts"})
+    merged = pd.merge_asof(target_df, src, left_on="timestamp", right_on="__coarse_ts", direction="backward")
 
-        value_cols = [c for c in merged.columns if c not in ("__fine_ts", "__coarse_ts", "__n")]
-        merged[value_cols] = merged[value_cols].div(merged["__n"], axis=0)
+    # Each full source period is now fully populated, so count == total fine slots in that period.
+    merged["__n"] = merged.groupby("__coarse_ts")["timestamp"].transform("count")
 
-        result = merged.drop(columns=["__coarse_ts", "__n"]).rename(columns={"__fine_ts": "timestamp"})
-        return result
+    value_cols = [c for c in merged.columns if c not in ("timestamp", "__coarse_ts", "__n")]
+    merged[value_cols] = merged[value_cols].div(merged["__n"], axis=0)
 
-    # output is coarser or equal — aggregate
-    return df.set_index("timestamp").resample(output_freq).sum().reset_index()
+    # Trim to the requested window and clean up helper columns.
+    result = merged[(merged["timestamp"] >= start) & (merged["timestamp"] < end)]
+    return result.drop(columns=["__coarse_ts", "__n"]).reset_index(drop=True)
 
 
 def detect_resolution_and_range(
