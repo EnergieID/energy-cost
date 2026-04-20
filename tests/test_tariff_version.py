@@ -214,6 +214,32 @@ def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_se
     assert result is None
 
 
+def test_apply_energy_cost_returns_none_when_data_is_outside_start_end() -> None:
+    """Data that falls entirely outside [start, end) becomes empty after slicing → returns None."""
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+    )
+
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-03-01", periods=4, freq="15min", tz=dt.UTC),
+            "value": [1.0] * 4,
+        }
+    )
+
+    result = segment.apply_energy_cost(
+        data,
+        meter_type=MeterType.SINGLE_RATE,
+        direction=PowerDirection.CONSUMPTION,
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+        input_resolution=dt.timedelta(minutes=15),
+    )
+
+    assert result is None
+
+
 def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
