@@ -247,14 +247,29 @@ class Tariff(VersionedCollection[TariffVersion]):
     ) -> pd.DataFrame | None:
         period_starts = pd.date_range(billing_start, billing_end, freq=output_freq, inclusive="left")
         period_ends_ts = list(period_starts[1:]) + [pd.Timestamp(billing_end)]
-        rows: list[dict] = []
-        names: set[str] = set()
-        for ps, pe in zip(period_starts, period_ends_ts, strict=True):
-            costs = self.get_periodic_cost(ps.to_pydatetime(), pe.to_pydatetime(), timezone)
-            names.update(costs.keys())
-            rows.append({"timestamp": ps, **costs})
-        if not names:
+
+        active_segments = self.find_active_versions(
+            align_datetime_to_tz(billing_start, timezone),
+            align_datetime_to_tz(billing_end, timezone),
+            timezone,
+        )
+        if not active_segments or not any(v.periodic for v, _, _ in active_segments):
             return None
+
+        rows: list[dict] = []
+        for ps, pe in zip(period_starts, period_ends_ts, strict=True):
+            slot_start = align_datetime_to_tz(ps.to_pydatetime(), timezone)
+            slot_end = align_datetime_to_tz(pe.to_pydatetime(), timezone)
+            totals: dict[str, float] = {}
+            for version, seg_start, seg_end in active_segments:
+                effective_start = max(slot_start, seg_start)
+                effective_end = min(slot_end, seg_end)
+                if effective_start >= effective_end:
+                    continue
+                for name, cost in version.get_periodic_cost(effective_start, effective_end, timezone).items():
+                    totals[name] = totals.get(name, 0.0) + cost
+            rows.append({"timestamp": ps, **totals})
+
         df = pd.DataFrame(rows).set_index("timestamp").fillna(0.0)
         df["total"] = df.sum(axis=1)
         df.columns = pd.MultiIndex.from_tuples([(CostGroup.FIXED, MeterType.ALL, c) for c in df.columns])
