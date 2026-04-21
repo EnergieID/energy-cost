@@ -43,14 +43,6 @@ def consumption_meter_15min() -> Meter:
     return Meter(data=data)
 
 
-@pytest.fixture(scope="module")
-def consumption_meter_monthly() -> Meter:
-    """Constant-consumption meter at ~1 MWh/month for 1.5 years."""
-    timestamps = pd.date_range(_START, _END, freq="MS", inclusive="left")
-    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
-    return Meter(data=data)
-
-
 # ---------------------------------------------------------------------------
 # Test parametrisation
 # ---------------------------------------------------------------------------
@@ -74,13 +66,11 @@ def test_contract_produces_valid_dataframe(
     customer_type: CustomerType,
     distributor_name: str,
     consumption_meter_15min: Meter,
-    consumption_meter_monthly: Meter,
 ) -> None:
     """Contract with fees + distributor + taxes returns a non-empty DataFrame."""
     regional_data = regionalData[region][connection_type]
 
-    # Gas banded formulas group by year: monthly data is sufficient and much faster.
-    meter = consumption_meter_monthly if connection_type == ConnectionType.GAS else consumption_meter_15min
+    meter = consumption_meter_15min
 
     contract = Contract(
         fees=regional_data.fees[customer_type],
