@@ -33,7 +33,25 @@ class PeriodUnit(ABC):
 
     def period_seconds(self, dt: datetime) -> float:
         """Total seconds in the period containing dt."""
-        return elapsed_seconds(self.period_start(dt), self.next_period(dt))
+        ps = self.period_start(dt)
+        return elapsed_seconds(ps, self.next_period(ps))
+
+    def _period_seconds_cached(self, period_start: datetime) -> float:
+        """Cached variant — pass period_start directly to avoid recomputing it.
+
+        Uses a simple per-instance dict to cache repeated calls for the same period.
+        """
+        try:
+            cache = self.__dict__["_ps_cache"]
+        except KeyError:
+            cache = {}
+            self.__dict__["_ps_cache"] = cache
+        try:
+            return cache[period_start]
+        except KeyError:
+            result = elapsed_seconds(period_start, self.next_period(period_start))
+            cache[period_start] = result
+            return result
 
     def fractional_periods(self, start: datetime, end: datetime, timezone: dt.tzinfo = UTC) -> float:
         """Calendar-aware fractional periods for a [start, end) interval.
@@ -53,12 +71,12 @@ class PeriodUnit(ABC):
         period_start_of_end = self.period_start(end)
 
         if period_start_of_start == period_start_of_end:
-            return elapsed_seconds(start, end) / self.period_seconds(start)
+            return elapsed_seconds(start, end) / self._period_seconds_cached(period_start_of_start)
 
         next_p = self.next_period(start)
-        frac_start = elapsed_seconds(start, next_p) / self.period_seconds(start)
+        frac_start = elapsed_seconds(start, next_p) / self._period_seconds_cached(period_start_of_start)
         complete = self.complete_periods_between(next_p, period_start_of_end)
-        frac_end = elapsed_seconds(period_start_of_end, end) / self.period_seconds(end)
+        frac_end = elapsed_seconds(period_start_of_end, end) / self._period_seconds_cached(period_start_of_end)
 
         return frac_start + complete + frac_end
 

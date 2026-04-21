@@ -62,9 +62,14 @@ class Tariff(VersionedCollection[TariffVersion]):
         output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
-        detected_start, detected_end, _ = detect_resolution_and_range(data)
-        start = align_datetime_to_tz(start if start is not None else detected_start, timezone)
-        end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
+        if start is None or end is None:
+            detected_start, detected_end, _ = detect_resolution_and_range(data)
+            if start is None:
+                start = detected_start
+            if end is None:
+                end = detected_end
+        start = align_datetime_to_tz(start, timezone)
+        end = align_datetime_to_tz(end, timezone)
         return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_capacity_cost(
                 data,
@@ -88,11 +93,19 @@ class Tariff(VersionedCollection[TariffVersion]):
         end: dt.datetime | None = None,
         timezone: dt.tzinfo = UTC,
         output_resolution: Resolution | None = None,
+        input_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data across all active versions."""
-        detected_start, detected_end, detected_resolution = detect_resolution_and_range(data)
-        start = align_datetime_to_tz(start if start is not None else detected_start, timezone)
-        end = align_datetime_to_tz(end if end is not None else detected_end, timezone)
+        if start is None or end is None or input_resolution is None:
+            detected_start, detected_end, detected_resolution = detect_resolution_and_range(data)
+            if start is None:
+                start = detected_start
+            if end is None:
+                end = detected_end
+            if input_resolution is None:
+                input_resolution = detected_resolution
+        start = align_datetime_to_tz(start, timezone)
+        end = align_datetime_to_tz(end, timezone)
         return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_energy_cost(
                 data,
@@ -101,7 +114,7 @@ class Tariff(VersionedCollection[TariffVersion]):
                 timezone=timezone,
                 start=seg_start,
                 end=seg_end,
-                input_resolution=detected_resolution,
+                input_resolution=input_resolution,
                 output_resolution=output_resolution,
             ),
             start,
@@ -142,12 +155,9 @@ class Tariff(VersionedCollection[TariffVersion]):
         if end is not None:
             end = align_datetime_to_tz(end, timezone)
 
-        billing_start: dt.datetime = start if start is not None else combined_consumption["timestamp"].min()
-        if end is not None:
-            billing_end: dt.datetime = end
-        else:
-            data_resolution = detect_resolution_and_range(combined_consumption)[2]
-            billing_end = combined_consumption["timestamp"].max() + data_resolution
+        detected_start, detected_end, data_resolution = detect_resolution_and_range(combined_consumption)
+        billing_start: dt.datetime = start if start is not None else detected_start
+        billing_end: dt.datetime = end if end is not None else detected_end
         output_freq = to_pandas_freq(resolution)
 
         billing_start, billing_end = snap_billing_period(billing_start, billing_end, output_freq)
@@ -156,7 +166,14 @@ class Tariff(VersionedCollection[TariffVersion]):
         for meter in meters:
             aligned_data = align_timestamps_to_tz(meter.data, timezone)
             frame = self._apply_direction_costs(
-                aligned_data, billing_start, billing_end, meter.type, meter.direction, resolution, timezone
+                aligned_data,
+                billing_start,
+                billing_end,
+                meter.type,
+                meter.direction,
+                resolution,
+                timezone,
+                input_resolution=data_resolution,
             )
             if frame is not None:
                 frames.append(frame)
@@ -197,6 +214,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         direction: PowerDirection,
         resolution: Resolution,
         timezone: dt.tzinfo = UTC,
+        input_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         costs = self.apply_energy_cost(
             data,
@@ -206,6 +224,7 @@ class Tariff(VersionedCollection[TariffVersion]):
             billing_end,
             timezone,
             output_resolution=resolution,
+            input_resolution=input_resolution,
         )
         if costs is None:
             return None
@@ -258,8 +277,8 @@ class Tariff(VersionedCollection[TariffVersion]):
 
         rows: list[dict] = []
         for ps, pe in zip(period_starts, period_ends_ts, strict=True):
-            slot_start = align_datetime_to_tz(ps.to_pydatetime(), timezone)
-            slot_end = align_datetime_to_tz(pe.to_pydatetime(), timezone)
+            slot_start = ps.to_pydatetime()
+            slot_end = pe.to_pydatetime()
             totals: dict[str, float] = {}
             for version, seg_start, seg_end in active_segments:
                 effective_start = max(slot_start, seg_start)

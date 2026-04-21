@@ -63,6 +63,7 @@ class TieredFormula(Formula):
         indexed = data.set_index("timestamp")
         groups = indexed.groupby(pd.Grouper(freq=to_pandas_freq(self.band_period or resolution)))
 
+        applied_pieces: list[pd.DataFrame] = []
         for period_start_key, group in groups:
             period_start = cast(pd.Timestamp, period_start_key)
             estimated_total = self._estimate_total_for_period(group, period_start, resolution)
@@ -73,9 +74,13 @@ class TieredFormula(Formula):
             else:
                 applied = self._apply_banded_group(group_frame, estimated_total, resolution, timezone)
 
-            result = result.merge(applied, on="timestamp", how="left", suffixes=("", "_group"))
-            result["value"] = result["value_group"].combine_first(result["value"])
-            result = result.drop(columns=["value_group"])
+            if not applied.empty:
+                applied_pieces.append(applied)
+
+        if applied_pieces:
+            all_applied = pd.concat(applied_pieces, ignore_index=True)
+            value_map = all_applied.set_index("timestamp")["value"]
+            result["value"] = result["timestamp"].map(value_map).combine_first(result["value"])
 
         return result
 
