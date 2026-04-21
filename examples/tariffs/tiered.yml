@@ -7,7 +7,7 @@
       bands:
       - up_to: 0.5 # if capacity in a billing period does not exceed 0.5 MW, it is billed according to this formula
         formula: # a fixed cost component of 5 €/month
-          period: monthly
+          period: P1M
           constant_cost: 5.0 
       - formula: # the capacity above 0.5 MW is billed according to this formula
           constant_cost: 10.0 # usage based costs of 10 €/MW

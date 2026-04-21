@@ -3,13 +3,13 @@ from __future__ import annotations
 import datetime as dt
 from zoneinfo import ZoneInfo
 
+import isodate
 import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
 from energy_cost.data.models import CustomerType
 from energy_cost.formula import IndexFormula, PeriodicFormula
-from energy_cost.fractional_periods import Period
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
@@ -34,7 +34,9 @@ def _tariff(
         {"all": {"energy": IndexFormula(constant_cost=injection_rate)}} if injection_rate is not None else {}
     )
     periodic: dict = (
-        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+        {"fixed": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=daily_fixed)}
+        if daily_fixed is not None
+        else {}
     )
     return Tariff(
         versions=[
@@ -386,7 +388,9 @@ def _tz_contract(
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET)
     consumption: dict = {"all": {"energy": IndexFormula(constant_cost=energy_rate)}}
     periodic: dict = (
-        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+        {"fixed": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=daily_fixed)}
+        if daily_fixed is not None
+        else {}
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
     tariff = Tariff(versions=[version])
@@ -678,7 +682,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     result = contract.calculate_cost(meters)
     expected = {
         TariffCategory.SUPPLIER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
-        TariffCategory.DISTRIBUTOR: 43.14186387067,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
+        TariffCategory.DISTRIBUTOR: 43.162240583,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
         TariffCategory.FEES: 0.475554,  # consumption * (excise + energy_contribution) => 0.475554 €
     }
     expected[TariffCategory.TAXES] = (sum(expected.values())) * 0.06

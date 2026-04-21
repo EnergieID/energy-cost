@@ -11,7 +11,7 @@ from energy_cost.versioning import Versioned
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
 from .meter import MeterType, PowerDirection
-from .resolution import Resolution, resample_or_distribute
+from .resolution import Resolution, resample_or_distribute, to_pandas_freq
 
 _METER_KEYS = {e.value for e in MeterType}
 
@@ -150,5 +150,25 @@ class TariffVersion(Versioned):
             result = resample_or_distribute(result, self.capacity.billing_period, output_resolution, start, end)
         return result
 
-    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
-        return {name: entry.get_cost_for_interval(start, end, timezone) for name, entry in self.periodic.items()}
+    def apply_periodic_costs(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
+    ) -> pd.DataFrame | None:
+        """Apply periodic cost formulas in [start, end), returning a DataFrame with a column per named cost."""
+        if not self.periodic:
+            return None
+
+        output_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
+        if output_ts.empty:
+            return None
+        sentinel = pd.DataFrame({"timestamp": output_ts})
+
+        result: pd.DataFrame | None = None
+        for name, formula in self.periodic.items():
+            df = formula.apply(sentinel, resolution=output_resolution, timezone=timezone)
+            df = df.rename(columns={"value": name})
+            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+        return result

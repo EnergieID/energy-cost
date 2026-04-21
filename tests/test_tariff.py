@@ -4,11 +4,11 @@ import datetime as dt
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import isodate
 import pandas as pd
 import pytest
 
 from energy_cost.formula import IndexFormula, PeriodicFormula
-from energy_cost.fractional_periods import Period
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
@@ -104,26 +104,28 @@ def test_get_energy_cost_returns_none_when_no_versions_overlap_interval() -> Non
     assert result is None
 
 
-def test_get_periodic_cost_spans_multiple_segments() -> None:
+def test_apply_periodic_costs_spans_multiple_segments() -> None:
     tariff = Tariff(
         versions=[
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
-                periodic={"admin": PeriodicFormula(period=Period.DAILY, constant_cost=24.0)},
+                periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
             ),
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 12, 0),
-                periodic={"admin": PeriodicFormula(period=Period.DAILY, constant_cost=48.0)},
+                periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=48.0)},
             ),
         ]
     )
 
-    costs = tariff.get_periodic_cost(
+    result = tariff.apply_periodic_costs(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 2, 0, 0),
+        output_resolution=dt.timedelta(hours=1),
     )
 
-    assert costs == pytest.approx({"admin": 36.0})
+    assert result is not None
+    assert result["admin"].sum() == pytest.approx(36.0)
 
 
 def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> None:
@@ -176,7 +178,9 @@ _CET = dt.timezone(dt.timedelta(hours=1))
 def _tz_tariff(*, energy_rate: float = 100.0, daily_fixed: float | None = None) -> Tariff:
     """Tariff whose version start is tz-aware (matches real YAML files)."""
     periodic: dict = (
-        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+        {"fixed": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=daily_fixed)}
+        if daily_fixed is not None
+        else {}
     )
     return Tariff(
         versions=[
@@ -532,8 +536,6 @@ def test_capacity_cost_aggregated_to_yearly_output(tmp_path) -> None:
         encoding="utf-8",
     )
     tariff = Tariff.from_yaml(cap_yaml)
-
-    import isodate
 
     jan_feb_ts = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
     consumption = pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})

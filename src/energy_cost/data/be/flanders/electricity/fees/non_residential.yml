@@ -1,25 +1,25 @@
 - start: 2022-01-01T00:00:00+01:00
   periodic:
     energy_fund:
-      period: monthly
+      period: P1M
       constant_cost: 8.49
 - start: 2023-01-01T00:00:00+01:00
   periodic:
     energy_fund:
-      period: monthly
+      period: P1M
       constant_cost: 9.54
 - start: 2024-01-01T00:00:00+01:00
   periodic:
     energy_fund:
-      period: monthly
+      period: P1M
       constant_cost: 9.57
 - start: 2025-01-01T00:00:00+01:00
   periodic:
     energy_fund:
-      period: monthly
+      period: P1M
       constant_cost: 9.88
 - start: 2026-01-01T00:00:00+01:00
   periodic:
     energy_fund:
-      period: monthly
+      period: P1M
       constant_cost: 10.07

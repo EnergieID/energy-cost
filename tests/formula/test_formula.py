@@ -33,7 +33,7 @@ bands: []
 
 def test_periodic_formulas_are_correctly_coerced_by_model_validate() -> None:
     simple_yaml = """
-period: monthly
+period: P1M
 constant_cost: 100.0
 """
     formula_dict = yaml.safe_load(simple_yaml)

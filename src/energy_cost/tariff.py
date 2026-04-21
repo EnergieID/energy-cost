@@ -122,14 +122,24 @@ class Tariff(VersionedCollection[TariffVersion]):
             timezone,
         )
 
-    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
+    def apply_periodic_costs(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
+    ) -> pd.DataFrame | None:
+        """Apply periodic cost formulas across all active versions, returning a DataFrame with a column per named cost."""
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
-        totals: dict[str, float] = {}
-        for version, seg_start, seg_end in self.find_active_versions(start, end, timezone):
-            for name, cost in version.get_periodic_cost(seg_start, seg_end, timezone).items():
-                totals[name] = totals.get(name, 0.0) + cost
-        return totals
+        return self.collect_version_frames(
+            lambda version, seg_start, seg_end: version.apply_periodic_costs(
+                seg_start, seg_end, output_resolution, timezone
+            ),
+            start,
+            end,
+            timezone,
+        )
 
     def apply(
         self,
@@ -180,7 +190,7 @@ class Tariff(VersionedCollection[TariffVersion]):
 
         for optional_frame in [
             self._apply_capacity_costs(combined_consumption, billing_start, billing_end, resolution, timezone),
-            self._apply_fixed_costs(billing_start, billing_end, output_freq, timezone),
+            self._apply_fixed_costs(billing_start, billing_end, resolution, timezone),
         ]:
             if optional_frame is not None:
                 frames.append(optional_frame)
@@ -261,38 +271,20 @@ class Tariff(VersionedCollection[TariffVersion]):
         self,
         billing_start: dt.datetime,
         billing_end: dt.datetime,
-        output_freq: str,
+        resolution: Resolution,
         timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame | None:
-        period_starts = pd.date_range(billing_start, billing_end, freq=output_freq, inclusive="left")
-        period_ends_ts = list(period_starts[1:]) + [pd.Timestamp(billing_end)]
-
-        active_segments = self.find_active_versions(
-            align_datetime_to_tz(billing_start, timezone),
-            align_datetime_to_tz(billing_end, timezone),
-            timezone,
+        fixed_df = self.apply_periodic_costs(
+            billing_start, billing_end, output_resolution=resolution, timezone=timezone
         )
-        if not active_segments or not any(v.periodic for v, _, _ in active_segments):
+        if fixed_df is None or fixed_df.empty:
             return None
-
-        rows: list[dict] = []
-        for ps, pe in zip(period_starts, period_ends_ts, strict=True):
-            slot_start = ps.to_pydatetime()
-            slot_end = pe.to_pydatetime()
-            totals: dict[str, float] = {}
-            for version, seg_start, seg_end in active_segments:
-                effective_start = max(slot_start, seg_start)
-                effective_end = min(slot_end, seg_end)
-                if effective_start >= effective_end:
-                    continue
-                for name, cost in version.get_periodic_cost(effective_start, effective_end, timezone).items():
-                    totals[name] = totals.get(name, 0.0) + cost
-            rows.append({"timestamp": ps, **totals})
-
-        df = pd.DataFrame(rows).set_index("timestamp").fillna(0.0)
-        df["total"] = df.sum(axis=1)
-        df.columns = pd.MultiIndex.from_tuples([(CostGroup.FIXED, MeterType.ALL, c) for c in df.columns])
-        return df
+        agg = fixed_df.set_index("timestamp").fillna(0.0)
+        cost_cols = [c for c in agg.columns if c != "total"]
+        if cost_cols:
+            agg["total"] = agg[cost_cols].sum(axis=1)
+        agg.columns = pd.MultiIndex.from_tuples([(CostGroup.FIXED, MeterType.ALL, c) for c in agg.columns])
+        return agg
 
 
 def _collapse_meter_type(df: pd.DataFrame) -> pd.DataFrame:
