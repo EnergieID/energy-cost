@@ -123,7 +123,7 @@ class TariffVersion(Versioned):
         result = self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution),
+            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution, start=start, end=end),
         )
 
         if output_resolution is not None and result is not None:
@@ -168,7 +168,7 @@ class TariffVersion(Versioned):
 
         result: pd.DataFrame | None = None
         for name, formula in self.periodic.items():
-            df = formula.apply(sentinel, resolution=output_resolution, timezone=timezone)
+            df = formula.apply(sentinel, resolution=output_resolution, timezone=timezone, start=start, end=end)
             df = df.rename(columns={"value": name})
             result = df if result is None else result.merge(df, on="timestamp", how="outer")
         return result

@@ -39,9 +39,13 @@ class PeriodicFormula(Formula):
         data: pd.DataFrame,
         resolution: Resolution | None = None,
         timezone: dt.tzinfo = UTC,
+        *,
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
     ) -> pd.DataFrame:
         data = align_timestamps_to_tz(data, timezone)
-        start, end, resolution = detect_resolution_and_range(data, resolution)
+        if start is None or end is None or resolution is None:
+            start, end, resolution = detect_resolution_and_range(data, resolution)
 
         period_freq = to_pandas_freq(self.period)
 

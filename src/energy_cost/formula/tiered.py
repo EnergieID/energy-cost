@@ -50,9 +50,13 @@ class TieredFormula(Formula):
         data: pd.DataFrame,
         resolution: Resolution | None = None,
         timezone: dt.tzinfo = UTC,
+        *,
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
     ) -> pd.DataFrame:
         data = align_timestamps_to_tz(data, timezone)
-        start, end, resolution = detect_resolution_and_range(data, resolution)
+        if start is None or end is None or resolution is None:
+            start, end, resolution = detect_resolution_and_range(data, resolution)
 
         # ── Step 1: estimate the full-period total for every data row ──
         indexed = data.set_index("timestamp")
@@ -105,7 +109,9 @@ class TieredFormula(Formula):
             for band in self.bands:
                 mask = unmatched if band.up_to is None else unmatched & (period_total <= band.up_to)
                 if mask.any():
-                    band_values = band.formula.apply(input_data.copy(), resolution=resolution, timezone=timezone)
+                    band_values = band.formula.apply(
+                        input_data.copy(), resolution=resolution, timezone=timezone, start=start, end=end
+                    )
                     result_values = result_values.where(~mask, band_values.set_index("timestamp")["value"])
                 unmatched = unmatched & ~mask
 
@@ -121,7 +127,9 @@ class TieredFormula(Formula):
                     period_total > 0, other=0.0
                 )
                 if fraction.any():
-                    band_values = band.formula.apply(input_data.copy(), resolution=resolution, timezone=timezone)
+                    band_values = band.formula.apply(
+                        input_data.copy(), resolution=resolution, timezone=timezone, start=start, end=end
+                    )
                     result_values = result_values + band_values.set_index("timestamp")["value"] * fraction
                 if band.up_to is not None:
                     prev_up_to = band.up_to
