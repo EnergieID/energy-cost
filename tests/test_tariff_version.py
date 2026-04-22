@@ -257,3 +257,19 @@ def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured(
         )
         is None
     )
+
+
+def test_apply_periodic_costs_returns_none_when_output_range_is_empty() -> None:
+    """When end < start the output timestamp grid is empty and the result is None."""
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
+    )
+
+    result = segment.apply_periodic_costs(
+        start=dt.datetime(2025, 1, 2, 0, 0),
+        end=dt.datetime(2025, 1, 1, 0, 0),  # end before start → empty grid
+        output_resolution=dt.timedelta(hours=1),
+    )
+
+    assert result is None

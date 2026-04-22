@@ -327,3 +327,48 @@ def test_load_preserves_stable_flag_as_stored(tmp_path: Path) -> None:
     # Both rows should remain False; _load_cache never promotes them.
     loaded = idx._load_cache()
     assert list(loaded["stable"]) == [False, False]
+
+
+def test_fetch_and_merge_returns_cache_when_source_returns_empty(tmp_path: Path) -> None:
+    """When the source returns an empty DataFrame, the existing cache is returned unchanged."""
+    idx, mock_source = _make_index(tmp_path)
+    mock_source.get_values.return_value = pd.DataFrame(columns=["timestamp", "value"])
+
+    existing_cache = _make_raw(["2020-01-01T00:00:00+00:00"], value=42.0)
+    existing_cache["fetch_time"] = pd.Timestamp.now(tz="UTC").isoformat()
+    existing_cache["stable"] = True
+
+    result = idx._fetch_and_merge(
+        existing_cache,
+        _ts("2020-01-02"),
+        _ts("2020-01-03"),
+        pd.Timestamp.now(tz="UTC"),
+    )
+
+    assert len(result) == 1
+    assert result["value"].iloc[0] == pytest.approx(42.0)
+
+
+def test_fetch_and_merge_returns_cache_when_all_fetched_values_are_nan(tmp_path: Path) -> None:
+    """When the source returns only NaN values, they are dropped and the existing cache is returned."""
+    idx, mock_source = _make_index(tmp_path)
+    mock_source.get_values.return_value = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2020-01-02T00:00:00+00:00"], utc=True),
+            "value": [float("nan")],
+        }
+    )
+
+    existing_cache = _make_raw(["2020-01-01T00:00:00+00:00"], value=42.0)
+    existing_cache["fetch_time"] = pd.Timestamp.now(tz="UTC").isoformat()
+    existing_cache["stable"] = True
+
+    result = idx._fetch_and_merge(
+        existing_cache,
+        _ts("2020-01-02"),
+        _ts("2020-01-03"),
+        pd.Timestamp.now(tz="UTC"),
+    )
+
+    assert len(result) == 1
+    assert result["value"].iloc[0] == pytest.approx(42.0)

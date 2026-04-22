@@ -168,6 +168,87 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_cap
     )
 
 
+def test_apply_energy_cost_detects_start_from_data_when_only_end_is_given() -> None:
+    """When start is None but end is provided, start is detected from data."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=5.0)}},
+            )
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC),
+            "value": [1.0] * 4,
+        }
+    )
+
+    result = tariff.apply_energy_cost(
+        data,
+        end=dt.datetime(2025, 1, 1, 1, 0, tzinfo=dt.UTC),
+        input_resolution=dt.timedelta(minutes=15),
+    )
+
+    assert result is not None
+    assert result["total"].tolist() == [5.0, 5.0, 5.0, 5.0]
+
+
+def test_apply_energy_cost_detects_end_from_data_when_only_start_is_given() -> None:
+    """When end is None but start is provided, end is detected from data."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=7.0)}},
+            )
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC),
+            "value": [1.0] * 4,
+        }
+    )
+
+    result = tariff.apply_energy_cost(
+        data,
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        input_resolution=dt.timedelta(minutes=15),
+    )
+
+    assert result is not None
+    assert result["total"].tolist() == [7.0, 7.0, 7.0, 7.0]
+
+
+def test_apply_energy_cost_detects_resolution_from_data_when_not_provided() -> None:
+    """When input_resolution is None but start and end are given, resolution is detected from data."""
+    tariff = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, 0, 0),
+                consumption={"all": {"energy": IndexFormula(constant_cost=3.0)}},
+            )
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC),
+            "value": [1.0] * 4,
+        }
+    )
+
+    result = tariff.apply_energy_cost(
+        data,
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 1, 1, 1, 0, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    assert result["total"].tolist() == [3.0, 3.0, 3.0, 3.0]
+
+
 # ---------------------------------------------------------------------------
 # Timezone-aware start / end — Tariff.apply
 # ---------------------------------------------------------------------------
