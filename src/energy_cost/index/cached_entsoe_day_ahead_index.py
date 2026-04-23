@@ -64,8 +64,8 @@ class CachedEntsoeDayAheadIndex(Index):
         """Load the cache if changed since last load, else return the in-memory cache."""
         path = self._csv_path()
         if not path.exists():
-            self._mem_cache: pd.DataFrame | None = None
-            self._mem_cache_mtime: float | None = None
+            self._mem_cache = None
+            self._mem_cache_mtime = None
             return pd.DataFrame(columns=_COLUMNS)
 
         mtime = path.stat().st_mtime
