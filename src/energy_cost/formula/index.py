@@ -41,17 +41,11 @@ class IndexFormula(Formula):
         # Align start/end to the target timezone so all generated timestamps share one tz
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
-        df = pd.DataFrame(
-            {
-                "timestamp": pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left"),
-                "value": self.constant_cost,
-            }
-        )
+        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
+        values = pd.Series(self.constant_cost, index=timestamps, dtype=float)
 
         for variable_cost in self.variable_costs:
-            variable_cost_values = variable_cost.get_values(start, end, resolution, timezone)
-            df = df.merge(variable_cost_values, on="timestamp", how="left", suffixes=("", "_right"))
-            df["value"] = df["value"] + df["value_right"]
-            df = df.drop(columns=["value_right"])
+            vc = variable_cost.get_values(start, end, resolution, timezone)
+            values = values.add(vc.set_index("timestamp")["value"])
 
-        return df
+        return pd.DataFrame({"timestamp": values.index, "value": values.to_numpy()})

@@ -72,16 +72,18 @@ class TariffVersion(Versioned):
         get_df: Callable[[Formula], pd.DataFrame],
     ) -> pd.DataFrame | None:
         resolved = self._resolve_energy_formulas(meter_type, direction)
-        result: pd.DataFrame | None = None
+        series: dict[str, pd.Series] = {}
         for cost_type, formula in resolved.items():
             df = get_df(formula)
-            if df.empty:
-                continue
-            df = df.rename(columns={"value": cost_type})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+            if not df.empty:
+                series[cost_type] = df.set_index("timestamp")["value"]
 
-        if result is None:
+        if not series:
             return None
+
+        result = pd.DataFrame(series)
+        result.index.name = "timestamp"
+        result = result.reset_index()
 
         cost_columns = [col for col in result.columns if col not in ("timestamp", "total")]
         if cost_columns:
