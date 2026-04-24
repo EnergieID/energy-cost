@@ -56,35 +56,33 @@ class CachedEntsoeDayAheadIndex(Index):
         self._mem_cache: pd.DataFrame | None = None
         super().__init__(resolution=resolution)
 
-    def _csv_path(self) -> Path:
+    def _cache_path(self) -> Path:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        return self.cache_dir / f"{self.country_code}.csv"
+        return self.cache_dir / f"{self.country_code}.pkl"
 
     def _load_cache(self) -> pd.DataFrame:
         """Load the cache if changed since last load, else return the in-memory cache."""
-        path = self._csv_path()
+        path = self._cache_path()
         if not path.exists():
             self._mem_cache = None
-            self._mem_cache_mtime = None
+            self._mem_cache_mtime: float | None = None
             return pd.DataFrame(columns=_COLUMNS)
 
         mtime = path.stat().st_mtime
         if self._mem_cache is not None and self._mem_cache_mtime == mtime:
             return self._mem_cache
 
-        df = pd.read_csv(path)
-        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.as_unit("us")
-        df["fetch_time"] = pd.to_datetime(df["fetch_time"], utc=True).dt.as_unit("us")
-        df["stable"] = df["stable"].astype(bool)
+        df = pd.read_pickle(path)
+        assert isinstance(df, pd.DataFrame)
 
         self._mem_cache = df
         self._mem_cache_mtime = mtime
         return df
 
     def _save_cache(self, df: pd.DataFrame) -> None:
-        path = self._csv_path()
+        path = self._cache_path()
         tmp = path.with_suffix(".tmp")
-        df.to_csv(tmp, index=False)
+        df.to_pickle(tmp)
         tmp.replace(path)
         # Invalidate the in-memory cache so the next _load_cache re-reads the new file.
         self._mem_cache_mtime = None

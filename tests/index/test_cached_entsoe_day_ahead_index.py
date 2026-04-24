@@ -47,8 +47,8 @@ def _make_index(
     return idx, mock_source
 
 
-def _csv_path(tmp_path: Path) -> Path:
-    return tmp_path / "cache" / "BE.csv"
+def _cache_path(tmp_path: Path) -> Path:
+    return tmp_path / "cache" / "BE.pkl"
 
 
 # ── Construction ──────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ def test_csv_has_required_columns(tmp_path: Path) -> None:
 
     idx._get_values(_ts("2020-01-01"), _ts("2020-01-02"), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
+    df = pd.read_pickle(_cache_path(tmp_path))
     assert set(df.columns) == {"timestamp", "value", "fetch_time", "stable"}
 
 
@@ -84,8 +84,8 @@ def test_first_call_creates_single_csv(tmp_path: Path) -> None:
 
     idx._get_values(_ts("2020-01-01"), _ts("2020-01-02"), dt.UTC)
 
-    assert _csv_path(tmp_path).exists()
-    assert len(list((tmp_path / "cache").glob("*.csv"))) == 1  # exactly one file
+    assert _cache_path(tmp_path).exists()
+    assert len(list((tmp_path / "cache").glob("*.pkl"))) == 1  # exactly one file
 
 
 # ── stable flag ───────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ def test_old_row_is_stored_as_stable(tmp_path: Path) -> None:
 
     idx._get_values(_ts("2020-01-01"), _ts("2020-01-02"), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
+    df = pd.read_pickle(_cache_path(tmp_path))
     assert bool(df["stable"].iloc[0]) is True
 
 
@@ -109,7 +109,7 @@ def test_recent_row_is_stored_as_not_stable(tmp_path: Path) -> None:
 
     idx._get_values(now, cast(pd.Timestamp, now + pd.Timedelta(hours=1)), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
+    df = pd.read_pickle(_cache_path(tmp_path))
     assert bool(df["stable"].iloc[0]) is False
 
 
@@ -159,12 +159,12 @@ def test_unstable_data_past_refresh_interval_triggers_refetch(tmp_path: Path) ->
         cast(pd.Timestamp, now - pd.Timedelta(minutes=30)), cast(pd.Timestamp, now + pd.Timedelta(minutes=30)), dt.UTC
     )
 
-    # Backdate fetch_time in the CSV to simulate stale cache
-    cache = pd.read_csv(_csv_path(tmp_path))
-    cache["fetch_time"] = (now - pd.Timedelta(hours=2)).isoformat()
-    tmp = _csv_path(tmp_path).with_suffix(".tmp")
-    cache.to_csv(tmp, index=False)
-    tmp.replace(_csv_path(tmp_path))
+    # Backdate fetch_time in the cache to simulate stale cache
+    cache = pd.read_pickle(_cache_path(tmp_path))
+    cache["fetch_time"] = now - pd.Timedelta(hours=2)
+    tmp = _cache_path(tmp_path).with_suffix(".tmp")
+    cache.to_pickle(tmp)
+    tmp.replace(_cache_path(tmp_path))
 
     call_count = mock_source.get_values.call_count
     idx._get_values(
@@ -215,17 +215,17 @@ def test_refetch_updates_value_for_unstable_row(tmp_path: Path) -> None:
     idx._get_values(now, cast(pd.Timestamp, now + pd.Timedelta(hours=1)), dt.UTC)
 
     # Backdate fetch_time to force re-fetch
-    cache = pd.read_csv(_csv_path(tmp_path))
-    cache["fetch_time"] = (now - pd.Timedelta(hours=2)).isoformat()
-    tmp = _csv_path(tmp_path).with_suffix(".tmp")
-    cache.to_csv(tmp, index=False)
-    tmp.replace(_csv_path(tmp_path))
+    cache = pd.read_pickle(_cache_path(tmp_path))
+    cache["fetch_time"] = now - pd.Timedelta(hours=2)
+    tmp = _cache_path(tmp_path).with_suffix(".tmp")
+    cache.to_pickle(tmp)
+    tmp.replace(_cache_path(tmp_path))
 
     mock_source.get_values.return_value = _make_raw([now.isoformat()], value=99.0)
     idx._get_values(now, cast(pd.Timestamp, now + pd.Timedelta(hours=1)), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
-    row = df[pd.to_datetime(df["timestamp"], utc=True) == now]
+    df = pd.read_pickle(_cache_path(tmp_path))
+    row = df[df["timestamp"] == now]
     assert row["value"].iloc[0] == pytest.approx(99.0)
 
 
@@ -237,16 +237,16 @@ def test_refetch_adds_new_rows(tmp_path: Path) -> None:
     idx._get_values(now, cast(pd.Timestamp, now + pd.Timedelta(hours=1)), dt.UTC)
 
     # Force re-fetch with additional row
-    cache = pd.read_csv(_csv_path(tmp_path))
-    cache["fetch_time"] = (now - pd.Timedelta(hours=2)).isoformat()
-    tmp = _csv_path(tmp_path).with_suffix(".tmp")
-    cache.to_csv(tmp, index=False)
-    tmp.replace(_csv_path(tmp_path))
+    cache = pd.read_pickle(_cache_path(tmp_path))
+    cache["fetch_time"] = now - pd.Timedelta(hours=2)
+    tmp = _cache_path(tmp_path).with_suffix(".tmp")
+    cache.to_pickle(tmp)
+    tmp.replace(_cache_path(tmp_path))
 
     mock_source.get_values.return_value = _make_raw([now.isoformat(), (now + pd.Timedelta(minutes=15)).isoformat()])
     idx._get_values(now, cast(pd.Timestamp, now + pd.Timedelta(hours=1)), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
+    df = pd.read_pickle(_cache_path(tmp_path))
     assert len(df) == 2
 
 
@@ -265,8 +265,7 @@ def test_stable_rows_are_not_overwritten_during_merge(tmp_path: Path) -> None:
     )
     idx._get_values(_ts("2020-01-01"), _ts("2020-01-03"), dt.UTC)
 
-    df = pd.read_csv(_csv_path(tmp_path))
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = pd.read_pickle(_cache_path(tmp_path))
     row = df[df["timestamp"] == _ts("2020-01-01")]
     # stable rows are overwritten by a newer fetch — new value wins
     assert row["value"].iloc[0] == pytest.approx(999.0)

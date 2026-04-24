@@ -129,9 +129,8 @@ def detect_resolution(timestamps: pd.Series) -> Resolution:
         if (month_gaps > 0).all() and (month_gaps == month_gaps.iloc[0]).all():
             return isodate.Duration(months=int(month_gaps.iloc[0]))
 
-    deltas = timestamps.diff().dropna()
-    mode_delta = deltas.mode()[0]
-    return pd.to_timedelta(mode_delta)
+    # For uniform-interval data (the common case) the first gap is the resolution.
+    return pd.to_timedelta(timestamps.iloc[1] - timestamps.iloc[0])
 
 
 def snap_billing_period(
