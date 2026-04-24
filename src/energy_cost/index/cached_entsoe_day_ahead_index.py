@@ -95,6 +95,11 @@ class CachedEntsoeDayAheadIndex(Index):
         now: pd.Timestamp,
     ) -> tuple[pd.Timestamp, pd.Timestamp] | None:
         """Return ``(fetch_start, fetch_end)`` if a network request is needed, else ``None``."""
+        # Cap end at now: day-ahead prices beyond today don't exist yet.
+        end_utc = min(end_utc, now)
+        if end_utc <= start_utc:
+            return None
+
         if cache.empty:
             return start_utc, end_utc
 
