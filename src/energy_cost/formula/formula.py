@@ -66,6 +66,6 @@ class Formula(ABC, BaseModel):
         formula_values = self.get_values(start, end, resolution, timezone)
 
         result = data.reset_index(drop=True)
-        merged = result.merge(formula_values, on="timestamp", how="left", suffixes=("", "_formula"))
-        result["value"] = merged["value_formula"].mul(merged["value"])
+        formula_series = formula_values.set_index("timestamp")["value"].reindex(result["timestamp"])
+        result["value"] = formula_series.values * result["value"].values
         return result

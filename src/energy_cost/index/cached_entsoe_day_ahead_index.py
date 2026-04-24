@@ -152,7 +152,7 @@ class CachedEntsoeDayAheadIndex(Index):
         if raw.empty:
             return cache
 
-        raw["timestamp"] = pd.to_datetime(raw["timestamp"], utc=True)
+        raw["timestamp"] = pd.to_datetime(raw["timestamp"], format="ISO8601", utc=True)
         raw["fetch_time"] = now
         raw["stable"] = (raw["timestamp"] + pd.Timedelta(self.old_threshold)) < now
 
