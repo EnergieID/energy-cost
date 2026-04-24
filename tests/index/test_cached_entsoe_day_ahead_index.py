@@ -371,3 +371,35 @@ def test_fetch_and_merge_returns_cache_when_all_fetched_values_are_nan(tmp_path:
 
     assert len(result) == 1
     assert result["value"].iloc[0] == pytest.approx(42.0)
+
+
+# ── _compute_fetch_range: future end capping ──────────────────────────────────
+
+
+def test_compute_fetch_range_returns_none_when_end_is_entirely_in_the_future(tmp_path: Path) -> None:
+    """When end_utc is capped to now and lies before start_utc, nothing should be fetched."""
+    idx, _ = _make_index(tmp_path)
+    now = pd.Timestamp.now(tz="UTC")
+    future_start = cast(pd.Timestamp, now + pd.Timedelta(hours=1))
+    future_end = cast(pd.Timestamp, now + pd.Timedelta(hours=2))
+    empty_cache = pd.DataFrame(columns=["timestamp", "value", "fetch_time", "stable"])
+
+    result = idx._compute_fetch_range(empty_cache, future_start, future_end, now)
+
+    assert result is None
+
+
+# ── _load_cache: in-memory hit ────────────────────────────────────────────────
+
+
+def test_load_cache_returns_in_memory_cache_when_file_is_unchanged(tmp_path: Path) -> None:
+    """Second _load_cache call with same mtime returns the cached object without re-reading disk."""
+    idx, mock_source = _make_index(tmp_path)
+    mock_source.get_values.return_value = _make_raw(["2020-01-01T00:00:00+00:00"])
+
+    # Prime the disk cache via _get_values
+    idx._get_values(_ts("2020-01-01"), _ts("2020-01-02"), dt.UTC)
+
+    first = idx._load_cache()
+    second = idx._load_cache()
+    assert second is first
