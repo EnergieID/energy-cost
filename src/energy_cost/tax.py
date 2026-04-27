@@ -10,7 +10,13 @@ from pydantic import BaseModel, Field
 from energy_cost.versioning import Versioned, VersionedCollection
 
 from .meter import CostGroup, TariffCategory
-from .resolution import Resolution, align_datetime_to_tz, align_timestamps_to_tz, detect_resolution_and_range
+from .resolution import (
+    Resolution,
+    align_datetime_to_tz,
+    align_timestamps_to_tz,
+    detect_resolution_and_range,
+    to_pandas_offset,
+)
 
 _WILDCARD: Literal["*"] = "*"
 
@@ -40,7 +46,13 @@ class TaxVersion(Versioned):
         result: list[tuple[float, ColumnPattern]] = [(rule.rate, pattern) for rule in rates for pattern in rule.columns]
         return sorted(result, key=lambda x: _specificity(x[1]), reverse=True)
 
-    def apply(self, data: pd.DataFrame, start: dt.datetime, end: dt.datetime) -> pd.DataFrame:
+    def apply(
+        self,
+        data: pd.DataFrame,
+        start: dt.datetime,
+        end: dt.datetime,
+        resolution: Resolution | None = None,
+    ) -> pd.DataFrame:
         """Compute total tax for each row in *data* within [start, end).
 
         *data* has a ``timestamp`` column and a 3-level MultiIndex on the
@@ -49,7 +61,14 @@ class TaxVersion(Versioned):
         Returns a DataFrame with a ``timestamp`` column and a
         ``("taxes", "total", "total")`` column.
         """
-        data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
+        if resolution is not None:
+            # Use period-overlap check: the row covers [timestamp, timestamp + period)
+            # which overlaps [start, end) iff timestamp < end AND timestamp + period > start.
+            offset = to_pandas_offset(resolution)
+            mask = (data["timestamp"] < end) & (data["timestamp"] + offset > start)
+            data = data[mask].copy()
+        else:
+            data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
         # Work on a mutable copy of totals so we can subtract handled amounts
         remaining = data.copy().set_index("timestamp")
         tax = pd.Series(0.0, index=remaining.index)
@@ -108,5 +127,10 @@ class Tax(VersionedCollection[TaxVersion]):
         data = align_timestamps_to_tz(data, timezone)
 
         return self.collect_version_frames(
-            lambda version, seg_start, seg_end: version.apply(data, start=seg_start, end=seg_end), start, end, timezone
+            lambda version, seg_start, seg_end: version.apply(
+                data, start=seg_start, end=seg_end, resolution=resolution
+            ),
+            start,
+            end,
+            timezone,
         )
