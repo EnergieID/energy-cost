@@ -90,3 +90,43 @@ def test_csv_and_yaml_index_load_values(tmp_path) -> None:
 
     assert csv_index.get_values(start, end, resolution)["value"].tolist() == [10]
     assert yaml_index.get_values(start, end, resolution)["value"].tolist() == [12]
+
+
+def test_yaml_index_with_mixed_utc_offsets(tmp_path) -> None:
+    """YAML timestamps that carry different UTC offsets (e.g. +01:00 and +02:00 across a
+    DST boundary) must be normalised to UTC so that get_values returns the correct
+    values in the correct order.
+
+    The two entries represent consecutive hours straddling the spring-forward moment:
+      2024-03-31T01:45:00+01:00  →  2024-03-31T00:45:00Z
+      2024-03-31T03:00:00+02:00  →  2024-03-31T01:00:00Z  (first slot after the gap)
+    """
+    yaml_path = tmp_path / "mixed.yml"
+    yaml_path.write_text(
+        "- timestamp: '2024-03-31T01:45:00+01:00'\n"
+        "  value: 42.0\n"
+        "- timestamp: '2024-03-31T03:00:00+02:00'\n"
+        "  value: 99.0\n",
+        encoding="utf-8",
+    )
+
+    index = YAMLIndex(str(yaml_path), resolution=dt.timedelta(minutes=15))
+
+    # Both timestamps must be stored as UTC and in chronological order.
+    assert index.df["timestamp"].tolist() == [
+        pd.Timestamp("2024-03-31T00:45:00Z"),
+        pd.Timestamp("2024-03-31T01:00:00Z"),
+    ]
+
+    # get_values across the whole range must return both entries correctly.
+    out = index.get_values(
+        start=dt.datetime(2024, 3, 31, 0, 45, tzinfo=dt.UTC),
+        end=dt.datetime(2024, 3, 31, 1, 15, tzinfo=dt.UTC),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert out["timestamp"].tolist() == [
+        pd.Timestamp("2024-03-31T00:45:00Z"),
+        pd.Timestamp("2024-03-31T01:00:00Z"),
+    ]
+    assert out["value"].tolist() == [42.0, 99.0]

@@ -11,7 +11,7 @@ class DataFrameIndex(Index):
     def __init__(self, df: pd.DataFrame, resolution: Resolution | None = None):
         if "timestamp" not in df.columns or "value" not in df.columns:
             raise ValueError("DataFrame must contain 'timestamp' and 'value' columns.")
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
         self.df = df.copy().sort_values("timestamp")
 
         if resolution is None:
