@@ -9,14 +9,20 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 7.9091715
+          constant_cost: 8.1188409
       - formula:
-          constant_cost: 3163.6686167
+          constant_cost: 3247.5363667
   consumption:
     all:
-      constant_cost: 39.0993
+      transmission:
+        constant_cost: 10.198
+      public_service_fee:
+        constant_cost: 32.0912
+      levies:
+        constant_cost: 4.3094
     night_only:
-      constant_cost: 27.9053
+      public_service_fee:
+        constant_cost: 19.2547
   periodic:
     data_management:
       period: yearly
@@ -32,14 +38,20 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 10.4670865
+          constant_cost: 10.1819423
       - formula:
-          constant_cost: 4186.8346083
+          constant_cost: 4072.7769333
   consumption:
     all:
-      constant_cost: 56.5101
+      transmission:
+        constant_cost: 22.7614
+      public_service_fee:
+        constant_cost: 36.5973
+      levies:
+        constant_cost: 4.7676
     night_only:
-      constant_cost: 46.9616
+      public_service_fee:
+        constant_cost: 25.6181
   periodic:
     data_management:
       period: yearly
@@ -55,14 +67,20 @@
       - up_to: 0.0025
         formula:
           period: monthly
-          constant_cost: 10.2924284
+          constant_cost: 10.2181122
       - formula:
-          constant_cost: 4116.9713583
+          constant_cost: 4087.2448667
   consumption:
     all:
-      constant_cost: 50.5027
+      transmission:
+        constant_cost: 23.2082
+      public_service_fee:
+        constant_cost: 26.6707
+      levies:
+        constant_cost: 4.3906
     night_only:
-      constant_cost: 45.4058
+      public_service_fee:
+        constant_cost: 21.3365
   periodic:
     data_management:
       period: yearly

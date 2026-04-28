@@ -113,8 +113,10 @@ def extract_tariffs(ws) -> dict:
     Values read from the LS piekmeting (digital meter) column:
       - capacity_per_month : EUR/MW/month  (converted from EUR/kW/year)
       - min_band_cost      : EUR/month for the ≤0.0025 MW band
-      - consumption_all    : EUR/MWh  (netgebruik + ODV normaal + toeslagen)
-      - consumption_night  : EUR/MWh  (netgebruik + ODV nacht  + toeslagen)
+      - transmission       : EUR/MWh  (kWh-tarief netgebruik)
+      - public_service_all : EUR/MWh  (ODV kWh-tarief normaal)
+      - public_service_night: EUR/MWh (ODV kWh-tarief exclusief nacht)
+      - levies             : EUR/MWh  (Toeslagen)
       - databeheer         : EUR/year
     """
     rows = list(ws.iter_rows(values_only=True))
@@ -134,15 +136,14 @@ def extract_tariffs(ws) -> dict:
     cap_per_month = cap_kw_year * 1000 / 12
     min_band = MIN_CAPACITY_MW * cap_per_month
 
-    # Sum kWh components and convert EUR/kWh → EUR/MWh
-    consumption_all = (kwh_net + odv_normaal + toeslagen) * 1000
-    consumption_night = (kwh_net + odv_nacht + toeslagen) * 1000
-
+    # Convert EUR/kWh → EUR/MWh
     return {
         "capacity_per_month": round(cap_per_month, 7),
         "min_band_cost": round(min_band, 7),
-        "consumption_all": round(consumption_all, 4),
-        "consumption_night": round(consumption_night, 4),
+        "transmission": round(kwh_net * 1000, 4),
+        "public_service_all": round(odv_normaal * 1000, 4),
+        "public_service_night": round(odv_nacht * 1000, 4),
+        "levies": round(toeslagen * 1000, 4),
         "databeheer": databeheer,
     }
 
@@ -174,8 +175,14 @@ def build_entry(year: int, tariffs: dict) -> dict:
             },
         },
         "consumption": {
-            "all": {"constant_cost": tariffs["consumption_all"]},
-            "night_only": {"constant_cost": tariffs["consumption_night"]},
+            "all": {
+                "transmission": {"constant_cost": tariffs["transmission"]},
+                "public_service_fee": {"constant_cost": tariffs["public_service_all"]},
+                "levies": {"constant_cost": tariffs["levies"]},
+            },
+            "night_only": {
+                "public_service_fee": {"constant_cost": tariffs["public_service_night"]},
+            },
         },
         "periodic": {
             "data_management": {

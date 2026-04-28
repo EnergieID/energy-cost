@@ -1,0 +1,255 @@
+- start: '2024-01-01T00:00:00+01:00'
+  periodic:
+    data_management:
+      period: yearly
+      constant_cost: 13.16
+  consumption:
+    fixed_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          period: yearly
+          constant_cost: 15.07
+      - up_to: 150
+        formula:
+          period: yearly
+          constant_cost: 94.22
+      - up_to: 1000
+        formula:
+          period: yearly
+          constant_cost: 376.89
+      - formula:
+          period: yearly
+          constant_cost: 3600.27
+    proportional_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 21.0994
+      - up_to: 150
+        formula:
+          constant_cost: 5.269
+      - up_to: 1000
+        formula:
+          constant_cost: 3.3845
+      - formula:
+          constant_cost: 0.1611
+    public_service_obligation:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.5831
+      - up_to: 150
+        formula:
+          constant_cost: 0.5831
+      - up_to: 1000
+        formula:
+          constant_cost: 0.5831
+      - formula:
+          constant_cost: 0.0
+    pension_levy:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.2389
+      - up_to: 150
+        formula:
+          constant_cost: 0.2389
+      - up_to: 1000
+        formula:
+          constant_cost: 0.2389
+      - formula:
+          constant_cost: 0.0435
+    other_levies:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.0512
+      - up_to: 150
+        formula:
+          constant_cost: 0.0512
+      - up_to: 1000
+        formula:
+          constant_cost: 0.0512
+      - formula:
+          constant_cost: 0.0093
+- start: '2025-01-01T00:00:00+01:00'
+  periodic:
+    data_management:
+      period: yearly
+      constant_cost: 17.51
+  consumption:
+    fixed_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          period: yearly
+          constant_cost: 13.43
+      - up_to: 150
+        formula:
+          period: yearly
+          constant_cost: 71.32
+      - up_to: 1000
+        formula:
+          period: yearly
+          constant_cost: 482.17
+      - formula:
+          period: yearly
+          constant_cost: 4476.41
+    proportional_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 18.6525
+      - up_to: 150
+        formula:
+          constant_cost: 7.0769
+      - up_to: 1000
+        formula:
+          constant_cost: 4.3379
+      - formula:
+          constant_cost: 0.3437
+    public_service_obligation:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.7569
+      - up_to: 150
+        formula:
+          constant_cost: 0.7569
+      - up_to: 1000
+        formula:
+          constant_cost: 0.7569
+      - formula:
+          constant_cost: 0.0
+    pension_levy:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.3311
+      - up_to: 150
+        formula:
+          constant_cost: 0.3311
+      - up_to: 1000
+        formula:
+          constant_cost: 0.3311
+      - formula:
+          constant_cost: 0.0679
+    other_levies:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.0438
+      - up_to: 150
+        formula:
+          constant_cost: 0.0438
+      - up_to: 1000
+        formula:
+          constant_cost: 0.0438
+      - formula:
+          constant_cost: 0.009
+- start: '2026-01-01T00:00:00+01:00'
+  periodic:
+    data_management:
+      period: yearly
+      constant_cost: 17.85
+  consumption:
+    fixed_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          period: yearly
+          constant_cost: 14.79
+      - up_to: 150
+        formula:
+          period: yearly
+          constant_cost: 78.51
+      - up_to: 1000
+        formula:
+          period: yearly
+          constant_cost: 530.78
+      - formula:
+          period: yearly
+          constant_cost: 4927.69
+    proportional_distribution_fee:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 20.533
+      - up_to: 150
+        formula:
+          constant_cost: 7.7903
+      - up_to: 1000
+        formula:
+          constant_cost: 4.7752
+      - formula:
+          constant_cost: 0.3783
+    public_service_obligation:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.3667
+      - up_to: 150
+        formula:
+          constant_cost: 0.3667
+      - up_to: 1000
+        formula:
+          constant_cost: 0.3667
+      - formula:
+          constant_cost: 0.0
+    pension_levy:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.3405
+      - up_to: 150
+        formula:
+          constant_cost: 0.3405
+      - up_to: 1000
+        formula:
+          constant_cost: 0.3405
+      - formula:
+          constant_cost: 0.0731
+    other_levies:
+      mode: banded
+      band_period: P1Y
+      bands:
+      - up_to: 5
+        formula:
+          constant_cost: 0.0467
+      - up_to: 150
+        formula:
+          constant_cost: 0.0467
+      - up_to: 1000
+        formula:
+          constant_cost: 0.0467
+      - formula:
+          constant_cost: 0.01
