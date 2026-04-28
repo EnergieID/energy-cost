@@ -11,7 +11,7 @@ from .index import Index
 
 _log = logging.getLogger(__name__)
 
-_DEFAULT_CACHE_DIR = Path(__file__).parents[3] / ".cache" / "entsoe"
+_DEFAULT_CACHE_DIR = Path.home() / ".cache" / "energy_cost" / "entsoe"
 
 _OLD_DATA_THRESHOLD = dt.timedelta(days=7)
 _REFRESH_INTERVAL = dt.timedelta(hours=1)
@@ -31,7 +31,7 @@ class CachedEntsoeDayAheadIndex(Index):
     resolution:
         Native resolution of the underlying index (default: 15 min).
     cache_dir:
-        Root directory for cache files.  Defaults to ``<repo_root>/.cache/entsoe``.
+        Root directory for cache files.  Defaults to ``~/.cache/energy_cost/entsoe``.
     old_threshold:
         How far in the past data must be before it is considered immutable
         (default: 7 days).

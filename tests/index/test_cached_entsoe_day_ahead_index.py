@@ -54,12 +54,6 @@ def _cache_path(tmp_path: Path) -> Path:
 # ── Construction ──────────────────────────────────────────────────────────────
 
 
-def test_default_cache_dir_is_inside_repo() -> None:
-    idx = CachedEntsoeDayAheadIndex(country_code="BE", api_key="k")
-    assert idx.cache_dir.name == "entsoe"
-    assert idx.cache_dir.parent.name == ".cache"
-
-
 def test_custom_cache_dir_is_respected(tmp_path: Path) -> None:
     idx = CachedEntsoeDayAheadIndex(country_code="BE", api_key="k", cache_dir=tmp_path / "my_cache")
     assert idx.cache_dir == tmp_path / "my_cache"
