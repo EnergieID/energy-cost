@@ -11,6 +11,7 @@ from energy_cost.resolution import (
     detect_resolution_and_range,
     is_divisor,
     parse_resolution,
+    resample_or_distribute,
     to_pandas_freq,
 )
 
@@ -188,3 +189,95 @@ def test_align_timestamps_to_tz_handles_mixed_utc_offsets():
     assert str(result["timestamp"].dt.tz) == str(tz)
     assert result["timestamp"].iloc[0] == pd.Timestamp("2024-03-31T01:45:00", tz=tz)
     assert result["timestamp"].iloc[1] == pd.Timestamp("2024-03-31T03:00:00", tz=tz)
+
+
+# ---------------------------------------------------------------------------
+# resample_or_distribute
+# ---------------------------------------------------------------------------
+
+
+def test_same_resolution_returns_values_unchanged() -> None:
+    """When source and output resolution are both monthly, values must pass through unchanged.
+
+    Previously this caused division by zero (→ infinity) because the equal case
+    entered the distribution branch instead of short-circuiting to the aggregate path.
+    """
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 4, 1, tzinfo=dt.UTC)
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=3, freq="MS", tz=dt.UTC),
+            "value": [10.0, 20.0, 30.0],
+        }
+    )
+
+    result = resample_or_distribute(df, isodate.parse_duration("P1M"), isodate.parse_duration("P1M"), start, end)
+
+    assert len(result) == 3
+    assert result["value"].tolist() == pytest.approx([10.0, 20.0, 30.0])
+    assert not result["value"].isin([float("inf"), float("-inf")]).any()
+
+
+def test_distribute_partial_window_divides_by_full_source_period() -> None:
+    """A single daily value distributed into 5-min slots for only 15 min of the day.
+    Even though only 3 slots fall inside the output window, the divisor must be
+    288 — so each slot receives 288 / 288 = 1, not 288 / 3 = 96.
+    """
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 1, 0, 15, tzinfo=dt.UTC)
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=1, freq="1D", tz=dt.UTC),
+            "value": [288.0],
+        }
+    )
+
+    result = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end)
+
+    assert len(result) == 3
+    assert result["value"].iloc[0] == pytest.approx(1.0)
+    assert result["value"].iloc[1] == pytest.approx(1.0)
+    assert result["value"].iloc[2] == pytest.approx(1.0)
+
+
+def test_distribute_full_window_matches_partial_window_per_slot_value() -> None:
+    """Distributing a daily value over the full day gives the same per-slot value
+    as distributing it over a partial window — both divide by 288."""
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
+    end_full = dt.datetime(2025, 1, 2, 0, 0, tzinfo=dt.UTC)
+    end_partial = dt.datetime(2025, 1, 1, 0, 15, tzinfo=dt.UTC)
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=1, freq="1D", tz=dt.UTC),
+            "value": [288.0],
+        }
+    )
+
+    full = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_full)
+    partial = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_partial)
+
+    assert full["value"].iloc[0] == pytest.approx(partial["value"].iloc[0])
+    assert len(full) == 288
+    assert len(partial) == 3
+
+
+def test_distribute_aligned_window_divides_by_slots_in_source_period() -> None:
+    """15-min source value distributed into 5-min slots: divides by 3 (slots per 15-min period)."""
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 1, 1, 0, tzinfo=dt.UTC)
+
+    df = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC),
+            "value": [30.0, 30.0, 30.0, 30.0],
+        }
+    )
+
+    result = resample_or_distribute(df, dt.timedelta(minutes=15), dt.timedelta(minutes=5), start, end)
+
+    assert len(result) == 12
+    assert result["value"].iloc[0] == pytest.approx(10.0)  # 30 / 3
+    assert result["value"].sum() == pytest.approx(120.0)

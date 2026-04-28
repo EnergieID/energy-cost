@@ -45,10 +45,17 @@ class VersionedCollection[V: Versioned](BaseModel):
     ) -> pd.DataFrame | None:
         segments = self.find_active_versions(start, end, timezone)
         frames = [
-            df[(df["timestamp"] >= seg_start) & (df["timestamp"] < seg_end)]
+            df
             for version, seg_start, seg_end in segments
             if (df := get_frame(version, seg_start, seg_end)) is not None and not df.empty
         ]
         if not frames:
             return None
-        return pd.concat(frames, ignore_index=True).sort_values("timestamp").reset_index(drop=True)
+        return (
+            pd.concat(frames, ignore_index=True)
+            .groupby("timestamp")
+            .sum(numeric_only=True)
+            .reset_index()
+            .sort_values("timestamp")
+            .reset_index(drop=True)
+        )

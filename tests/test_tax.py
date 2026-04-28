@@ -105,7 +105,7 @@ class TestTaxVersionApply:
         )
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         df.insert(0, "timestamp", timestamps)
-        result = v.apply(df)
+        result = v.apply(df, start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC))
         # Uses ("total","total","total") × 0.10
         assert result[("taxes", "total", "total")].tolist() == pytest.approx([10.0, 20.0])
 
@@ -127,7 +127,7 @@ class TestTaxVersionApply:
         )
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         df.insert(0, "timestamp", pd.date_range("2025-01-01", periods=1, freq="MS", tz="UTC"))
-        result = v.apply(df)
+        result = v.apply(df, start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC))
         # capacity: 50 * 0.21 = 10.5
         # remainder: (150 - 50) * 0.06 = 6.0
         assert result[("taxes", "total", "total")].iloc[0] == pytest.approx(16.5)
@@ -151,7 +151,7 @@ class TestTaxVersionApply:
         )
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         df.insert(0, "timestamp", pd.date_range("2025-01-01", periods=1, freq="MS", tz="UTC"))
-        result = v.apply(df)
+        result = v.apply(df, start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC))
         # injection: 30 * 0.0 = 0; remainder: (130 - 30) * 0.10 = 10
         assert result[("taxes", "total", "total")].iloc[0] == pytest.approx(10.0)
 
@@ -176,7 +176,7 @@ class TestTaxVersionApply:
         )
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         df.insert(0, "timestamp", pd.date_range("2025-01-01", periods=1, freq="MS", tz="UTC"))
-        result = v.apply(df)
+        result = v.apply(df, start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC))
         # capacity: 50 * 0.21 = 10.5
         # remainder: (190 - 50) * 0.06 = 8.4
         assert result[("taxes", "total", "total")].iloc[0] == pytest.approx(18.9)
@@ -200,7 +200,7 @@ class TestTaxVersionApply:
         )
         df.columns = pd.MultiIndex.from_tuples(df.columns)
         df.insert(0, "timestamp", pd.date_range("2025-01-01", periods=1, freq="MS", tz="UTC"))
-        result = v.apply(df)
+        result = v.apply(df, start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC))
         # excise: 20 * 0.21 = 4.2
         # remainder: (50 - 20) * 0.06 = 1.8
         assert result[("taxes", "total", "total")].iloc[0] == pytest.approx(6.0)
