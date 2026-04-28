@@ -29,13 +29,14 @@ Then, you can use the `Contract` class to calculate your costs based on your con
 
 ```python
 from energy_cost import Contract, Meter, Tariff
-from energy_cost.data.be import distributors, fees, tax_rate
+from energy_cost.data import CustomerType
+from energy_cost.data.be.flanders.electricity import data
 
 contract = Contract(
-    provider=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
-    distributor=distributors["fluvius_imewo"],
-    fees=[fees["flanders_residential"], fees["be_residential"]],
-    tax_rate=tax_rate,
+    supplier=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
+    distributor=data.distributors["fluvius_imewo"],
+    fees=data.fees[CustomerType.RESIDENTIAL],
+    taxes=data.taxes,
     timezone=ZoneInfo("Europe/Brussels"),
 )
 

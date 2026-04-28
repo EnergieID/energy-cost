@@ -26,7 +26,7 @@ class PowerDirection(StrEnum):
 
 
 class TariffCategory(StrEnum):
-    PROVIDER = "provider"
+    SUPPLIER = "supplier"
     DISTRIBUTOR = "distributor"
     FEES = "fees"
     TAXES = "taxes"
