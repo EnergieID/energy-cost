@@ -8,7 +8,7 @@
       bands:
       - up_to: 0.0025
         formula:
-          period: monthly
+          period: P1M
           constant_cost: 8.7077747
       - formula:
           constant_cost: 3483.1098917
@@ -25,7 +25,7 @@
         constant_cost: 16.649
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 14.28
 - start: '2025-01-01T00:00:00+01:00'
   capacity:
@@ -37,7 +37,7 @@
       bands:
       - up_to: 0.0025
         formula:
-          period: monthly
+          period: P1M
           constant_cost: 11.8609158
       - formula:
           constant_cost: 4744.366325
@@ -54,7 +54,7 @@
         constant_cost: 29.2026
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
   capacity:
@@ -66,7 +66,7 @@
       bands:
       - up_to: 0.0025
         formula:
-          period: monthly
+          period: P1M
           constant_cost: 11.8957443
       - formula:
           constant_cost: 4758.2977167
@@ -83,5 +83,5 @@
         constant_cost: 26.631
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 17.85

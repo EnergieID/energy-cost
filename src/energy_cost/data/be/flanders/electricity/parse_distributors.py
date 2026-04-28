@@ -162,7 +162,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
                     {
                         "up_to": MIN_CAPACITY_MW,
                         "formula": {
-                            "period": "monthly",
+                            "period": "P1M",
                             "constant_cost": tariffs["min_band_cost"],
                         },
                     },
@@ -186,7 +186,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
         },
         "periodic": {
             "data_management": {
-                "period": "yearly",
+                "period": "P1Y",
                 "constant_cost": tariffs["databeheer"],
             }
         },

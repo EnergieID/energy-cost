@@ -1,7 +1,7 @@
 - start: '2024-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 13.16
   consumption:
     fixed_distribution_fee:
@@ -10,18 +10,18 @@
       bands:
       - up_to: 5
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 7.31
       - up_to: 150
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 83.71
       - up_to: 1000
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 839.67
       - formula:
-          period: yearly
+          period: P1Y
           constant_cost: 5433.89
     proportional_distribution_fee:
       mode: banded
@@ -86,7 +86,7 @@
 - start: '2025-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 17.51
   consumption:
     fixed_distribution_fee:
@@ -95,18 +95,18 @@
       bands:
       - up_to: 5
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 16.18
       - up_to: 150
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 85.91
       - up_to: 1000
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 580.76
       - formula:
-          period: yearly
+          period: P1Y
           constant_cost: 5391.74
     proportional_distribution_fee:
       mode: banded
@@ -171,7 +171,7 @@
 - start: '2026-01-01T00:00:00+01:00'
   periodic:
     data_management:
-      period: yearly
+      period: P1Y
       constant_cost: 17.85
   consumption:
     fixed_distribution_fee:
@@ -180,18 +180,18 @@
       bands:
       - up_to: 5
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 17.95
       - up_to: 150
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 95.3
       - up_to: 1000
         formula:
-          period: yearly
+          period: P1Y
           constant_cost: 644.3
       - formula:
-          period: yearly
+          period: P1Y
           constant_cost: 5981.55
     proportional_distribution_fee:
       mode: banded

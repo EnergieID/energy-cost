@@ -18,17 +18,19 @@ def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
 
 
 def align_timestamps_to_tz(data: pd.DataFrame, tz: dt.tzinfo) -> pd.DataFrame:
-    """Return a copy of *data* with the ``"timestamp"`` column converted/localized to *tz*."""
-    data = data.copy()
+    """Return *data* with the ``"timestamp"`` column converted/localized to *tz*."""
     col = data["timestamp"]
     # Coerce object columns (mixed-offset tz-aware datetimes) to a uniform datetime64
     if col.dtype == object:
         col = pd.to_datetime(col, utc=True)
     if col.dt.tz is not None:
-        data["timestamp"] = col.dt.tz_convert(tz)
+        # Use str() comparison: pytz.UTC and datetime.timezone.utc both stringify to "UTC"
+        if str(col.dt.tz) == str(tz):
+            return data
+        new_col = col.dt.tz_convert(tz)
     else:
-        data["timestamp"] = col.dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
-    return data
+        new_col = col.dt.tz_localize(tz, ambiguous=False, nonexistent="shift_forward")
+    return data.assign(timestamp=new_col)
 
 
 def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedelta | isodate.Duration:
@@ -101,36 +103,20 @@ def is_divisor(root: Resolution, divisor: Resolution) -> bool:
 
 
 def detect_resolution(timestamps: pd.Series) -> Resolution:
-    """
-    Infer the resolution from a sorted timestamp series.
-
-    Strategy
-    --------
-    1. Check for yearly alignment: all timestamps on Jan 1, gaps are multiples of 1 year
-    2. Check for monthly alignment: all timestamps on the 1st, gaps are multiples of 1 month
-    3. Fall back to timedelta mode (works correctly for fixed-period data like 15min)
-    """
+    """Infer the resolution from the first two timestamps."""
     if len(timestamps) < 2:
         raise ValueError("Cannot detect resolution from fewer than 2 timestamps.")
 
-    all_month_starts = (timestamps.dt.day == 1).all() and (timestamps.dt.hour == 0).all()
+    t0, t1 = timestamps.iloc[0], timestamps.iloc[1]
 
-    if all_month_starts:
-        all_year_starts = (timestamps.dt.month == 1).all()
+    if t0.day == 1 and t1.day == 1:
+        month_gap = (t1.year - t0.year) * 12 + (t1.month - t0.month)
+        if month_gap > 0:
+            if month_gap % 12 == 0:
+                return isodate.Duration(years=month_gap // 12)
+            return isodate.Duration(months=month_gap)
 
-        if all_year_starts:
-            year_gaps = timestamps.dt.year.diff().dropna()
-            if (year_gaps > 0).all() and (year_gaps == year_gaps.iloc[0]).all():
-                return isodate.Duration(years=int(year_gaps.iloc[0]))
-
-        month_numbers = timestamps.dt.year * 12 + timestamps.dt.month
-        month_gaps = month_numbers.diff().dropna()
-        if (month_gaps > 0).all() and (month_gaps == month_gaps.iloc[0]).all():
-            return isodate.Duration(months=int(month_gaps.iloc[0]))
-
-    deltas = timestamps.diff().dropna()
-    mode_delta = deltas.mode()[0]
-    return pd.to_timedelta(mode_delta)
+    return pd.to_timedelta(t1 - t0)
 
 
 def snap_billing_period(

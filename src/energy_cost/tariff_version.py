@@ -11,7 +11,7 @@ from energy_cost.versioning import Versioned
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
 from .meter import MeterType, PowerDirection
-from .resolution import Resolution, resample_or_distribute
+from .resolution import Resolution, resample_or_distribute, to_pandas_freq
 
 _METER_KEYS = {e.value for e in MeterType}
 
@@ -72,16 +72,18 @@ class TariffVersion(Versioned):
         get_df: Callable[[Formula], pd.DataFrame],
     ) -> pd.DataFrame | None:
         resolved = self._resolve_energy_formulas(meter_type, direction)
-        result: pd.DataFrame | None = None
+        series: dict[str, pd.Series] = {}
         for cost_type, formula in resolved.items():
             df = get_df(formula)
-            if df.empty:
-                continue
-            df = df.rename(columns={"value": cost_type})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+            if not df.empty:
+                series[cost_type] = df.set_index("timestamp")["value"]
 
-        if result is None:
+        if not series:
             return None
+
+        result = pd.DataFrame(series)
+        result.index.name = "timestamp"
+        result = result.reset_index()
 
         cost_columns = [col for col in result.columns if col not in ("timestamp", "total")]
         if cost_columns:
@@ -123,7 +125,7 @@ class TariffVersion(Versioned):
         result = self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution),
+            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution, start=start, end=end),
         )
 
         if output_resolution is not None and result is not None:
@@ -150,5 +152,25 @@ class TariffVersion(Versioned):
             result = resample_or_distribute(result, self.capacity.billing_period, output_resolution, start, end)
         return result
 
-    def get_periodic_cost(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo = UTC) -> dict[str, float]:
-        return {name: entry.get_cost_for_interval(start, end, timezone) for name, entry in self.periodic.items()}
+    def apply_periodic_costs(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
+    ) -> pd.DataFrame | None:
+        """Apply periodic cost formulas in [start, end), returning a DataFrame with a column per named cost."""
+        if not self.periodic:
+            return None
+
+        output_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
+        if output_ts.empty:
+            return None
+        sentinel = pd.DataFrame({"timestamp": output_ts})
+
+        result: pd.DataFrame | None = None
+        for name, formula in self.periodic.items():
+            df = formula.apply(sentinel, resolution=output_resolution, timezone=timezone, start=start, end=end)
+            df = df.rename(columns={"value": name})
+            result = df if result is None else result.merge(df, on="timestamp", how="outer")
+        return result

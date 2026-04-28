@@ -330,19 +330,22 @@ def test_periodic_costs_are_prorated_correctly(tmp_path: Path) -> None:
                 constant_cost: 1.0
           periodic:
             admin:
-              period: daily
+              period: P1D
               constant_cost: 24.0
             billing:
-              period: daily
+              period: P1D
               constant_cost: 12.0
         """,
     )
 
     tariff = Tariff.from_yaml(path)
-    costs = tariff.get_periodic_cost(
+    result = tariff.apply_periodic_costs(
         start=dt.datetime.fromisoformat("2026-03-08T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2026-03-08T01:00:00+01:00"),
+        output_resolution=dt.timedelta(hours=1),
     )
 
     # 1 hour = 1/24 of a day; admin: 24 * (1/24) = 1.0; billing: 12 * (1/24) = 0.5
-    assert costs == pytest.approx({"admin": 1.0, "billing": 0.5})
+    assert result is not None
+    assert result["admin"].sum() == pytest.approx(1.0)
+    assert result["billing"].sum() == pytest.approx(0.5)

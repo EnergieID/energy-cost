@@ -2,8 +2,8 @@
 - start: 2025-01-01T00:00:00+01:00
   periodic:
     connection_fee:
-      period: daily
+      period: P1D
       constant_cost: 1.5
     service_fee:
-      period: monthly
+      period: P1M
       constant_cost: 31.0

@@ -16,7 +16,6 @@ from energy_cost.formula import (
     TieringMode,
 )
 from energy_cost.formula.scheduled import DayOfWeek, WhenClause
-from energy_cost.fractional_periods import Period
 
 
 def test_tier_band_coerces_nested_formula_dict() -> None:
@@ -66,8 +65,8 @@ def test_tiered_formula_apply_supports_fixed_periodic_band() -> None:
     formula = TieredFormula(
         mode=TieringMode.BANDED,
         bands=[
-            TierBand(up_to=10.0, formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=100.0)),
-            TierBand(formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=180.0)),
+            TierBand(up_to=10.0, formula=PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=100.0)),
+            TierBand(formula=PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=180.0)),
         ],
     )
     data = pd.DataFrame(

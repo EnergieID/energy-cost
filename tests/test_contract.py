@@ -3,13 +3,13 @@ from __future__ import annotations
 import datetime as dt
 from zoneinfo import ZoneInfo
 
+import isodate
 import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
 from energy_cost.data.models import CustomerType
 from energy_cost.formula import IndexFormula, PeriodicFormula
-from energy_cost.fractional_periods import Period
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
@@ -34,7 +34,9 @@ def _tariff(
         {"all": {"energy": IndexFormula(constant_cost=injection_rate)}} if injection_rate is not None else {}
     )
     periodic: dict = (
-        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+        {"fixed": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=daily_fixed)}
+        if daily_fixed is not None
+        else {}
     )
     return Tariff(
         versions=[
@@ -386,7 +388,9 @@ def _tz_contract(
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET)
     consumption: dict = {"all": {"energy": IndexFormula(constant_cost=energy_rate)}}
     periodic: dict = (
-        {"fixed": PeriodicFormula(period=Period.DAILY, constant_cost=daily_fixed)} if daily_fixed is not None else {}
+        {"fixed": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=daily_fixed)}
+        if daily_fixed is not None
+        else {}
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
     tariff = Tariff(versions=[version])
@@ -678,7 +682,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     result = contract.calculate_cost(meters)
     expected = {
         TariffCategory.SUPPLIER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
-        TariffCategory.DISTRIBUTOR: 43.14186387067,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
+        TariffCategory.DISTRIBUTOR: 43.162240583,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
         TariffCategory.FEES: 0.475554,  # consumption * (excise + energy_contribution) => 0.475554 €
     }
     expected[TariffCategory.TAXES] = (sum(expected.values())) * 0.06
@@ -804,3 +808,213 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 
     assert result is not None
     assert len(result) == 1  # one monthly billing row
+
+
+# ---------------------------------------------------------------------------
+# Contract.calculate_cost — monthly output for partial-month 15-min data
+# ---------------------------------------------------------------------------
+
+
+def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -> None:
+    """Regression: tax must not be null when 15-minute input data covers only part of a
+    month (e.g. March 15-17) but the output resolution is monthly.
+
+    The tariff aggregates the data into a single monthly row with timestamp
+    2024-03-01.  That row is then passed to Tax.apply with start=2024-03-15 and
+    end=2024-03-17.  The old exact-match filter (timestamp >= start) incorrectly
+    excluded the row because 2024-03-01 < 2024-03-15, yielding a null tax.
+    The fix extends the filter to an overlap check: the row's period [2024-03-01,
+    2024-04-01) clearly overlaps with [2024-03-15, 2024-03-17).
+    """
+    from isodate import Duration
+
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
+        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        timezone=dt.UTC,
+    )
+
+    start = dt.datetime(2024, 3, 15, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 3, 17, tzinfo=dt.UTC)
+    # 2 full days × 4 intervals/h × 24 h = 192 fifteen-minute intervals
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.calculate_cost(
+        [Meter(data=consumption)],
+        start=start,
+        end=end,
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 1
+    # Monthly output row is timestamped at the start of March
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-03-01", tz=dt.UTC)
+    # Tax must not be null
+    tax = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
+    assert pd.notna(tax)
+    # supplier: 192 intervals × 1.0 MWh × 100 €/MWh = 19 200 €; tax = 10 % = 1 920 €
+    assert tax == pytest.approx(1920.0)
+
+
+def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_output() -> None:
+    """15-minute data spanning a month boundary (e.g. March 25 – April 9) with monthly
+    output should produce two rows (one per month) each with a non-null tax."""
+    from isodate import Duration
+
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
+        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        timezone=dt.UTC,
+    )
+
+    start = dt.datetime(2024, 3, 25, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 4, 9, tzinfo=dt.UTC)
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.calculate_cost(
+        [Meter(data=consumption)],
+        start=start,
+        end=end,
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 2
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-03-01", tz=dt.UTC)
+    assert result["timestamp"].iloc[1] == pd.Timestamp("2024-04-01", tz=dt.UTC)
+
+    # All tax values must be non-null and positive
+    taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")]
+    assert taxes.notna().all()
+    assert (taxes > 0).all()
+
+    # March slice: March 25 00:00 – April 1 00:00 = 7 days = 672 intervals
+    march_supplier = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[0]
+    assert march_supplier == pytest.approx(672 * 1.0 * 100.0)
+    assert taxes.iloc[0] == pytest.approx(march_supplier * 0.10)
+
+    # April slice: April 1 00:00 – April 9 00:00 = 8 days = 768 intervals
+    april_supplier = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[1]
+    assert april_supplier == pytest.approx(768 * 1.0 * 100.0)
+    assert taxes.iloc[1] == pytest.approx(april_supplier * 0.10)
+
+    # Grand total tax = 10 % of total supplier cost
+    total = result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")]
+    expected_tax = (march_supplier + april_supplier) * 0.10
+    assert taxes.sum() == pytest.approx(expected_tax)
+    assert total.sum() == pytest.approx((march_supplier + april_supplier) * 1.10)
+
+
+def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> None:
+    """When input data covers complete calendar months exactly, each month gets the
+    correct tax (no off-by-one at period boundaries)."""
+    from isodate import Duration
+
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
+        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        timezone=dt.UTC,
+    )
+
+    start = dt.datetime(2024, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 4, 1, tzinfo=dt.UTC)  # three complete months
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.calculate_cost(
+        [Meter(data=consumption)],
+        start=start,
+        end=end,
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 3
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-01-01", tz=dt.UTC)
+    assert result["timestamp"].iloc[1] == pd.Timestamp("2024-02-01", tz=dt.UTC)
+    assert result["timestamp"].iloc[2] == pd.Timestamp("2024-03-01", tz=dt.UTC)
+
+    taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")]
+    assert taxes.notna().all()
+
+    # Jan=31d, Feb=29d (2024 is a leap year), Mar=31d
+    days = [31, 29, 31]
+    for i, d in enumerate(days):
+        intervals = d * 24 * 4
+        expected_supplier = intervals * 100.0
+        expected_tax = expected_supplier * 0.10
+        assert taxes.iloc[i] == pytest.approx(expected_tax)
+
+
+def test_contract_taxes_correct_for_single_complete_month() -> None:
+    """A billing window aligned exactly to a complete month produces a single row
+    with the correct tax and no nulls."""
+    from isodate import Duration
+
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
+        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.21)]),
+        timezone=dt.UTC,
+    )
+
+    start = dt.datetime(2024, 2, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 3, 1, tzinfo=dt.UTC)
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    consumption = _consumption(timestamps, value=2.0)
+
+    result = contract.calculate_cost(
+        [Meter(data=consumption)],
+        start=start,
+        end=end,
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 1
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-02-01", tz=dt.UTC)
+
+    # Feb 2024 = 29 days (leap year)
+    intervals = 29 * 24 * 4
+    expected_supplier = intervals * 2.0 * 100.0
+    tax = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
+    assert pd.notna(tax)
+    assert tax == pytest.approx(expected_supplier * 0.21)
+
+
+def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
+    """A billing window that does not overlap the output period should produce no tax rows.
+    This ensures the overlap filter does not over-include periods."""
+    from isodate import Duration
+
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
+        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        timezone=dt.UTC,
+    )
+
+    # Data in January only
+    start = dt.datetime(2024, 1, 10, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 1, 20, tzinfo=dt.UTC)
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.calculate_cost(
+        [Meter(data=consumption)],
+        start=start,
+        end=end,
+        resolution=Duration(months=1),
+    )
+
+    assert result is not None
+    assert len(result) == 1
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-01-01", tz=dt.UTC)
+
+    taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")]
+    assert taxes.notna().all()
+    assert (taxes > 0).all()
+
+    # Only the January bucket covers [Jan 10, Jan 20) — no February bucket exists
+    assert not any(result["timestamp"] == pd.Timestamp("2024-02-01", tz=dt.UTC))

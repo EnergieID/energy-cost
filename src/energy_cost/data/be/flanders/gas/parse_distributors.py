@@ -140,7 +140,7 @@ def extract_tariffs(ws) -> dict:
 
 def _banded_mwh(values: list[float], yearly: bool = False) -> dict:
     """Build a banded consumption formula dict from a 4-element list [T1, T2, T3, T4]."""
-    formula = (lambda v: {"period": "yearly", "constant_cost": v}) if yearly else (lambda v: {"constant_cost": v})
+    formula = (lambda v: {"period": "P1Y", "constant_cost": v}) if yearly else (lambda v: {"constant_cost": v})
     return {
         "mode": "banded",
         "band_period": "P1Y",
@@ -159,7 +159,7 @@ def build_entry(year: int, tariffs: dict) -> dict:
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "periodic": {
             "data_management": {
-                "period": "yearly",
+                "period": "P1Y",
                 "constant_cost": tariffs["databeheer"],
             }
         },

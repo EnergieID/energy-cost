@@ -53,15 +53,19 @@ class Formula(ABC, BaseModel):
         data: pd.DataFrame,
         resolution: Resolution | None = None,
         timezone: dt.tzinfo = UTC,
+        *,
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Apply formula values to a dataframe of quantities and return a single value column."""
         if data.empty:
             return data.copy()
         data = align_timestamps_to_tz(data, timezone)
-        start, end, resolution = detect_resolution_and_range(data, resolution)
+        if start is None or end is None or resolution is None:
+            start, end, resolution = detect_resolution_and_range(data, resolution)
         formula_values = self.get_values(start, end, resolution, timezone)
 
         result = data.reset_index(drop=True)
-        merged = result.merge(formula_values, on="timestamp", how="left", suffixes=("", "_formula"))
-        result["value"] = merged["value_formula"].mul(merged["value"])
+        formula_series = formula_values.set_index("timestamp")["value"].reindex(result["timestamp"])
+        result["value"] = formula_series.values * result["value"].values
         return result

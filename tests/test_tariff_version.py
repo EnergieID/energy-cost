@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import datetime as dt
 
+import isodate
 import pandas as pd
 import pytest
 
 from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas
-from energy_cost.fractional_periods import Period
 from energy_cost.resolution import Resolution
 from energy_cost.tariff_version import (
     MeterType,
@@ -99,21 +99,24 @@ def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
     assert out["total"].tolist() == [15.0, 15.0, 15.0, 15.0]
 
 
-def test_get_periodic_cost_returns_prorated_cost_for_each_periodic_entry() -> None:
+def test_apply_periodic_costs_returns_prorated_cost_for_each_periodic_entry() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         periodic={
-            "admin": PeriodicFormula(period=Period.DAILY, constant_cost=24.0),
-            "billing": PeriodicFormula(period=Period.DAILY, constant_cost=12.0),
+            "admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0),
+            "billing": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=12.0),
         },
     )
 
-    costs = segment.get_periodic_cost(
+    result = segment.apply_periodic_costs(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        end=dt.datetime(2025, 1, 1, 1, 0),
+        end=dt.datetime(2025, 1, 2, 0, 0),
+        output_resolution=dt.timedelta(hours=1),
     )
 
-    assert costs == pytest.approx({"admin": 1.0, "billing": 0.5})
+    assert result is not None
+    assert result["admin"].sum() == pytest.approx(24.0)
+    assert result["billing"].sum() == pytest.approx(12.0)
 
 
 def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_total() -> None:
@@ -254,3 +257,19 @@ def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured(
         )
         is None
     )
+
+
+def test_apply_periodic_costs_returns_none_when_output_range_is_empty() -> None:
+    """When end < start the output timestamp grid is empty and the result is None."""
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
+    )
+
+    result = segment.apply_periodic_costs(
+        start=dt.datetime(2025, 1, 2, 0, 0),
+        end=dt.datetime(2025, 1, 1, 0, 0),  # end before start → empty grid
+        output_resolution=dt.timedelta(hours=1),
+    )
+
+    assert result is None

@@ -18,7 +18,6 @@ from energy_cost.formula import (
     TieringMode,
     WhenClause,
 )
-from energy_cost.fractional_periods import Period
 from energy_cost.tariff import Tariff
 from energy_cost.tariff_version import TariffVersion
 
@@ -49,8 +48,10 @@ def test_capacity_component_applies_banded_tiered_formula() -> None:
         formula=TieredFormula(
             mode=TieringMode.BANDED,
             bands=[
-                TierBand(up_to=10.0, formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=100.0)),
-                TierBand(formula=PeriodicFormula(period=Period.MONTHLY, constant_cost=180.0)),
+                TierBand(
+                    up_to=10.0, formula=PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=100.0)
+                ),
+                TierBand(formula=PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=180.0)),
             ],
         ),
     )
