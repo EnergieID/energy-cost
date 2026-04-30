@@ -3,16 +3,19 @@ from datetime import UTC
 
 import pandas as pd
 from isodate import Duration
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from .meter import CostGroup, Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
+from .versioning import Versioned
 
 
-class Contract(BaseModel):
+class Contract(Versioned):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    start: dt.datetime = dt.datetime(1970, 1, 1, tzinfo=UTC)
 
     supplier: Tariff | list[Tariff] | None = None
     distributor: Tariff | list[Tariff] | None = None
@@ -22,7 +25,7 @@ class Contract(BaseModel):
     """All datetime operations use this timezone. Naive datetimes are treated as being
     in this timezone; tz-aware datetimes are converted to it."""
 
-    def calculate_cost(
+    def apply(
         self,
         meters: list[Meter],
         start: dt.datetime | None = None,

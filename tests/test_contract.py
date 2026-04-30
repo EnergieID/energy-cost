@@ -268,7 +268,7 @@ def test_contract_combines_supplier_and_distributor() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     assert (TariffCategory.SUPPLIER, CostGroup.CONSUMPTION, "energy") in result.columns
     assert (TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, "energy") in result.columns
@@ -286,7 +286,7 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
     # 2 intervals × 1 MWh each
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     supplier_total = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[0]
     distributor_total = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
@@ -315,7 +315,7 @@ def test_contract_list_of_taxes() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     # supplier: 2 × 100 = 200; taxes = 200*(0.10 + 0.05) = 30
     taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
@@ -329,7 +329,7 @@ def test_contract_no_fees_omits_fees_columns() -> None:
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
+    result = contract.apply([Meter(data=_consumption(timestamps))])
 
     assert not any(isinstance(c, tuple) and c[0] == TariffCategory.FEES for c in result.columns)
 
@@ -342,7 +342,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
         taxes=Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
+    result = contract.apply([Meter(data=_consumption(timestamps))])
 
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
@@ -358,7 +358,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     p = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[0]
     d = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
@@ -373,7 +373,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — timezone-aware start / end
+# Contract.apply — timezone-aware start / end
 # ---------------------------------------------------------------------------
 
 _CET = dt.timezone(dt.timedelta(hours=1))
@@ -403,7 +403,7 @@ def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
     timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     assert result["timestamp"].dt.tz is not None
     # Midnight CET must appear as 2025-01-01 00:00 +01:00, not 2024-12-31 23:00 UTC
@@ -420,7 +420,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
     end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
 
-    result = contract.calculate_cost([Meter(data=consumption)], start=start, end=end)
+    result = contract.apply([Meter(data=consumption)], start=start, end=end)
 
     assert result is not None
     # 8 intervals × 2 MWh × 5 €/MWh = 80 €
@@ -429,7 +429,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tariff.apply / Contract.calculate_cost — TOU meters & multiple meters
+# Tariff.apply / Contract.apply — TOU meters & multiple meters
 # ---------------------------------------------------------------------------
 
 
@@ -496,7 +496,7 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
 
 
 def test_contract_with_tou_meter_routes_cost_correctly() -> None:
-    """contract.calculate_cost routes a TOU_PEAK meter through the correct formula."""
+    """contract.apply routes a TOU_PEAK meter through the correct formula."""
     tou_tariff = Tariff(
         versions=[
             TariffVersion(
@@ -511,7 +511,7 @@ def test_contract_with_tou_meter_routes_cost_correctly() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     data = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=data, type=MeterType.TOU_PEAK)])
+    result = contract.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
 
     assert result is not None
     # supplier + distributor each: 4 × 1 × 50 = 200 €
@@ -550,7 +550,7 @@ def test_contract_with_injection_and_tou_meters() -> None:
     cons_data = _consumption(timestamps, value=2.0)
     inj_data = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [
             Meter(data=cons_data, type=MeterType.TOU_OFFPEAK),
             Meter(data=inj_data, direction=PowerDirection.INJECTION),
@@ -679,7 +679,7 @@ def test_avoid_regression_on_real_world_data() -> None:
             ),
         )
     ]
-    result = contract.calculate_cost(meters)
+    result = contract.apply(meters)
     expected = {
         TariffCategory.SUPPLIER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
         TariffCategory.DISTRIBUTOR: 43.162240583,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
@@ -725,7 +725,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     # fees: (2 × 100) + (2 × 50) = 300
     assert result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(300.0)
@@ -737,7 +737,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
 
 
 def test_contract_collapses_meter_types_by_default() -> None:
-    """contract.calculate_cost collapses MeterType by default (3-level output)."""
+    """contract.apply collapses MeterType by default (3-level output)."""
     tou_tariff = Tariff(
         versions=[
             TariffVersion(
@@ -751,7 +751,7 @@ def test_contract_collapses_meter_types_by_default() -> None:
     )
     contract = Contract(supplier=tou_tariff)
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
-    result = contract.calculate_cost(
+    result = contract.apply(
         [
             Meter(data=_consumption(timestamps, value=1.0), type=MeterType.SINGLE_RATE),
             Meter(data=_consumption(timestamps, value=1.0), type=MeterType.TOU_PEAK),
@@ -766,7 +766,7 @@ def test_contract_collapses_meter_types_by_default() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — mixed-offset timestamps (DST boundary)
+# Contract.apply — mixed-offset timestamps (DST boundary)
 # ---------------------------------------------------------------------------
 
 
@@ -799,7 +799,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
         ),
     )
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         meters=[meter],
         start=dt.datetime.fromisoformat("2024-03-31T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2024-03-31T04:00:00+02:00"),
@@ -811,7 +811,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — monthly output for partial-month 15-min data
+# Contract.apply — monthly output for partial-month 15-min data
 # ---------------------------------------------------------------------------
 
 
@@ -840,7 +840,7 @@ def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -874,7 +874,7 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -924,7 +924,7 @@ def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> Non
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -965,7 +965,7 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -1001,7 +1001,7 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,

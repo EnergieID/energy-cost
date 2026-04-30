@@ -79,7 +79,7 @@ def test_contract_produces_valid_dataframe(
         timezone=CET,
     )
 
-    result = contract.calculate_cost(meters=[meter])
+    result = contract.apply(meters=[meter])
 
-    assert isinstance(result, pd.DataFrame), "calculate_cost must return a DataFrame"
+    assert isinstance(result, pd.DataFrame), "apply must return a DataFrame"
     assert not result.empty, "result DataFrame must not be empty"

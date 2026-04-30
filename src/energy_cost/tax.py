@@ -1,10 +1,8 @@
 import datetime as dt
 from datetime import UTC
-from pathlib import Path
 from typing import Literal
 
 import pandas as pd
-import yaml
 from pydantic import BaseModel, Field
 
 from energy_cost.versioning import Versioned, VersionedCollection
@@ -104,13 +102,6 @@ def _total_pattern(pattern: ColumnPattern) -> ColumnPattern:
 
 
 class Tax(VersionedCollection[TaxVersion]):
-    @classmethod
-    def from_yaml(cls, path: str | Path) -> "Tax":
-        """Load a tax definition from YAML."""
-        with Path(path).open(encoding="utf-8") as file:
-            raw_data = yaml.safe_load(file)
-        return cls.model_validate({"versions": raw_data})
-
     def apply(
         self,
         data: pd.DataFrame,
