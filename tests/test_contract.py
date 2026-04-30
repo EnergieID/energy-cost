@@ -7,8 +7,8 @@ import isodate
 import pandas as pd
 import pytest
 
-from energy_cost.contract import Contract
-from energy_cost.data.models import CustomerType
+from energy_cost.contract import Contract, ContractHistory
+from energy_cost.data import ConnectionType, CustomerType, RegionalData
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
@@ -268,7 +268,7 @@ def test_contract_combines_supplier_and_distributor() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     assert (TariffCategory.SUPPLIER, CostGroup.CONSUMPTION, "energy") in result.columns
     assert (TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, "energy") in result.columns
@@ -286,7 +286,7 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
     # 2 intervals × 1 MWh each
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     supplier_total = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[0]
     distributor_total = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
@@ -315,7 +315,7 @@ def test_contract_list_of_taxes() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     # supplier: 2 × 100 = 200; taxes = 200*(0.10 + 0.05) = 30
     taxes = result[(TariffCategory.TAXES, CostGroup.TOTAL, "total")].iloc[0]
@@ -329,7 +329,7 @@ def test_contract_no_fees_omits_fees_columns() -> None:
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
+    result = contract.apply([Meter(data=_consumption(timestamps))])
 
     assert not any(isinstance(c, tuple) and c[0] == TariffCategory.FEES for c in result.columns)
 
@@ -342,7 +342,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
         taxes=Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
-    result = contract.calculate_cost([Meter(data=_consumption(timestamps))])
+    result = contract.apply([Meter(data=_consumption(timestamps))])
 
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
@@ -358,7 +358,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     p = result[(TariffCategory.SUPPLIER, CostGroup.TOTAL, "total")].iloc[0]
     d = result[(TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")].iloc[0]
@@ -373,7 +373,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — timezone-aware start / end
+# Contract.apply — timezone-aware start / end
 # ---------------------------------------------------------------------------
 
 _CET = dt.timezone(dt.timedelta(hours=1))
@@ -403,7 +403,7 @@ def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
     timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     assert result["timestamp"].dt.tz is not None
     # Midnight CET must appear as 2025-01-01 00:00 +01:00, not 2024-12-31 23:00 UTC
@@ -420,7 +420,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
     end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
 
-    result = contract.calculate_cost([Meter(data=consumption)], start=start, end=end)
+    result = contract.apply([Meter(data=consumption)], start=start, end=end)
 
     assert result is not None
     # 8 intervals × 2 MWh × 5 €/MWh = 80 €
@@ -429,7 +429,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tariff.apply / Contract.calculate_cost — TOU meters & multiple meters
+# Tariff.apply / Contract.apply — TOU meters & multiple meters
 # ---------------------------------------------------------------------------
 
 
@@ -496,7 +496,7 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
 
 
 def test_contract_with_tou_meter_routes_cost_correctly() -> None:
-    """contract.calculate_cost routes a TOU_PEAK meter through the correct formula."""
+    """contract.apply routes a TOU_PEAK meter through the correct formula."""
     tou_tariff = Tariff(
         versions=[
             TariffVersion(
@@ -511,7 +511,7 @@ def test_contract_with_tou_meter_routes_cost_correctly() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     data = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=data, type=MeterType.TOU_PEAK)])
+    result = contract.apply([Meter(data=data, type=MeterType.TOU_PEAK)])
 
     assert result is not None
     # supplier + distributor each: 4 × 1 × 50 = 200 €
@@ -550,7 +550,7 @@ def test_contract_with_injection_and_tou_meters() -> None:
     cons_data = _consumption(timestamps, value=2.0)
     inj_data = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [
             Meter(data=cons_data, type=MeterType.TOU_OFFPEAK),
             Meter(data=inj_data, direction=PowerDirection.INJECTION),
@@ -632,7 +632,7 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
 def test_avoid_regression_on_real_world_data() -> None:
     import yaml
 
-    from energy_cost.data.be.flanders.electricity import data
+    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
     from energy_cost.index import DataFrameIndex, Index
 
     Index.register(
@@ -679,7 +679,7 @@ def test_avoid_regression_on_real_world_data() -> None:
             ),
         )
     ]
-    result = contract.calculate_cost(meters)
+    result = contract.apply(meters)
     expected = {
         TariffCategory.SUPPLIER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
         TariffCategory.DISTRIBUTOR: 43.162240583,  # (capacity 0.01 * 4116.9713583) + (consumption * 50.5027) + (data_management/12) => 41.1697 + 0.01 * 50.5027 + 17.85/12 = 43.162227 €
@@ -725,7 +725,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost([Meter(data=consumption)])
+    result = contract.apply([Meter(data=consumption)])
 
     # fees: (2 × 100) + (2 × 50) = 300
     assert result[(TariffCategory.FEES, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(300.0)
@@ -737,7 +737,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
 
 
 def test_contract_collapses_meter_types_by_default() -> None:
-    """contract.calculate_cost collapses MeterType by default (3-level output)."""
+    """contract.apply collapses MeterType by default (3-level output)."""
     tou_tariff = Tariff(
         versions=[
             TariffVersion(
@@ -751,7 +751,7 @@ def test_contract_collapses_meter_types_by_default() -> None:
     )
     contract = Contract(supplier=tou_tariff)
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
-    result = contract.calculate_cost(
+    result = contract.apply(
         [
             Meter(data=_consumption(timestamps, value=1.0), type=MeterType.SINGLE_RATE),
             Meter(data=_consumption(timestamps, value=1.0), type=MeterType.TOU_PEAK),
@@ -766,24 +766,23 @@ def test_contract_collapses_meter_types_by_default() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — mixed-offset timestamps (DST boundary)
+# Contract.apply — mixed-offset timestamps (DST boundary)
 # ---------------------------------------------------------------------------
 
 
 def test_calculate_cost_with_mixed_offset_meter_data() -> None:
     """A billing period crossing the DST boundary where meter readings carry different
     UTC offsets (+01:00 before, +02:00 after spring-forward) must not raise."""
-    from zoneinfo import ZoneInfo
 
     from isodate import Duration
 
-    from energy_cost.data.be.flanders.electricity import data
+    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
 
     contract = Contract(
         distributor=data.distributors["fluvius_antwerpen"],
         fees=data.fees[CustomerType.RESIDENTIAL],
         taxes=data.taxes,
-        timezone=ZoneInfo("Europe/Brussels"),
+        timezone=data.timezone,
     )
     meter = Meter(
         direction=PowerDirection.CONSUMPTION,
@@ -799,7 +798,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
         ),
     )
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         meters=[meter],
         start=dt.datetime.fromisoformat("2024-03-31T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2024-03-31T04:00:00+02:00"),
@@ -811,7 +810,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Contract.calculate_cost — monthly output for partial-month 15-min data
+# Contract.apply — monthly output for partial-month 15-min data
 # ---------------------------------------------------------------------------
 
 
@@ -840,7 +839,7 @@ def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -874,7 +873,7 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -924,7 +923,7 @@ def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> Non
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -965,7 +964,7 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -1001,7 +1000,7 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.calculate_cost(
+    result = contract.apply(
         [Meter(data=consumption)],
         start=start,
         end=end,
@@ -1018,3 +1017,278 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
 
     # Only the January bucket covers [Jan 10, Jan 20) — no February bucket exists
     assert not any(result["timestamp"] == pd.Timestamp("2024-02-01", tz=dt.UTC))
+
+
+# ---------------------------------------------------------------------------
+# Contract — reference key resolution
+# ---------------------------------------------------------------------------
+
+
+def test_contract_resolves_region_keys() -> None:
+    """Contract with region/connection_type/customer_type/distributor_key resolves
+    fees, taxes, distributor, and timezone from the registry."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        supplier=_tariff(energy_rate=10.0),
+    )
+
+    assert contract.distributor is not None
+    assert contract.fees is not None
+    assert contract.taxes is not None
+    from zoneinfo import ZoneInfo
+
+    assert str(contract.timezone) == str(ZoneInfo("Europe/Brussels"))
+
+
+def test_contract_region_keys_produce_valid_result() -> None:
+    """A contract built from reference keys can be applied and produces a non-empty result."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        supplier=_tariff(energy_rate=10.0),
+    )
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz="Europe/Brussels")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.apply([Meter(data=consumption)])
+
+    assert result is not None
+    assert not result.empty
+    assert (TariffCategory.SUPPLIER, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.FEES, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.TAXES, CostGroup.TOTAL, "total") in result.columns
+
+
+def test_contract_inline_overrides_reference_keys() -> None:
+    """Inline fees/taxes/distributor take precedence over reference keys."""
+    inline_distributor = _tariff(energy_rate=999.0)
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        distributor=inline_distributor,  # inline override
+        supplier=_tariff(energy_rate=10.0),
+    )
+
+    # The inline distributor should win over the registry one
+    assert contract.distributor is inline_distributor
+
+
+def test_contract_inline_fees_override_customer_type() -> None:
+    """Inline fees take precedence over customer_type resolution."""
+    inline_fees = _tariff(energy_rate=42.0)
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        fees=inline_fees,
+    )
+
+    assert contract.fees is inline_fees
+
+
+def test_contract_inline_timezone_overrides_region() -> None:
+    """An explicit timezone overrides the region default."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        timezone=dt.UTC,
+    )
+
+    assert contract.timezone is dt.UTC
+
+
+def test_contract_without_region_works_as_before() -> None:
+    """Contracts without reference keys still work (pure inline)."""
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=50.0),
+    )
+
+    assert contract.region is None
+    assert contract.distributor is not None
+    assert contract.fees is None
+
+
+# ---------------------------------------------------------------------------
+# ContractHistory
+# ---------------------------------------------------------------------------
+
+
+def test_contract_history_single_contract() -> None:
+    """A history with one contract produces the same result as calling contract.apply directly."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            )
+        ]
+    )
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = history.apply([Meter(data=consumption)])
+
+    assert result is not None
+    assert len(result) == 1
+    assert (TariffCategory.SUPPLIER, CostGroup.TOTAL, "total") in result.columns
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(40.0)
+
+
+def test_contract_history_two_contracts_sequential() -> None:
+    """Two sequential contracts each produce rows for their respective period."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+            ),
+        ]
+    )
+    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
+    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
+    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    assert len(result) == 2
+    total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")
+    # Jan: 4 × 1 × 10 = 40
+    assert result[total].iloc[0] == pytest.approx(40.0)
+    # Feb: 4 × 1 × 20 = 80
+    assert result[total].iloc[1] == pytest.approx(80.0)
+
+
+def test_contract_history_gap_produces_no_rows() -> None:
+    """A gap between contracts produces no rows for the gap period."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 4, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+            ),
+        ]
+    )
+    ts = pd.date_range("2025-01-01", "2025-05-01", freq="15min", tz=dt.UTC, inclusive="left")
+    consumption = pd.DataFrame({"timestamp": ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 5, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    # Jan row + Apr row = 2 rows (Feb, Mar gap → no rows)
+    assert len(result) == 2
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01", tz=dt.UTC)
+    assert result["timestamp"].iloc[1] == pd.Timestamp("2025-04-01", tz=dt.UTC)
+
+
+def test_contract_history_different_columns_zero_filled() -> None:
+    """When contracts produce different columns, missing columns are zero-filled."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+                distributor=_tariff(energy_rate=5.0),
+            ),
+        ]
+    )
+    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
+    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
+    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    assert len(result) == 2
+    # Jan row should have distributor columns filled with 0
+    dist_col = (TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")
+    assert dist_col in result.columns
+    assert result[dist_col].iloc[0] == pytest.approx(0.0)  # zero-filled
+    assert result[dist_col].iloc[1] == pytest.approx(20.0)  # 4 × 1 × 5
+
+
+def test_contract_history_returns_none_when_no_contracts_overlap() -> None:
+    """Querying a period with no active contracts returns None."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 6, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+        ]
+    )
+    ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    consumption = _consumption(ts, value=1.0)
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is None
+
+
+def test_contract_history_from_yaml(tmp_path) -> None:
+    """ContractHistory can be loaded from YAML via the inherited from_yaml."""
+    yaml_content = """
+- start: 2025-01-01T00:00:00+00:00
+  end: 2025-06-01T00:00:00+00:00
+  supplier:
+    versions:
+    - start: 2025-01-01T00:00:00+00:00
+      consumption:
+        constant_cost: 10.0
+- start: 2025-06-01T00:00:00+00:00
+  supplier:
+    versions:
+    - start: 2025-06-01T00:00:00+00:00
+      consumption:
+        constant_cost: 20.0
+"""
+    path = tmp_path / "history.yml"
+    path.write_text(yaml_content, encoding="utf-8")
+
+    history = ContractHistory.from_yaml(path)
+
+    assert len(history.versions) == 2
+    assert history.versions[0].end == dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
+    assert history.versions[1].end is None

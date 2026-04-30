@@ -1,11 +1,9 @@
 import datetime as dt
 from datetime import UTC
-from pathlib import Path
 from typing import Literal
 
 import isodate
 import pandas as pd
-import yaml
 
 from energy_cost.versioning import VersionedCollection
 
@@ -22,15 +20,6 @@ from .tariff_version import TariffVersion
 
 
 class Tariff(VersionedCollection[TariffVersion]):
-    @classmethod
-    def from_yaml(cls, path: str | Path) -> "Tariff":
-        """Load a tariff definition from YAML."""
-        with Path(path).open(encoding="utf-8") as file:
-            raw_data = yaml.safe_load(file)
-
-        tariff = cls.model_validate({"versions": raw_data})
-        return tariff
-
     def get_energy_cost(
         self,
         start: dt.datetime,

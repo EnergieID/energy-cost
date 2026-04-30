@@ -1,4 +1,4 @@
-from .contract import Contract
+from .contract import Contract, ContractHistory
 from .meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from .resolution import Resolution
 from .tariff import Tariff
@@ -11,6 +11,7 @@ __all__ = [
     "Tax",
     "TaxVersion",
     "Contract",
+    "ContractHistory",
     "TariffCategory",
     "CostGroup",
     "MeterType",
