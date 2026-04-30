@@ -1017,3 +1017,101 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
 
     # Only the January bucket covers [Jan 10, Jan 20) — no February bucket exists
     assert not any(result["timestamp"] == pd.Timestamp("2024-02-01", tz=dt.UTC))
+
+
+# ---------------------------------------------------------------------------
+# Contract — reference key resolution
+# ---------------------------------------------------------------------------
+
+
+def test_contract_resolves_region_keys() -> None:
+    """Contract with region/connection_type/customer_type/distributor_key resolves
+    fees, taxes, distributor, and timezone from the registry."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        supplier=_tariff(energy_rate=10.0),
+    )
+
+    assert contract.distributor is not None
+    assert contract.fees is not None
+    assert contract.taxes is not None
+    from zoneinfo import ZoneInfo
+
+    assert str(contract.timezone) == str(ZoneInfo("Europe/Brussels"))
+
+
+def test_contract_region_keys_produce_valid_result() -> None:
+    """A contract built from reference keys can be applied and produces a non-empty result."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        supplier=_tariff(energy_rate=10.0),
+    )
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz="Europe/Brussels")
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = contract.apply([Meter(data=consumption)])
+
+    assert result is not None
+    assert not result.empty
+    assert (TariffCategory.SUPPLIER, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.FEES, CostGroup.TOTAL, "total") in result.columns
+    assert (TariffCategory.TAXES, CostGroup.TOTAL, "total") in result.columns
+
+
+def test_contract_inline_overrides_reference_keys() -> None:
+    """Inline fees/taxes/distributor take precedence over reference keys."""
+    inline_distributor = _tariff(energy_rate=999.0)
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
+        distributor=inline_distributor,  # inline override
+        supplier=_tariff(energy_rate=10.0),
+    )
+
+    # The inline distributor should win over the registry one
+    assert contract.distributor is inline_distributor
+
+
+def test_contract_inline_fees_override_customer_type() -> None:
+    """Inline fees take precedence over customer_type resolution."""
+    inline_fees = _tariff(energy_rate=42.0)
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        fees=inline_fees,
+    )
+
+    assert contract.fees is inline_fees
+
+
+def test_contract_inline_timezone_overrides_region() -> None:
+    """An explicit timezone overrides the region default."""
+    contract = Contract(
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        timezone=dt.UTC,
+    )
+
+    assert contract.timezone is dt.UTC
+
+
+def test_contract_without_region_works_as_before() -> None:
+    """Contracts without reference keys still work (pure inline)."""
+    contract = Contract(
+        supplier=_tariff(energy_rate=100.0),
+        distributor=_tariff(energy_rate=50.0),
+    )
+
+    assert contract.region is None
+    assert contract.distributor is not None
+    assert contract.fees is None

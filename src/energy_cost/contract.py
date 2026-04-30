@@ -1,10 +1,12 @@
 import datetime as dt
 from datetime import UTC
+from typing import Any
 
 import pandas as pd
 from isodate import Duration
-from pydantic import ConfigDict
+from pydantic import ConfigDict, model_validator
 
+from .data.models import ConnectionType, CustomerType, RegionalData
 from .meter import CostGroup, Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
@@ -17,6 +19,13 @@ class Contract(Versioned):
 
     start: dt.datetime = dt.datetime(1970, 1, 1, tzinfo=UTC)
 
+    # Reference keys (optional) — resolved into live objects by the validator
+    region: str | None = None
+    connection_type: ConnectionType | None = None
+    customer_type: CustomerType | None = None
+    distributor_key: str | None = None
+
+    # Live objects — populated directly or resolved from reference keys
     supplier: Tariff | list[Tariff] | None = None
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
@@ -24,6 +33,34 @@ class Contract(Versioned):
     timezone: dt.tzinfo = UTC
     """All datetime operations use this timezone. Naive datetimes are treated as being
     in this timezone; tz-aware datetimes are converted to it."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_references(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+
+        region = values.get("region")
+        connection_type = values.get("connection_type")
+
+        if region is not None and connection_type is not None:
+            regional = RegionalData.get(region, ConnectionType(connection_type))
+
+            customer_type = values.get("customer_type")
+            if values.get("fees") is None and customer_type is not None:
+                values["fees"] = regional.fees[CustomerType(customer_type)]
+
+            if values.get("taxes") is None:
+                values["taxes"] = regional.taxes
+
+            if "timezone" not in values:
+                values["timezone"] = regional.timezone
+
+            distributor_key = values.get("distributor_key")
+            if values.get("distributor") is None and distributor_key is not None:
+                values["distributor"] = regional.distributors[distributor_key]
+
+        return values
 
     def apply(
         self,
