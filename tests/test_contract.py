@@ -7,7 +7,7 @@ import isodate
 import pandas as pd
 import pytest
 
-from energy_cost.contract import Contract
+from energy_cost.contract import Contract, ContractHistory
 from energy_cost.data import ConnectionType, CustomerType, RegionalData
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
@@ -1115,3 +1115,180 @@ def test_contract_without_region_works_as_before() -> None:
     assert contract.region is None
     assert contract.distributor is not None
     assert contract.fees is None
+
+
+# ---------------------------------------------------------------------------
+# ContractHistory
+# ---------------------------------------------------------------------------
+
+
+def test_contract_history_single_contract() -> None:
+    """A history with one contract produces the same result as calling contract.apply directly."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            )
+        ]
+    )
+    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=1.0)
+
+    result = history.apply([Meter(data=consumption)])
+
+    assert result is not None
+    assert len(result) == 1
+    assert (TariffCategory.SUPPLIER, CostGroup.TOTAL, "total") in result.columns
+    assert result[(TariffCategory.TOTAL, CostGroup.TOTAL, "total")].iloc[0] == pytest.approx(40.0)
+
+
+def test_contract_history_two_contracts_sequential() -> None:
+    """Two sequential contracts each produce rows for their respective period."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+            ),
+        ]
+    )
+    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
+    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
+    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    assert len(result) == 2
+    total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")
+    # Jan: 4 × 1 × 10 = 40
+    assert result[total].iloc[0] == pytest.approx(40.0)
+    # Feb: 4 × 1 × 20 = 80
+    assert result[total].iloc[1] == pytest.approx(80.0)
+
+
+def test_contract_history_gap_produces_no_rows() -> None:
+    """A gap between contracts produces no rows for the gap period."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 4, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+            ),
+        ]
+    )
+    ts = pd.date_range("2025-01-01", "2025-05-01", freq="15min", tz=dt.UTC, inclusive="left")
+    consumption = pd.DataFrame({"timestamp": ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 5, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    # Jan row + Apr row = 2 rows (Feb, Mar gap → no rows)
+    assert len(result) == 2
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01", tz=dt.UTC)
+    assert result["timestamp"].iloc[1] == pd.Timestamp("2025-04-01", tz=dt.UTC)
+
+
+def test_contract_history_different_columns_zero_filled() -> None:
+    """When contracts produce different columns, missing columns are zero-filled."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+            Contract(
+                start=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=20.0),
+                distributor=_tariff(energy_rate=5.0),
+            ),
+        ]
+    )
+    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
+    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
+    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is not None
+    assert len(result) == 2
+    # Jan row should have distributor columns filled with 0
+    dist_col = (TariffCategory.DISTRIBUTOR, CostGroup.TOTAL, "total")
+    assert dist_col in result.columns
+    assert result[dist_col].iloc[0] == pytest.approx(0.0)  # zero-filled
+    assert result[dist_col].iloc[1] == pytest.approx(20.0)  # 4 × 1 × 5
+
+
+def test_contract_history_returns_none_when_no_contracts_overlap() -> None:
+    """Querying a period with no active contracts returns None."""
+    history = ContractHistory(
+        versions=[
+            Contract(
+                start=dt.datetime(2025, 6, 1, tzinfo=dt.UTC),
+                supplier=_tariff(energy_rate=10.0),
+            ),
+        ]
+    )
+    ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    consumption = _consumption(ts, value=1.0)
+
+    result = history.apply(
+        [Meter(data=consumption)],
+        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
+    )
+
+    assert result is None
+
+
+def test_contract_history_from_yaml(tmp_path) -> None:
+    """ContractHistory can be loaded from YAML via the inherited from_yaml."""
+    yaml_content = """
+- start: 2025-01-01T00:00:00+00:00
+  end: 2025-06-01T00:00:00+00:00
+  supplier:
+    versions:
+    - start: 2025-01-01T00:00:00+00:00
+      consumption:
+        constant_cost: 10.0
+- start: 2025-06-01T00:00:00+00:00
+  supplier:
+    versions:
+    - start: 2025-06-01T00:00:00+00:00
+      consumption:
+        constant_cost: 20.0
+"""
+    path = tmp_path / "history.yml"
+    path.write_text(yaml_content, encoding="utf-8")
+
+    history = ContractHistory.from_yaml(path)
+
+    assert len(history.versions) == 2
+    assert history.versions[0].end == dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
+    assert history.versions[1].end is None

@@ -11,7 +11,7 @@ from .meter import CostGroup, Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
-from .versioning import Versioned
+from .versioning import Versioned, VersionedCollection
 
 
 class Contract(Versioned):
@@ -134,3 +134,30 @@ class Contract(Versioned):
         result[_total] = result[total_cols].sum(axis=1)
 
         return result
+
+
+class ContractHistory(VersionedCollection[Contract]):
+    def apply(
+        self,
+        meters: list[Meter],
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
+        resolution: Resolution | None = None,
+    ) -> pd.DataFrame | None:
+        if start is None or end is None:
+            from .resolution import detect_resolution_and_range
+
+            combined = pd.concat([m.data for m in meters], ignore_index=True)
+            detected_start, detected_end, _ = detect_resolution_and_range(combined)
+            if start is None:
+                start = detected_start
+            if end is None:
+                end = detected_end
+
+        return self.collect_version_frames(
+            lambda contract, seg_start, seg_end: contract.apply(
+                meters, start=seg_start, end=seg_end, resolution=resolution
+            ),
+            start,
+            end,
+        )

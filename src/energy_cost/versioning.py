@@ -83,9 +83,11 @@ class VersionedCollection[V: Versioned](BaseModel):
         ]
         if not frames:
             return None
+        combined = pd.concat(frames, ignore_index=True)
+        if isinstance(combined.columns, pd.MultiIndex):
+            combined = combined.sort_index(axis=1)
         return (
-            pd.concat(frames, ignore_index=True)
-            .groupby("timestamp")
+            combined.groupby("timestamp")
             .sum(numeric_only=True)
             .reset_index()
             .sort_values("timestamp")
