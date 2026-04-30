@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
-from energy_cost.data import ConnectionType, CustomerType, regionalData
+from energy_cost.data import ConnectionType, CustomerType, RegionalData
 from energy_cost.meter import Meter
 
 # ---------------------------------------------------------------------------
@@ -49,8 +49,8 @@ def consumption_meter_15min() -> Meter:
 
 _CASES: list[tuple[str, ConnectionType, CustomerType, str]] = [
     (region, connection_type, customer_type, distributor_name)
-    for region, ct_map in regionalData.items()
-    for connection_type, regional_data in ct_map.items()
+    for region in RegionalData._registry
+    for connection_type, regional_data in RegionalData._registry[region].items()
     for distributor_name in regional_data.distributors
     for customer_type in regional_data.fees
 ]
@@ -68,7 +68,7 @@ def test_contract_produces_valid_dataframe(
     consumption_meter_15min: Meter,
 ) -> None:
     """Contract with fees + distributor + taxes returns a non-empty DataFrame."""
-    regional_data = regionalData[region][connection_type]
+    regional_data = RegionalData.get(region, connection_type)
 
     meter = consumption_meter_15min
 
@@ -76,7 +76,7 @@ def test_contract_produces_valid_dataframe(
         fees=regional_data.fees[customer_type],
         distributor=regional_data.distributors[distributor_name],
         taxes=regional_data.taxes,
-        timezone=CET,
+        timezone=regional_data.timezone,
     )
 
     result = contract.apply(meters=[meter])

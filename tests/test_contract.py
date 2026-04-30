@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
-from energy_cost.data.models import CustomerType
+from energy_cost.data import ConnectionType, CustomerType, RegionalData
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
@@ -632,7 +632,7 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
 def test_avoid_regression_on_real_world_data() -> None:
     import yaml
 
-    from energy_cost.data.be.flanders.electricity import data
+    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
     from energy_cost.index import DataFrameIndex, Index
 
     Index.register(
@@ -773,17 +773,16 @@ def test_contract_collapses_meter_types_by_default() -> None:
 def test_calculate_cost_with_mixed_offset_meter_data() -> None:
     """A billing period crossing the DST boundary where meter readings carry different
     UTC offsets (+01:00 before, +02:00 after spring-forward) must not raise."""
-    from zoneinfo import ZoneInfo
 
     from isodate import Duration
 
-    from energy_cost.data.be.flanders.electricity import data
+    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
 
     contract = Contract(
         distributor=data.distributors["fluvius_antwerpen"],
         fees=data.fees[CustomerType.RESIDENTIAL],
         taxes=data.taxes,
-        timezone=ZoneInfo("Europe/Brussels"),
+        timezone=data.timezone,
     )
     meter = Meter(
         direction=PowerDirection.CONSUMPTION,
