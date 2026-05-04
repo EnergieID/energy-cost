@@ -19,13 +19,13 @@ class ConnectionType(StrEnum):
     GAS = "gas"
 
 
-class Supplier(RegistryMixin[str, "Supplier"], BaseModel):
+class Supplier(BaseModel, RegistryMixin[str, "Supplier"]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     products: dict[str, Tariff]
 
 
-class RegionalData(RegistryMixin[tuple[str, ConnectionType], "RegionalData"], BaseModel):
+class RegionalData(BaseModel, RegistryMixin[tuple[str, ConnectionType], "RegionalData"]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     fees: dict[CustomerType, Tariff | list[Tariff]]
