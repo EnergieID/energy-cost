@@ -58,7 +58,7 @@ consumption = Meter(
 contract.apply([consumption])
 ```
 
-For more detailed examples, see the notebooks in the `notebooks` directory.
+For more detailed examples, see the notebooks in the [`notebooks`](notebooks) directory.
 
 ## Development
 
