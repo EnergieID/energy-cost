@@ -2,13 +2,13 @@
 
 Python package to model your energy bill based on your energy consumption.
 
-This energy bill is calculated based on a `Contract` or even a `ContractHistory`, which is a collection of `Contract`s that can change over time.
+This energy bill is calculated based on a `Contract` or even a `ContractHistory`, which is a collection of contracts that can change over time.
 A contract consists of 5 parts:
 - `supplier`: the `Tariff` of your energy supplier
 - `distributor`: the `Tariff` of your energy distributor
 - `fees`: the government fees applicable to you, als defined as a `Tariff`
 - `taxes`: the government `Taxes` applicable to each cost component of your bill
-- `timezone`: the timezone in which all timestamps will be aligned and all outputs will be in
+- `timezone`: the timezone in which all calculations will be done
 
 You can also specify a `region`, `connection_type`, `customer_type` and `distributor_key` in your contract, which will automatically fetch the applicable distributor tariffs, fees, taxes and timezone for you from our built in data. This is optional, but it can save you a lot of time if your region is supported.
 
@@ -17,7 +17,7 @@ Contracts can be defined in a yaml file, which makes it easy to manage and updat
 We also have more detailed documentation on the different components of a contract, see [`notebooks`](notebooks/) for all available notebooks.
 You can find example yaml files for tariffs and taxes in the [`examples`](examples) directory.
 
-A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy. We have built in support for fetching these prices from ENTSOE or defining them in a data file, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info.
+A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info.
 
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
