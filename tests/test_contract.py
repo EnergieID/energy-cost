@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import isodate
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
 from energy_cost.contract import Contract, ContractHistory
 from energy_cost.data import ConnectionType, CustomerType, RegionalData
@@ -1104,6 +1105,12 @@ def test_contract_inline_timezone_overrides_region() -> None:
     )
 
     assert contract.timezone is dt.UTC
+
+
+def test_contract_model_validate_rejects_non_dict_with_validation_error() -> None:
+    """Passing a non-dict (e.g. a list) raises a clean ValidationError."""
+    with pytest.raises(ValidationError):
+        Contract.model_validate([{"start": "2025-01-01"}])
 
 
 def test_contract_without_region_works_as_before() -> None:
