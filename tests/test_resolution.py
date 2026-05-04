@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.resolution import (
+    _find_common_divisor,
     align_datetime_to_tz,
     align_timestamps_to_tz,
     detect_resolution_and_range,
@@ -281,3 +282,123 @@ def test_distribute_aligned_window_divides_by_slots_in_source_period() -> None:
     assert len(result) == 12
     assert result["value"].iloc[0] == pytest.approx(10.0)  # 30 / 3
     assert result["value"].sum() == pytest.approx(120.0)
+
+
+# ---------------------------------------------------------------------------
+# _find_common_divisor
+# ---------------------------------------------------------------------------
+
+
+def test_find_common_divisor_returns_gcd_for_two_timedeltas() -> None:
+    assert _find_common_divisor(dt.timedelta(hours=2), dt.timedelta(hours=3)) == dt.timedelta(hours=1)
+    assert _find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
+    assert _find_common_divisor(dt.timedelta(days=1), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert _find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=1)) == dt.timedelta(minutes=1)
+
+
+def test_find_common_divisor_returns_gcd_for_two_calendar_durations() -> None:
+    assert _find_common_divisor(isodate.parse_duration("P1Y"), isodate.parse_duration("P1M")) == isodate.Duration(
+        months=1
+    )
+    assert _find_common_divisor(isodate.parse_duration("P3M"), isodate.parse_duration("P2M")) == isodate.Duration(
+        months=1
+    )
+    assert _find_common_divisor(isodate.parse_duration("P6M"), isodate.parse_duration("P4M")) == isodate.Duration(
+        months=2
+    )
+
+
+def test_find_common_divisor_returns_timedelta_for_mixed_types_when_timedelta_divides_calendar() -> None:
+    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(days=1)) == dt.timedelta(days=1)
+    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert _find_common_divisor(isodate.parse_duration("P1Y"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
+
+
+def test_find_common_divisor_mixed_uses_gcd_with_one_day() -> None:
+    # Mixed calendar + timedelta: common divisor is gcd(timedelta, P1D).
+    # P7D and P1D share P1D as GCD, so P1M + P7D → P1D.
+    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(weeks=1)) == dt.timedelta(days=1)
+    # P8H and P1D share P8H as GCD, so P1M + P8H → P8H.
+    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=8)) == dt.timedelta(hours=8)
+    # P25H and P1D: gcd(90000s, 86400s) = 3600s = P1H.
+    assert _find_common_divisor(dt.timedelta(hours=25), dt.timedelta(hours=24)) == dt.timedelta(hours=1)
+
+
+# ---------------------------------------------------------------------------
+# resample_or_distribute: cases A / B / C / D
+# ---------------------------------------------------------------------------
+
+
+def test_resample_or_distribute_case_a_distribute_month_to_day() -> None:
+    """Case A: source (P1M) is coarser than output (P1D) → distribute."""
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
+    df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [310.0]})
+    result = resample_or_distribute(df, isodate.parse_duration("P1M"), dt.timedelta(days=1), start, end)
+    assert len(result) == 31
+    assert result["value"].sum() == pytest.approx(310.0)
+    assert result["value"].iloc[0] == pytest.approx(310.0 / 31)
+
+
+def test_resample_or_distribute_case_a_distribute_day_to_hour() -> None:
+    """Case A: source (P1D) is coarser than output (P1H) → distribute."""
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
+    df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [24.0]})
+    result = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(hours=1), start, end)
+    assert len(result) == 24
+    assert result["value"].sum() == pytest.approx(24.0)
+    assert result["value"].tolist() == pytest.approx([1.0] * 24)
+
+
+def test_resample_or_distribute_case_b_aggregate_15min_to_day() -> None:
+    """Case B: source (PT15M) is finer than output (P1D) → sum."""
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
+    timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
+    df = pd.DataFrame({"timestamp": timestamps, "value": [1.0] * len(timestamps)})
+    result = resample_or_distribute(df, dt.timedelta(minutes=15), dt.timedelta(days=1), start, end)
+    assert len(result) == 1
+    assert result["value"].iloc[0] == pytest.approx(96.0)  # 4 * 24 slots
+
+
+def test_resample_or_distribute_case_b_aggregate_hour_to_month() -> None:
+    """Case B: source (P1H) is finer than output (P1M) → sum."""
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
+    timestamps = pd.date_range(start, end, freq="1h", inclusive="left")
+    df = pd.DataFrame({"timestamp": timestamps, "value": [1.0] * len(timestamps)})
+    result = resample_or_distribute(df, dt.timedelta(hours=1), isodate.parse_duration("P1M"), start, end)
+    assert len(result) == 1
+    assert result["value"].iloc[0] == pytest.approx(31 * 24)
+
+
+def test_resample_or_distribute_case_c_intermediate_gcd() -> None:
+    """Case C: source (P2H) and output (P3H) share GCD (P1H) → distribute then aggregate."""
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 1, 6, tzinfo=dt.UTC)  # 3 x P2H slots = 2 x P3H slots
+    timestamps = pd.date_range(start, end, freq="2h", inclusive="left")
+    df = pd.DataFrame({"timestamp": timestamps, "value": [60.0, 60.0, 60.0]})
+    result = resample_or_distribute(df, dt.timedelta(hours=2), dt.timedelta(hours=3), start, end)
+    assert len(result) == 2
+    # Each P2H value 60 distributes to 2 x P1H slots of 30 each; 3 x P1H slots sum to 90.
+    assert result["value"].sum() == pytest.approx(180.0)
+    assert result["value"].iloc[0] == pytest.approx(90.0)
+    assert result["value"].iloc[1] == pytest.approx(90.0)
+
+
+def test_resample_or_distribute_case_c_month_to_week_via_day() -> None:
+    """Case C: P1M → P7D has no direct divisor relationship, but P1D is a common divisor.
+    The function distributes P1M → P1D first, then aggregates P1D → P7D.
+    January has 31 days: weeks receive 7, 7, 7, 7 and 3 daily shares.
+    """
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
+    df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [310.0]})
+    result = resample_or_distribute(df, isodate.parse_duration("P1M"), dt.timedelta(weeks=1), start, end)
+    assert len(result) == 5
+    assert result["value"].sum() == pytest.approx(310.0)
+    # Jan 1–7 (7 days), Jan 8–14 (7), Jan 15–21 (7), Jan 22–28 (7), Jan 29–31 (3)
+    expected = [310.0 * n / 31 for n in (7, 7, 7, 7, 3)]
+    assert result["value"].tolist() == pytest.approx(expected)

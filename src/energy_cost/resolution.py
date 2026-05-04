@@ -1,4 +1,5 @@
 import datetime as dt
+import math
 from typing import Annotated, cast
 
 import isodate
@@ -151,23 +152,47 @@ def snap_billing_period(
     return snapped_start, snapped_end
 
 
-def resample_or_distribute(
+def _find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
+    """Return a common divisor of *a* and *b*, i.e. the coarsest resolution C such that
+    C divides both *a* and *b* (both are integer multiples of C).
+    """
+    a_is_cal = isinstance(a, isodate.Duration) and (a.years or a.months)
+    b_is_cal = isinstance(b, isodate.Duration) and (b.years or b.months)
+
+    if not a_is_cal and not b_is_cal:
+        a_s = int(a.total_seconds())
+        b_s = int(b.total_seconds())
+        g = math.gcd(a_s, b_s)
+        return dt.timedelta(seconds=g)
+
+    if a_is_cal and b_is_cal:
+        a_dur = cast(isodate.Duration, a)
+        b_dur = cast(isodate.Duration, b)
+        a_months = int(a_dur.years * 12 + a_dur.months)
+        b_months = int(b_dur.years * 12 + b_dur.months)
+        g = math.gcd(a_months, b_months)
+        return isodate.Duration(months=g)
+
+    # Mixed: one calendar, one timedelta. 1 day is a divisor of a every calender duration
+    # So a common divisor between P1D and the timedelta also divides the calendar duration.
+    cal, td = (a, b) if a_is_cal else (b, a)
+    return _find_common_divisor(td, isodate.parse_duration("P1D"))
+
+
+def _distribute(
     df: pd.DataFrame,
     source_resolution: Resolution,
     output_resolution: Resolution,
     start: dt.datetime,
     end: dt.datetime,
 ) -> pd.DataFrame:
-    output_freq = to_pandas_freq(output_resolution)
+    """Distribute coarse *source_resolution* values proportionally into finer *output_resolution* bins."""
     source_freq = to_pandas_freq(source_resolution)
-
-    if source_freq == output_freq or not is_divisor(source_resolution, output_resolution):
-        return df.set_index("timestamp").resample(output_freq).sum().reset_index()
+    output_freq = to_pandas_freq(output_resolution)
 
     # Snap to full source periods so every coarse slot is fully populated in the target index.
     snapped_start, snapped_end = snap_billing_period(start, end, source_freq)
 
-    # Build fine-grained target index over the full snapped range.
     target_df = pd.DataFrame(
         {
             "timestamp": pd.date_range(start=snapped_start, end=snapped_end, freq=output_freq, inclusive="left"),
@@ -187,6 +212,30 @@ def resample_or_distribute(
     # Trim to the requested window and clean up helper columns.
     result = merged[(merged["timestamp"] >= start) & (merged["timestamp"] < end)]
     return result.drop(columns=["__coarse_ts", "__n"]).reset_index(drop=True)
+
+
+def resample_or_distribute(
+    df: pd.DataFrame,
+    source_resolution: Resolution,
+    output_resolution: Resolution,
+    start: dt.datetime,
+    end: dt.datetime,
+) -> pd.DataFrame:
+    """Convert *df* from *source_resolution* to *output_resolution*."""
+
+    if source_resolution == output_resolution:
+        return df
+
+    gcd = _find_common_divisor(source_resolution, output_resolution)
+    result = df
+
+    if gcd != source_resolution:
+        result = _distribute(result, source_resolution, gcd, start, end)
+
+    if gcd != output_resolution:
+        result = result.set_index("timestamp").resample(to_pandas_freq(output_resolution)).sum().reset_index()
+
+    return result
 
 
 def detect_resolution_and_range(
