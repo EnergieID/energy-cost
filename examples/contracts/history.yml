@@ -1,0 +1,18 @@
+# A contract history tracking two sequential supplier contracts.
+# Fees, taxes and distributor are resolved from the region.
+- start: 2024-01-01T00:00:00+01:00
+  end: 2025-06-01T00:00:00+02:00
+  supplier_key: my_supplier
+  product_key: fixed
+  region: be_flanders
+  connection_type: electricity
+  customer_type: residential
+  distributor_key: fluvius_imewo
+
+- start: 2025-06-01T00:00:00+02:00
+  supplier_key: my_supplier
+  product_key: dynamic
+  region: be_flanders
+  connection_type: electricity
+  customer_type: residential
+  distributor_key: fluvius_imewo

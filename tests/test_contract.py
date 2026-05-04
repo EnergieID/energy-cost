@@ -9,6 +9,7 @@ import pytest
 
 from energy_cost.contract import Contract, ContractHistory
 from energy_cost.data import ConnectionType, CustomerType, RegionalData
+from energy_cost.data.models import Supplier
 from energy_cost.formula import IndexFormula, PeriodicFormula
 from energy_cost.meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory
 from energy_cost.tariff import Tariff
@@ -1115,6 +1116,34 @@ def test_contract_without_region_works_as_before() -> None:
     assert contract.region is None
     assert contract.distributor is not None
     assert contract.fees is None
+
+
+# ---------------------------------------------------------------------------
+# Contract — supplier registry resolution
+# ---------------------------------------------------------------------------
+
+
+def test_contract_resolves_supplier_key() -> None:
+    """supplier_key + product_key resolves the supplier from the registry."""
+    product = _tariff(energy_rate=42.0)
+    Supplier.register("test_supplier", Supplier(products={"basic": product}))
+    contract = Contract(supplier_key="test_supplier", product_key="basic")
+
+    assert contract.supplier is product
+
+
+def test_contract_inline_supplier_overrides_supplier_key() -> None:
+    """An inline supplier takes precedence over supplier_key + product_key."""
+    product = _tariff(energy_rate=42.0)
+    Supplier.register("test_supplier", Supplier(products={"basic": product}))
+    inline = _tariff(energy_rate=999.0)
+    contract = Contract(
+        supplier_key="test_supplier",
+        product_key="basic",
+        supplier=inline,
+    )
+
+    assert contract.supplier is inline
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,9 @@
+# A simple contract using reference keys to resolve everything.
+# The supplier is looked up from the Supplier registry, and
+# fees, taxes, distributor and timezone are resolved from the region.
+supplier_key: my_supplier
+product_key: fixed
+region: be_flanders
+connection_type: electricity
+customer_type: residential
+distributor_key: fluvius_imewo

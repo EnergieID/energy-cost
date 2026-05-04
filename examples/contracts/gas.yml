@@ -1,0 +1,7 @@
+# A gas contract using the gas regional data.
+supplier_key: my_supplier
+product_key: fixed
+region: be_flanders
+connection_type: gas
+customer_type: residential
+distributor_key: fluvius_imewo

@@ -1,0 +1,11 @@
+# A contract with the supplier tariff defined inline.
+# Fees, taxes, distributor and timezone are resolved from the region.
+supplier:
+  versions:
+  - start: 2025-01-01T00:00:00+01:00
+    consumption:
+      constant_cost: 90.0
+region: be_flanders
+connection_type: electricity
+customer_type: residential
+distributor_key: fluvius_imewo

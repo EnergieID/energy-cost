@@ -1,12 +1,14 @@
 import datetime as dt
 from datetime import UTC
-from typing import Any
+from pathlib import Path
+from typing import Any, Self
 
 import pandas as pd
+import yaml
 from isodate import Duration
 from pydantic import ConfigDict, model_validator
 
-from .data.models import ConnectionType, CustomerType, RegionalData
+from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
 from .meter import CostGroup, Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
@@ -24,6 +26,8 @@ class Contract(Versioned):
     connection_type: ConnectionType | None = None
     customer_type: CustomerType | None = None
     distributor_key: str | None = None
+    supplier_key: str | None = None
+    product_key: str | None = None
 
     # Live objects — populated directly or resolved from reference keys
     supplier: Tariff | list[Tariff] | None = None
@@ -39,6 +43,12 @@ class Contract(Versioned):
     def _resolve_references(cls, values: Any) -> Any:
         if not isinstance(values, dict):
             return values
+
+        # Resolve supplier from supplier registry
+        supplier_key = values.get("supplier_key")
+        product_key = values.get("product_key")
+        if values.get("supplier") is None and supplier_key is not None and product_key is not None:
+            values["supplier"] = Supplier.get(supplier_key).products[product_key]
 
         region = values.get("region")
         connection_type = values.get("connection_type")
@@ -61,6 +71,13 @@ class Contract(Versioned):
                 values["distributor"] = regional.distributors[distributor_key]
 
         return values
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> Self:
+        """Load a single contract from a YAML file."""
+        with Path(path).open(encoding="utf-8") as file:
+            raw_data = yaml.safe_load(file)
+        return cls.model_validate(raw_data)
 
     def apply(
         self,

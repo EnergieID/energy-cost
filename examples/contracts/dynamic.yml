@@ -1,0 +1,7 @@
+# A dynamic contract where the supplier tariff tracks an index.
+supplier_key: my_supplier
+product_key: dynamic
+region: be_flanders
+connection_type: electricity
+customer_type: residential
+distributor_key: fluvius_imewo

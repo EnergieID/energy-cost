@@ -19,6 +19,22 @@ class ConnectionType(StrEnum):
     GAS = "gas"
 
 
+class Supplier(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    products: dict[str, Tariff]
+
+    _registry: ClassVar[dict[str, "Supplier"]] = {}
+
+    @classmethod
+    def register(cls, key: str, supplier: "Supplier") -> None:
+        cls._registry[key] = supplier
+
+    @classmethod
+    def get(cls, key: str) -> "Supplier":
+        return cls._registry[key]
+
+
 class RegionalData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
