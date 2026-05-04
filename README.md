@@ -12,12 +12,12 @@ A contract consists of 5 parts:
 
 You can also specify a `region`, `connection_type`, `customer_type` and `distributor_key` in your contract, which will automatically fetch the applicable distributor tariffs, fees, taxes and timezone for you from our built in data. This is optional, but it can save you a lot of time if your region is supported.
 
-Contracts can be defined in a yaml file, which makes it easy to manage and update your contract over time. See [`notebooks/contracts.ipynb`](notebooks/contracts.ipynb) for more info on how to define your contract in a yaml file.
+Contracts can be defined in a yaml file, which makes it easy to manage and update your contract over time. See [`notebooks/contract.ipynb`](notebooks/contract.ipynb) for more info on how to define your contract in a yaml file.
 
 We also have more detailed documentation on the different components of a contract, see [`notebooks`](notebooks/) for all available notebooks.
-You can find example yaml files for tariffs and taxes in the `examples` directory.
+You can find example yaml files for tariffs and taxes in the [`examples`](examples) directory.
 
-A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy. We have built in support for fetching these prices from ENTSOE or defining them in a data file, see `notebooks/index.ipynb` for more info.
+A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy. We have built in support for fetching these prices from ENTSOE or defining them in a data file, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info.
 
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
