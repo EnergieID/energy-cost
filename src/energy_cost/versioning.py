@@ -6,7 +6,7 @@ from typing import Any, Self
 
 import pandas as pd
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from energy_cost.resolution import align_datetime_to_tz
 
@@ -19,17 +19,20 @@ class Versioned(BaseModel):
 class VersionedCollection[V: Versioned](BaseModel):
     versions: list[V]
 
+    @model_validator(mode="before")
     @classmethod
-    def from_dict(cls, data: list[dict[str, Any]]) -> Self:
-        """Create from a list of version dicts (the same structure found in YAML files)."""
-        return cls.model_validate({"versions": data})
+    def _accept_list(cls, data: Any) -> Any:
+        """Allow a plain list as shorthand for ``{"versions": [...]}``.."""
+        if isinstance(data, list):
+            return {"versions": data}
+        return data
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file containing a list of version entries."""
         with Path(path).open(encoding="utf-8") as file:
             raw_data = yaml.safe_load(file)
-        return cls.from_dict(raw_data)
+        return cls.model_validate(raw_data)
 
     def find_active_versions(
         self,

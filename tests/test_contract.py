@@ -1302,16 +1302,14 @@ def test_contract_history_from_yaml(tmp_path) -> None:
 - start: 2025-01-01T00:00:00+00:00
   end: 2025-06-01T00:00:00+00:00
   supplier:
-    versions:
-    - start: 2025-01-01T00:00:00+00:00
-      consumption:
-        constant_cost: 10.0
+  - start: 2025-01-01T00:00:00+00:00
+    consumption:
+      constant_cost: 10.0
 - start: 2025-06-01T00:00:00+00:00
   supplier:
-    versions:
-    - start: 2025-06-01T00:00:00+00:00
-      consumption:
-        constant_cost: 20.0
+  - start: 2025-06-01T00:00:00+00:00
+    consumption:
+      constant_cost: 20.0
 """
     path = tmp_path / "history.yml"
     path.write_text(yaml_content, encoding="utf-8")

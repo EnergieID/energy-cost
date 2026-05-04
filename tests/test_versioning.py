@@ -174,16 +174,16 @@ class TestCollectVersionFramesWithGaps:
 
 
 # ---------------------------------------------------------------------------
-# from_yaml / from_dict on VersionedCollection base
+# from_yaml on VersionedCollection base
 # ---------------------------------------------------------------------------
 
 
 class TestFromYamlFromDict:
-    def test_tariff_from_dict(self) -> None:
+    def test_tariff_from_list(self) -> None:
         data = [
             {"start": "2025-01-01T00:00:00", "consumption": {"constant_cost": 100.0}},
         ]
-        tariff = Tariff.from_dict(data)
+        tariff = Tariff.model_validate(data)
         assert len(tariff.versions) == 1
 
     def test_tariff_from_yaml(self, tmp_path) -> None:
@@ -195,7 +195,7 @@ class TestFromYamlFromDict:
         tariff = Tariff.from_yaml(path)
         assert len(tariff.versions) == 1
 
-    def test_from_dict_with_end(self) -> None:
+    def test_from_list_with_end(self) -> None:
         data = [
             {
                 "start": "2025-01-01T00:00:00",
@@ -203,5 +203,5 @@ class TestFromYamlFromDict:
                 "consumption": {"constant_cost": 100.0},
             },
         ]
-        tariff = Tariff.from_dict(data)
+        tariff = Tariff.model_validate(data)
         assert tariff.versions[0].end == dt.datetime(2025, 6, 1, 0, 0)
