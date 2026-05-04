@@ -66,7 +66,7 @@ def consumption_meter() -> Meter:
 class TestContractConfigs:
     @pytest.mark.parametrize(
         "config_name",
-        ["simple.yml", "dynamic.yml", "injection.yml", "gas.yml", "inline.yml"],
+        ["simple.yml", "dynamic.yml", "injection.yml", "gas.yml", "inline.yml", "inline_full.yml"],
     )
     def test_load_and_apply(
         self,

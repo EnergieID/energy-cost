@@ -2,6 +2,7 @@ import datetime as dt
 from datetime import UTC
 from pathlib import Path
 from typing import Any, Self
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yaml
@@ -49,6 +50,11 @@ class Contract(Versioned):
         product_key = values.get("product_key")
         if values.get("supplier") is None and supplier_key is not None and product_key is not None:
             values["supplier"] = Supplier.get(supplier_key).products[product_key]
+
+        # Coerce a timezone string (e.g. "Europe/Brussels") to a ZoneInfo object
+        timezone_val = values.get("timezone")
+        if isinstance(timezone_val, str):
+            values["timezone"] = ZoneInfo(timezone_val)
 
         region = values.get("region")
         connection_type = values.get("connection_type")

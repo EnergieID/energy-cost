@@ -1,0 +1,32 @@
+# A fully inlined contract — all tariff components defined directly.
+# Useful when the region is not supported or for handling special cases.
+supplier:
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 90.0
+  injection:
+    constant_cost: -15.0
+
+distributor:
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 50.0
+  periodic:
+    grid_fee:
+      period: P1M
+      constant_cost: 10.0
+
+fees:
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 20.0
+
+taxes:
+- start: 2025-01-01T00:00:00+01:00
+  default: 0.06
+  rates:
+  - rate: 0.0
+    columns:
+    - ["*", "injection", "*"]
+
+timezone: Europe/Brussels
