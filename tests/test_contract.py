@@ -634,7 +634,7 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
 def test_avoid_regression_on_real_world_data() -> None:
     import yaml
 
-    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
+    data = RegionalData.get(("be_flanders", ConnectionType.ELECTRICITY))
     from energy_cost.index import DataFrameIndex, Index
 
     Index.register(
@@ -778,7 +778,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 
     from isodate import Duration
 
-    data = RegionalData.get("be_flanders", ConnectionType.ELECTRICITY)
+    data = RegionalData.get(("be_flanders", ConnectionType.ELECTRICITY))
 
     contract = Contract(
         distributor=data.distributors["fluvius_antwerpen"],

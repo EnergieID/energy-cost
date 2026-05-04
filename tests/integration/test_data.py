@@ -49,8 +49,7 @@ def consumption_meter_15min() -> Meter:
 
 _CASES: list[tuple[str, ConnectionType, CustomerType, str]] = [
     (region, connection_type, customer_type, distributor_name)
-    for region in RegionalData._registry
-    for connection_type, regional_data in RegionalData._registry[region].items()
+    for (region, connection_type), regional_data in RegionalData.items()
     for distributor_name in regional_data.distributors
     for customer_type in regional_data.fees
 ]
@@ -68,7 +67,7 @@ def test_contract_produces_valid_dataframe(
     consumption_meter_15min: Meter,
 ) -> None:
     """Contract with fees + distributor + taxes returns a non-empty DataFrame."""
-    regional_data = RegionalData.get(region, connection_type)
+    regional_data = RegionalData.get((region, connection_type))
 
     meter = consumption_meter_15min
 

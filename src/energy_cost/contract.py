@@ -60,7 +60,7 @@ class Contract(Versioned):
         connection_type = values.get("connection_type")
 
         if region is not None and connection_type is not None:
-            regional = RegionalData.get(region, ConnectionType(connection_type))
+            regional = RegionalData.get((region, ConnectionType(connection_type)))
 
             customer_type = values.get("customer_type")
             if values.get("fees") is None and customer_type is not None:

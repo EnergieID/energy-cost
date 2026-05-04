@@ -23,4 +23,4 @@ data = RegionalData(
 
 
 def register() -> None:
-    RegionalData.register("be_flanders", ConnectionType.GAS, data)
+    RegionalData.register(("be_flanders", ConnectionType.GAS), data)
