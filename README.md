@@ -10,7 +10,7 @@ A contract consists of 5 parts:
 - `taxes`: the government `Taxes` applicable to each cost component of your bill
 - `timezone`: the timezone in which all calculations will be done
 
-You can also specify a `region`, `connection_type`, `customer_type` and `distributor_key` in your contract, which will automatically fetch the applicable distributor tariffs, fees, taxes and timezone for you from our built in data. This is optional, but it can save you a lot of time if your region is supported.
+You can also specify a `region`, `connection_type`, `customer_type` and `distributor_key` in your contract, which will automatically fetch the applicable distributor tariffs, fees, taxes and timezone for you from our built in data. If your region is not yet supported, you can contribute the data for your region, see [CONTRIBUTING.md](CONTRIBUTING.md) for how to do that.
 
 Contracts can be defined in a yaml file, which makes it easy to manage and update your contract over time. See [`notebooks/contract.ipynb`](notebooks/contract.ipynb) for more info on how to define your contract in a yaml file.
 
@@ -104,6 +104,10 @@ Every commit will automatically run:
 | **ty** | Type checking | `poe check` |
 
 You can also run them manually at any time.
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started, including how to add support for new regions.
 
 ## License
 
