@@ -69,7 +69,7 @@ class Contract(Versioned):
             if values.get("taxes") is None:
                 values["taxes"] = regional.taxes
 
-            if "timezone" not in values:
+            if values.get("timezone") is None:
                 values["timezone"] = regional.timezone
 
             distributor_key = values.get("distributor_key")
