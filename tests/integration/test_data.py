@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+import isodate
 import pandas as pd
 import pytest
 
@@ -108,8 +109,6 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
         taxes=regional_data.taxes,
         timezone=CET,
     )
-
-    import isodate
 
     result = contract.apply(meters=[meter], start=start, end=end, resolution=isodate.parse_duration("P7D"))
 
