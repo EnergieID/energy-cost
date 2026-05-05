@@ -101,7 +101,7 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
     ]
     meter = Meter(data=pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]}))
 
-    regional_data = regionalData["be_flanders"][ConnectionType.ELECTRICITY]
+    regional_data = RegionalData.get(("be_flanders", ConnectionType.ELECTRICITY))
     contract = Contract(
         fees=regional_data.fees[CustomerType.RESIDENTIAL],
         distributor=regional_data.distributors["fluvius_antwerpen"],
@@ -111,7 +111,7 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
 
     import isodate
 
-    result = contract.calculate_cost(meters=[meter], start=start, end=end, resolution=isodate.parse_duration("P7D"))
+    result = contract.apply(meters=[meter], start=start, end=end, resolution=isodate.parse_duration("P7D"))
 
     assert isinstance(result, pd.DataFrame)
     assert not result.empty

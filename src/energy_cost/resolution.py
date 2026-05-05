@@ -93,10 +93,8 @@ def is_divisor(root: Resolution, divisor: Resolution) -> bool:
 
     if root_is_calendar and divisor_is_calendar:
         # Normalise both to months
-        root_dur = cast(isodate.Duration, root)
-        divisor_dur = cast(isodate.Duration, divisor)
-        root_months = int(root_dur.years * 12 + root_dur.months)
-        divisor_months = int(divisor_dur.years * 12 + divisor_dur.months)
+        root_months = int(root.years * 12 + root.months)
+        divisor_months = int(divisor.years * 12 + divisor.months)
         return divisor_months > 0 and root_months % divisor_months == 0
 
     # divisor is calendar, root is fixed timedelta — nonsensical subdivision
@@ -166,16 +164,14 @@ def _find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
         return dt.timedelta(seconds=g)
 
     if a_is_cal and b_is_cal:
-        a_dur = cast(isodate.Duration, a)
-        b_dur = cast(isodate.Duration, b)
-        a_months = int(a_dur.years * 12 + a_dur.months)
-        b_months = int(b_dur.years * 12 + b_dur.months)
+        a_months = int(a.years * 12 + a.months)
+        b_months = int(b.years * 12 + b.months)
         g = math.gcd(a_months, b_months)
         return isodate.Duration(months=g)
 
     # Mixed: one calendar, one timedelta. 1 day is a divisor of a every calender duration
     # So a common divisor between P1D and the timedelta also divides the calendar duration.
-    cal, td = (a, b) if a_is_cal else (b, a)
+    td = b if a_is_cal else a
     return _find_common_divisor(td, isodate.parse_duration("P1D"))
 
 
