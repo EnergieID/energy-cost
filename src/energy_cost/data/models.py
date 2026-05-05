@@ -1,4 +1,3 @@
-import datetime as dt
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
@@ -6,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 from energy_cost.registry import RegistryMixin
 from energy_cost.tariff import Tariff
 from energy_cost.tax import Tax
+from energy_cost.types import TzInfo
 
 
 class CustomerType(StrEnum):
@@ -31,4 +31,4 @@ class RegionalData(BaseModel, RegistryMixin[tuple[str, ConnectionType], "Regiona
     fees: dict[CustomerType, Tariff | list[Tariff]]
     distributors: dict[str, Tariff | list[Tariff]]
     taxes: Tax | list[Tax]
-    timezone: dt.tzinfo
+    timezone: TzInfo
