@@ -22,17 +22,17 @@ class DummyIndex(Index):
         )
 
 
-def test_register_and_from_name_returns_same_instance() -> None:
+def test_register_and_get_returns_same_instance() -> None:
     index = DummyIndex()
 
     Index.register("dummy", index)
 
-    assert Index.from_name("dummy") is index
+    assert Index.get("dummy") is index
 
 
-def test_from_name_raises_for_unknown_index() -> None:
-    with pytest.raises(ValueError, match="Unsupported index: unknown"):
-        Index.from_name("unknown")
+def test_get_raises_for_unknown_index() -> None:
+    with pytest.raises(KeyError):
+        Index.get("unknown")
 
 
 def test_index_returns_nan_for_out_of_range_values() -> None:

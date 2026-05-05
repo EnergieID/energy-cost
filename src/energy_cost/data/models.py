@@ -1,7 +1,9 @@
+import datetime as dt
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
+from energy_cost.registry import RegistryMixin
 from energy_cost.tariff import Tariff
 from energy_cost.tax import Tax
 
@@ -17,7 +19,16 @@ class ConnectionType(StrEnum):
     GAS = "gas"
 
 
-class RegionalData(BaseModel):
+class Supplier(BaseModel, RegistryMixin[str, "Supplier"]):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    products: dict[str, Tariff]
+
+
+class RegionalData(BaseModel, RegistryMixin[tuple[str, ConnectionType], "RegionalData"]):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     fees: dict[CustomerType, Tariff | list[Tariff]]
     distributors: dict[str, Tariff | list[Tariff]]
     taxes: Tax | list[Tax]
+    timezone: dt.tzinfo

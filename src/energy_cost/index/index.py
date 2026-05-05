@@ -1,9 +1,10 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from typing import ClassVar, cast
+from typing import cast
 
 import pandas as pd
 
+from ..registry import RegistryMixin
 from ..resolution import (
     Resolution,
     align_datetime_to_tz,
@@ -14,22 +15,8 @@ from ..resolution import (
 )
 
 
-class Index(ABC):
+class Index(RegistryMixin[str, "Index"], ABC):
     """An index used for calculating energy costs (€/MWh)."""
-
-    indexes: ClassVar[dict[str, "Index"]] = {}
-
-    @classmethod
-    def register(cls, name: str, index: "Index") -> None:
-        """Register an index instance by name."""
-        cls.indexes[name] = index
-
-    @staticmethod
-    def from_name(name: str) -> "Index":
-        """Return the named index instance."""
-        if name not in Index.indexes:
-            raise ValueError(f"Unsupported index: {name}")
-        return Index.indexes[name]
 
     def __init__(self, resolution: Resolution) -> None:
         self.resolution = resolution

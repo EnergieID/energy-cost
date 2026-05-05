@@ -1,0 +1,7 @@
+# A contract with both consumption and injection tariffs.
+supplier_key: my_supplier
+product_key: injection
+region: be_flanders
+connection_type: electricity
+customer_type: residential
+distributor_key: fluvius_imewo

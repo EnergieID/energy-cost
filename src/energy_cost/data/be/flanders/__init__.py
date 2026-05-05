@@ -1,9 +1,7 @@
-from energy_cost.data.models import ConnectionType
+from .electricity import register as _register_electricity
+from .gas import register as _register_gas
 
-from .electricity import data as electricity_data
-from .gas import data as gas_data
 
-data = {
-    ConnectionType.ELECTRICITY: electricity_data,
-    ConnectionType.GAS: gas_data,
-}
+def register() -> None:
+    _register_electricity()
+    _register_gas()
