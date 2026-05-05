@@ -11,7 +11,7 @@ from pydantic import ConfigDict, model_validator
 
 from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
 from .meter import CostGroup, Meter, TariffCategory
-from .resolution import Resolution, align_datetime_to_tz
+from .resolution import Resolution, align_datetime_to_tz, detect_resolution_and_range
 from .tariff import Tariff
 from .tax import Tax
 from .versioning import Versioned, VersionedCollection
@@ -168,8 +168,6 @@ class ContractHistory(VersionedCollection[Contract]):
         resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         if start is None or end is None:
-            from .resolution import detect_resolution_and_range
-
             combined = pd.concat([m.data for m in meters], ignore_index=True)
             detected_start, detected_end, _ = detect_resolution_and_range(combined)
             if start is None:
