@@ -12,7 +12,7 @@ from energy_cost.resolution import (
     detect_resolution_and_range,
     is_divisor,
     parse_resolution,
-    resample_or_distribute,
+    redistribute_to_resolution,
     to_pandas_freq,
 )
 
@@ -193,7 +193,7 @@ def test_align_timestamps_to_tz_handles_mixed_utc_offsets():
 
 
 # ---------------------------------------------------------------------------
-# resample_or_distribute
+# redistribute_to_resolution
 # ---------------------------------------------------------------------------
 
 
@@ -213,7 +213,7 @@ def test_same_resolution_returns_values_unchanged() -> None:
         }
     )
 
-    result = resample_or_distribute(df, isodate.parse_duration("P1M"), isodate.parse_duration("P1M"), start, end)
+    result = redistribute_to_resolution(df, isodate.parse_duration("P1M"), isodate.parse_duration("P1M"), start, end)
 
     assert len(result) == 3
     assert result["value"].tolist() == pytest.approx([10.0, 20.0, 30.0])
@@ -235,7 +235,7 @@ def test_distribute_partial_window_divides_by_full_source_period() -> None:
         }
     )
 
-    result = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end)
 
     assert len(result) == 3
     assert result["value"].iloc[0] == pytest.approx(1.0)
@@ -257,8 +257,8 @@ def test_distribute_full_window_matches_partial_window_per_slot_value() -> None:
         }
     )
 
-    full = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_full)
-    partial = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_partial)
+    full = redistribute_to_resolution(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_full)
+    partial = redistribute_to_resolution(df, dt.timedelta(days=1), dt.timedelta(minutes=5), start, end_partial)
 
     assert full["value"].iloc[0] == pytest.approx(partial["value"].iloc[0])
     assert len(full) == 288
@@ -277,7 +277,7 @@ def test_distribute_aligned_window_divides_by_slots_in_source_period() -> None:
         }
     )
 
-    result = resample_or_distribute(df, dt.timedelta(minutes=15), dt.timedelta(minutes=5), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(minutes=15), dt.timedelta(minutes=5), start, end)
 
     assert len(result) == 12
     assert result["value"].iloc[0] == pytest.approx(10.0)  # 30 / 3
@@ -326,61 +326,61 @@ def test_find_common_divisor_mixed_uses_gcd_with_one_day() -> None:
 
 
 # ---------------------------------------------------------------------------
-# resample_or_distribute: cases A / B / C / D
+# redistribute_to_resolution: cases A / B / C / D
 # ---------------------------------------------------------------------------
 
 
-def test_resample_or_distribute_case_a_distribute_month_to_day() -> None:
+def test_redistribute_to_resolution_case_a_distribute_month_to_day() -> None:
     """Case A: source (P1M) is coarser than output (P1D) → distribute."""
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
     df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [310.0]})
-    result = resample_or_distribute(df, isodate.parse_duration("P1M"), dt.timedelta(days=1), start, end)
+    result = redistribute_to_resolution(df, isodate.parse_duration("P1M"), dt.timedelta(days=1), start, end)
     assert len(result) == 31
     assert result["value"].sum() == pytest.approx(310.0)
     assert result["value"].iloc[0] == pytest.approx(310.0 / 31)
 
 
-def test_resample_or_distribute_case_a_distribute_day_to_hour() -> None:
+def test_redistribute_to_resolution_case_a_distribute_day_to_hour() -> None:
     """Case A: source (P1D) is coarser than output (P1H) → distribute."""
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
     df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [24.0]})
-    result = resample_or_distribute(df, dt.timedelta(days=1), dt.timedelta(hours=1), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(days=1), dt.timedelta(hours=1), start, end)
     assert len(result) == 24
     assert result["value"].sum() == pytest.approx(24.0)
     assert result["value"].tolist() == pytest.approx([1.0] * 24)
 
 
-def test_resample_or_distribute_case_b_aggregate_15min_to_day() -> None:
+def test_redistribute_to_resolution_case_b_aggregate_15min_to_day() -> None:
     """Case B: source (PT15M) is finer than output (P1D) → sum."""
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 1, 2, tzinfo=dt.UTC)
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left")
     df = pd.DataFrame({"timestamp": timestamps, "value": [1.0] * len(timestamps)})
-    result = resample_or_distribute(df, dt.timedelta(minutes=15), dt.timedelta(days=1), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(minutes=15), dt.timedelta(days=1), start, end)
     assert len(result) == 1
     assert result["value"].iloc[0] == pytest.approx(96.0)  # 4 * 24 slots
 
 
-def test_resample_or_distribute_case_b_aggregate_hour_to_month() -> None:
+def test_redistribute_to_resolution_case_b_aggregate_hour_to_month() -> None:
     """Case B: source (P1H) is finer than output (P1M) → sum."""
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
     timestamps = pd.date_range(start, end, freq="1h", inclusive="left")
     df = pd.DataFrame({"timestamp": timestamps, "value": [1.0] * len(timestamps)})
-    result = resample_or_distribute(df, dt.timedelta(hours=1), isodate.parse_duration("P1M"), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(hours=1), isodate.parse_duration("P1M"), start, end)
     assert len(result) == 1
     assert result["value"].iloc[0] == pytest.approx(31 * 24)
 
 
-def test_resample_or_distribute_case_c_intermediate_gcd() -> None:
+def test_redistribute_to_resolution_case_c_intermediate_gcd() -> None:
     """Case C: source (P2H) and output (P3H) share GCD (P1H) → distribute then aggregate."""
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 1, 1, 6, tzinfo=dt.UTC)  # 3 x P2H slots = 2 x P3H slots
     timestamps = pd.date_range(start, end, freq="2h", inclusive="left")
     df = pd.DataFrame({"timestamp": timestamps, "value": [60.0, 60.0, 60.0]})
-    result = resample_or_distribute(df, dt.timedelta(hours=2), dt.timedelta(hours=3), start, end)
+    result = redistribute_to_resolution(df, dt.timedelta(hours=2), dt.timedelta(hours=3), start, end)
     assert len(result) == 2
     # Each P2H value 60 distributes to 2 x P1H slots of 30 each; 3 x P1H slots sum to 90.
     assert result["value"].sum() == pytest.approx(180.0)
@@ -388,7 +388,7 @@ def test_resample_or_distribute_case_c_intermediate_gcd() -> None:
     assert result["value"].iloc[1] == pytest.approx(90.0)
 
 
-def test_resample_or_distribute_case_c_month_to_week_via_day() -> None:
+def test_redistribute_to_resolution_case_c_month_to_week_via_day() -> None:
     """Case C: P1M → P7D has no direct divisor relationship, but P1D is a common divisor.
     The function distributes P1M → P1D first, then aggregates P1D → P7D.
     January has 31 days: weeks receive 7, 7, 7, 7 and 3 daily shares.
@@ -396,7 +396,7 @@ def test_resample_or_distribute_case_c_month_to_week_via_day() -> None:
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
     df = pd.DataFrame({"timestamp": [pd.Timestamp("2025-01-01", tz=dt.UTC)], "value": [310.0]})
-    result = resample_or_distribute(df, isodate.parse_duration("P1M"), dt.timedelta(weeks=1), start, end)
+    result = redistribute_to_resolution(df, isodate.parse_duration("P1M"), dt.timedelta(weeks=1), start, end)
     assert len(result) == 5
     assert result["value"].sum() == pytest.approx(310.0)
     # Jan 1–7 (7 days), Jan 8–14 (7), Jan 15–21 (7), Jan 22–28 (7), Jan 29–31 (3)

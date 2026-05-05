@@ -214,7 +214,7 @@ def _distribute(
     return result.drop(columns=["__coarse_ts", "__n"]).reset_index(drop=True)
 
 
-def resample_or_distribute(
+def redistribute_to_resolution(
     df: pd.DataFrame,
     source_resolution: Resolution,
     output_resolution: Resolution,
