@@ -169,7 +169,7 @@ def _find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
         g = math.gcd(a_months, b_months)
         return isodate.Duration(months=g)
 
-    # Mixed: one calendar, one timedelta. 1 day is a divisor of a every calender duration
+    # Mixed: one calendar, one timedelta. 1 day is a divisor of every calendar duration
     # So a common divisor between P1D and the timedelta also divides the calendar duration.
     td = b if a_is_cal else a
     return _find_common_divisor(td, isodate.parse_duration("P1D"))
