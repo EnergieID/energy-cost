@@ -11,7 +11,7 @@ from energy_cost.versioning import Versioned
 from .capacity_cost import CapacityComponent
 from .formula import Formula, PeriodicFormula
 from .meter import MeterType, PowerDirection
-from .resolution import Resolution, resample_or_distribute, to_pandas_freq
+from .resolution import Resolution, redistribute_to_resolution, to_pandas_freq
 
 _METER_KEYS = {e.value for e in MeterType}
 
@@ -129,7 +129,7 @@ class TariffVersion(Versioned):
         )
 
         if output_resolution is not None and result is not None:
-            result = resample_or_distribute(result, input_resolution, output_resolution, start, end)
+            result = redistribute_to_resolution(result, input_resolution, output_resolution, start, end)
         return result
 
     def apply_capacity_cost(
@@ -149,7 +149,7 @@ class TariffVersion(Versioned):
         result = result[(result["timestamp"] >= start) & (result["timestamp"] < end)].copy()
 
         if output_resolution is not None and not result.empty:
-            result = resample_or_distribute(result, self.capacity.billing_period, output_resolution, start, end)
+            result = redistribute_to_resolution(result, self.capacity.billing_period, output_resolution, start, end)
         return result
 
     def apply_periodic_costs(

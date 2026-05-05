@@ -513,7 +513,7 @@ def test_apply_correctly_returns_four_index_levels_when_include_meter_type_and_t
 
 
 # ---------------------------------------------------------------------------
-# resample_or_distribute: direction costs
+# redistribute_to_resolution: direction costs
 # ---------------------------------------------------------------------------
 
 
@@ -570,7 +570,7 @@ def test_direction_cost_aggregated_correctly_to_coarser_resolution() -> None:
 
 
 # ---------------------------------------------------------------------------
-# resample_or_distribute: capacity costs
+# redistribute_to_resolution: capacity costs
 # ---------------------------------------------------------------------------
 
 

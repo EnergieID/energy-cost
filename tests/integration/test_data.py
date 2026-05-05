@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+import isodate
 import pandas as pd
 import pytest
 
@@ -82,3 +83,39 @@ def test_contract_produces_valid_dataframe(
 
     assert isinstance(result, pd.DataFrame), "apply must return a DataFrame"
     assert not result.empty, "result DataFrame must not be empty"
+
+
+def test_p7d_resolution_produces_no_nan_values() -> None:
+    """Regression test: weekly (P7D) resolution must not produce NaN values.
+
+    P1M capacity and P1Y periodic fees are bridged to P7D via their common divisor
+    P1D: costs are first distributed from the coarse calendar period to daily bins,
+    then daily bins are summed into weekly bins.
+    """
+    CET = dt.timezone(dt.timedelta(hours=1))
+    start = dt.datetime(2025, 1, 1, tzinfo=CET)
+    end = dt.datetime(2025, 2, 1, tzinfo=CET)
+
+    timestamps = [
+        pd.Timestamp("2025-01-01T00:00:00+01:00"),
+        pd.Timestamp("2025-01-01T00:15:00+01:00"),
+    ]
+    meter = Meter(data=pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]}))
+
+    regional_data = RegionalData.get(("be_flanders", ConnectionType.ELECTRICITY))
+    contract = Contract(
+        fees=regional_data.fees[CustomerType.RESIDENTIAL],
+        distributor=regional_data.distributors["fluvius_antwerpen"],
+        taxes=regional_data.taxes,
+        timezone=CET,
+    )
+
+    result = contract.apply(meters=[meter], start=start, end=end, resolution=isodate.parse_duration("P7D"))
+
+    assert isinstance(result, pd.DataFrame)
+    assert not result.empty
+    # Five weekly buckets expected in January 2025
+    assert len(result) == 5, f"Expected 5 weekly rows, got {len(result)}"
+    # No row may contain any NaN — all weekly bins must carry distributed costs
+    nan_rows = result[result.isna().any(axis=1)]
+    assert nan_rows.empty, f"Unexpected NaN values in rows:\n{nan_rows}"

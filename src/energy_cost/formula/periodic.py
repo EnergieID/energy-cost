@@ -10,7 +10,7 @@ from energy_cost.resolution import (
     Resolution,
     align_timestamps_to_tz,
     detect_resolution_and_range,
-    resample_or_distribute,
+    redistribute_to_resolution,
     snap_billing_period,
     to_pandas_freq,
 )
@@ -54,4 +54,4 @@ class PeriodicFormula(Formula):
         period_timestamps = pd.date_range(start=snapped_start, end=end, freq=period_freq, inclusive="left")
 
         coarse_df = pd.DataFrame({"timestamp": period_timestamps, "value": float(self.constant_cost)})
-        return resample_or_distribute(coarse_df, self.period, resolution, start, end)
+        return redistribute_to_resolution(coarse_df, self.period, resolution, start, end)
