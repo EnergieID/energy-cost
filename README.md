@@ -2,43 +2,49 @@
 
 Python package to model your energy bill based on your energy consumption.
 
-To use this library, you first specify the `Tariff` applicable to you in a yaml file. See the `examples/tariffs` directory for inspiration, with `notebooks/tariffs.ipynb` for a detailed walkthrough.
+This energy bill is calculated based on a `Contract` or even a `ContractHistory`, which is a collection of contracts that can change over time.
+A contract consists of 5 parts:
+- `supplier`: the `Tariff` of your energy supplier
+- `distributor`: the `Tariff` of your energy distributor
+- `fees`: the government fees applicable to you, als defined as a `Tariff`
+- `taxes`: the government `Taxes` applicable to each cost component of your bill
+- `timezone`: the timezone in which all calculations will be done
 
-A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy. We have built in support for fetching these prices from ENTSOE or defining them in a data file, see `notebooks/index.ipynb` for more info.
+You can also specify a `region`, `connection_type`, `customer_type` and `distributor_key` in your contract, which will automatically fetch the applicable distributor tariffs, fees, taxes and timezone for you from our built in data. This is optional, but it can save you a lot of time if your region is supported.
 
-Then, you can use the `Contract` class to calculate your costs based on your consumption data. See `notebooks/contract.ipynb` for an example.
+Contracts can be defined in a yaml file, which makes it easy to manage and update your contract over time. See [`notebooks/contract.ipynb`](notebooks/contract.ipynb) for more info on how to define your contract in a yaml file.
 
-We already have some built in tariffs for the Belgian market, which you can find in `src/energy_cost/data/be/`. These are the distributor tariffs for the main Belgian distributors, as well as the government fees and taxes. We plan to expand this to other European countries in the future, feel free to contribute if you want to see your country's tariffs in the library!
+We also have more detailed documentation on the different components of a contract, see [`notebooks`](notebooks/) for all available notebooks.
+You can find example yaml files for tariffs and taxes in the [`examples`](examples) directory.
+
+A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info.
+
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.
 
-> Note on timezones: every method that takes timestamps as input also takes a timezone as input. All timestamps will be aligned to this timezone, and all outputs will be in this timezone as well. This means that you can use the library with any timezone, regardless of the timezone of the input data or the tariff definitions. By default, the timezone is set to UTC.
+> Note on timezones: every method that takes timestamps as input also takes a timezone as input. All timestamps will be aligned to this timezone, and all outputs will be in this timezone as well. By default, the timezone is set by the regional data, but you can override it in your contract if needed.
 
 ## Example usage
-First define the tariff from your distributor in a yaml file, for example:
+You can define your contract in a yaml file like this:
 
 ```yaml
-- start: 2024-01-01T00:00:00+01:00
+supplier:
+- start: 2025-01-01T00:00:00+01:00
   consumption:
-    constant_cost: 100.0
-  injection:
-    constant_cost: -20.0
+    constant_cost: 90.0
+region: be_flanders
+connection_type: electricity
+customer_type: residential
+distributor_key: fluvius_imewo
 ```
 
 Then, you can use the `Contract` class to calculate your costs based on your consumption data:
 
 ```python
-from energy_cost import Contract, Meter, Tariff
-from energy_cost.data import CustomerType
-from energy_cost.data.be.flanders.electricity import data
+from energy_cost import Contract, Meter
+import pandas as pd
 
-contract = Contract(
-    supplier=Tariff.from_yaml("../examples/tariffs/fixed.yml"),
-    distributor=data.distributors["fluvius_imewo"],
-    fees=data.fees[CustomerType.RESIDENTIAL],
-    taxes=data.taxes,
-    timezone=ZoneInfo("Europe/Brussels"),
-)
+Contract.from_yaml("../examples/contracts/inline.yml")
 
 consumption = Meter(
     data=pd.DataFrame(
@@ -49,10 +55,10 @@ consumption = Meter(
     )
 )
 
-contract.calculate_cost([consumption])
+contract.apply([consumption])
 ```
 
-For more detailed examples, see the notebooks in the `notebooks` directory.
+For more detailed examples, see the notebooks in the [`notebooks`](notebooks) directory.
 
 ## Development
 

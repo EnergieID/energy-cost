@@ -1,19 +1,36 @@
 import datetime as dt
 from datetime import UTC
+from pathlib import Path
+from typing import Any, Self
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+import yaml
 from isodate import Duration
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict, model_validator
 
+from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
 from .meter import CostGroup, Meter, TariffCategory
-from .resolution import Resolution, align_datetime_to_tz
+from .resolution import Resolution, align_datetime_to_tz, detect_resolution_and_range
 from .tariff import Tariff
 from .tax import Tax
+from .versioning import Versioned, VersionedCollection
 
 
-class Contract(BaseModel):
+class Contract(Versioned):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    start: dt.datetime = dt.datetime(1970, 1, 1, tzinfo=UTC)
+
+    # Reference keys (optional) — resolved into live objects by the validator
+    region: str | None = None
+    connection_type: ConnectionType | None = None
+    customer_type: CustomerType | None = None
+    distributor_key: str | None = None
+    supplier_key: str | None = None
+    product_key: str | None = None
+
+    # Live objects — populated directly or resolved from reference keys
     supplier: Tariff | list[Tariff] | None = None
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
@@ -22,7 +39,53 @@ class Contract(BaseModel):
     """All datetime operations use this timezone. Naive datetimes are treated as being
     in this timezone; tz-aware datetimes are converted to it."""
 
-    def calculate_cost(
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_references(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+
+        # Resolve supplier from supplier registry
+        supplier_key = values.get("supplier_key")
+        product_key = values.get("product_key")
+        if values.get("supplier") is None and supplier_key is not None and product_key is not None:
+            values["supplier"] = Supplier.get(supplier_key).products[product_key]
+
+        # Coerce a timezone string (e.g. "Europe/Brussels") to a ZoneInfo object
+        timezone_val = values.get("timezone")
+        if isinstance(timezone_val, str):
+            values["timezone"] = ZoneInfo(timezone_val)
+
+        region = values.get("region")
+        connection_type = values.get("connection_type")
+
+        if region is not None and connection_type is not None:
+            regional = RegionalData.get((region, ConnectionType(connection_type)))
+
+            customer_type = values.get("customer_type")
+            if values.get("fees") is None and customer_type is not None:
+                values["fees"] = regional.fees[CustomerType(customer_type)]
+
+            if values.get("taxes") is None:
+                values["taxes"] = regional.taxes
+
+            if values.get("timezone") is None:
+                values["timezone"] = regional.timezone
+
+            distributor_key = values.get("distributor_key")
+            if values.get("distributor") is None and distributor_key is not None:
+                values["distributor"] = regional.distributors[distributor_key]
+
+        return values
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> Self:
+        """Load a single contract from a YAML file."""
+        with Path(path).open(encoding="utf-8") as file:
+            raw_data = yaml.safe_load(file)
+        return cls.model_validate(raw_data)
+
+    def apply(
         self,
         meters: list[Meter],
         start: dt.datetime | None = None,
@@ -94,3 +157,28 @@ class Contract(BaseModel):
         result[_total] = result[total_cols].sum(axis=1)
 
         return result
+
+
+class ContractHistory(VersionedCollection[Contract]):
+    def apply(
+        self,
+        meters: list[Meter],
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
+        resolution: Resolution | None = None,
+    ) -> pd.DataFrame | None:
+        if start is None or end is None:
+            combined = pd.concat([m.data for m in meters], ignore_index=True)
+            detected_start, detected_end, _ = detect_resolution_and_range(combined)
+            if start is None:
+                start = detected_start
+            if end is None:
+                end = detected_end
+
+        return self.collect_version_frames(
+            lambda contract, seg_start, seg_end: contract.apply(
+                meters, start=seg_start, end=seg_end, resolution=resolution
+            ),
+            start,
+            end,
+        )

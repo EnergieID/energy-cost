@@ -19,7 +19,7 @@ class IndexAdder(BaseModel):
     def get_values(
         self, start: dt.datetime, end: dt.datetime, resolution: Resolution, timezone: dt.tzinfo = UTC
     ) -> pd.DataFrame:
-        index = Index.from_name(self.index)
+        index = Index.get(self.index)
         index_values = index.get_values(start, end, resolution, timezone)
         index_values = index_values.copy()
         index_values["value"] = index_values["value"] * self.scalar
