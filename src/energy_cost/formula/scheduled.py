@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from datetime import UTC
 from enum import StrEnum
+from typing import Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
@@ -84,7 +85,7 @@ class ScheduledFormula(Formula):
 
 
 class ScheduledFormulas(Formula):
-    kind: str = "scheduled"
+    kind: Literal["scheduled"] = "scheduled"
     schedule: list[ScheduledFormula] = Field(default_factory=list)
 
     def get_values(

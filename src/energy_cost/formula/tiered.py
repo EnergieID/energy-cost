@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from datetime import UTC
 from enum import StrEnum
+from typing import Literal
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
@@ -31,7 +32,7 @@ class TierBand(BaseModel):
 class TieredFormula(Formula):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    kind: str = "tiered"
+    kind: Literal["tiered"] = "tiered"
     bands: list[TierBand] = Field(default_factory=list)
     band_period: Resolution | None = None
     mode: TieringMode = TieringMode.PROGRESSIVE

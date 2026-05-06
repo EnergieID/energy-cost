@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 from datetime import UTC
+from typing import Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -27,7 +28,7 @@ class IndexAdder(BaseModel):
 
 
 class IndexFormula(Formula):
-    kind: str = "index"
+    kind: Literal["index"] = "index"
     constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 import datetime as dt
 from abc import ABC, abstractmethod
 from datetime import UTC
-from typing import Any
+from typing import Annotated, Any
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, TypeAdapter
 from pydantic_core import core_schema
 
 from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
@@ -19,6 +19,20 @@ class Formula(ABC, BaseModel):
         if cls.__name__ != "Formula":
             return handler(source_type)
         return core_schema.no_info_plain_validator_function(cls._coerce)
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, schema, handler):
+        # Subclasses generate their own detailed schemas normally.
+        if cls.__name__ != "Formula":
+            return handler(schema)
+        # only import here to avoid circular imports
+        from . import IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
+
+        union = Annotated[
+            IndexFormula | PeriodicFormula | ScheduledFormulas | TieredFormula,
+            Field(discriminator="kind"),
+        ]
+        return TypeAdapter(union).json_schema()
 
     @classmethod
     def _coerce(cls, value: Any) -> Formula:

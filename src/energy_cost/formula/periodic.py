@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 from datetime import UTC
+from typing import Literal
 
 import pandas as pd
 from pydantic import ConfigDict
@@ -21,7 +22,7 @@ from .formula import Formula
 class PeriodicFormula(Formula):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    kind: str = "periodic"
+    kind: Literal["periodic"] = "periodic"
     period: Resolution
     constant_cost: float
 
