@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from energy_cost.index.index import Index
 from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
 
-from .formula import Formula
+from .formula import FormulaBase
 
 
 class IndexAdder(BaseModel):
@@ -27,7 +27,7 @@ class IndexAdder(BaseModel):
         return index_values
 
 
-class IndexFormula(Formula):
+class IndexFormula(FormulaBase):
     kind: Literal["index"] = "index"
     constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)

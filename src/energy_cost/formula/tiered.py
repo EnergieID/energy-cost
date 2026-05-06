@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from datetime import UTC
 from enum import StrEnum
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
@@ -16,7 +16,10 @@ from energy_cost.resolution import (
     to_pandas_freq,
 )
 
-from .formula import Formula
+from .formula import FormulaBase
+
+if TYPE_CHECKING:
+    from energy_cost.formula import Formula
 
 
 class TieringMode(StrEnum):
@@ -29,7 +32,7 @@ class TierBand(BaseModel):
     formula: Formula
 
 
-class TieredFormula(Formula):
+class TieredFormula(FormulaBase):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: Literal["tiered"] = "tiered"

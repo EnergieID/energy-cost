@@ -16,10 +16,10 @@ from energy_cost.resolution import (
     to_pandas_freq,
 )
 
-from .formula import Formula
+from .formula import FormulaBase
 
 
-class PeriodicFormula(Formula):
+class PeriodicFormula(FormulaBase):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: Literal["periodic"] = "periodic"

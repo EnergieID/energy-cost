@@ -3,56 +3,14 @@ from __future__ import annotations
 import datetime as dt
 from abc import ABC, abstractmethod
 from datetime import UTC
-from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
-from pydantic_core import core_schema
 
 from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
 
 
-class Formula(ABC, BaseModel):
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source_type, handler):
-        # Subclasses get normal Pydantic schema — only the base class dispatches
-        if cls.__name__ != "Formula":
-            return handler(source_type)
-        return core_schema.no_info_plain_validator_function(cls._coerce)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, schema, handler):
-        # Subclasses generate their own detailed schemas normally.
-        if cls.__name__ != "Formula":
-            return handler(schema)
-        # only import here to avoid circular imports
-        from . import IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
-
-        return {
-            "oneOf": [
-                handler(t.__pydantic_core_schema__)
-                for t in (IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula)
-            ]
-        }
-
-    @classmethod
-    def _coerce(cls, value: Any) -> Formula:
-        # only import here to avoid circular imports
-        from . import IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
-
-        if isinstance(value, Formula):
-            return value
-        if isinstance(value, dict):
-            if value.get("kind") == "tiered" or "bands" in value:
-                return TieredFormula.model_validate(value)
-            if value.get("kind") == "periodic" or "period" in value:
-                return PeriodicFormula.model_validate(value)
-            if value.get("kind") == "scheduled" or "schedule" in value:
-                return ScheduledFormulas.model_validate(value)
-            if value.get("kind") == "index" or "constant_cost" in value or "variable_costs" in value:
-                return IndexFormula.model_validate(value)
-        raise ValueError(f"Cannot coerce {value!r} to Formula")
-
+class FormulaBase(ABC, BaseModel):
     @abstractmethod
     def get_values(
         self,
