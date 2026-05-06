@@ -3,10 +3,10 @@ from __future__ import annotations
 import datetime as dt
 from abc import ABC, abstractmethod
 from datetime import UTC
-from typing import Annotated, Any
+from typing import Any
 
 import pandas as pd
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel
 from pydantic_core import core_schema
 
 from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
@@ -28,11 +28,12 @@ class Formula(ABC, BaseModel):
         # only import here to avoid circular imports
         from . import IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
 
-        union = Annotated[
-            IndexFormula | PeriodicFormula | ScheduledFormulas | TieredFormula,
-            Field(discriminator="kind"),
-        ]
-        return TypeAdapter(union).json_schema()
+        return {
+            "oneOf": [
+                handler(t.__pydantic_core_schema__)
+                for t in (IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula)
+            ]
+        }
 
     @classmethod
     def _coerce(cls, value: Any) -> Formula:
