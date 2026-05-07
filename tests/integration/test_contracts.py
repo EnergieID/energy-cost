@@ -91,7 +91,7 @@ class TestContractHistoryConfigs:
     def test_history(self, fake_index: None, fake_supplier: None, consumption_meter: Meter) -> None:
         history = ContractHistory.from_yaml(EXAMPLES / "contracts" / "history.yml")
 
-        assert len(history.versions) == 2
+        assert len(history.root) == 2
         result = history.apply(
             meters=[consumption_meter],
             start=dt.datetime(2024, 6, 1, tzinfo=CET),
@@ -104,7 +104,7 @@ class TestContractHistoryConfigs:
     def test_history_with_gap(self, fake_index: None, fake_supplier: None, consumption_meter: Meter) -> None:
         history = ContractHistory.from_yaml(EXAMPLES / "contracts" / "history_with_gap.yml")
 
-        assert len(history.versions) == 2
+        assert len(history.root) == 2
         result = history.apply(
             meters=[consumption_meter],
             start=dt.datetime(2024, 6, 1, tzinfo=CET),

@@ -120,7 +120,7 @@ def test_capacity_component_applies_rolling_average_window() -> None:
 
 def test_tariff_applies_capacity_cost_across_version_boundary() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 capacity=CapacityComponent(
@@ -270,7 +270,7 @@ def test_tariff_version_apply_capacity_cost_accepts_unit_param() -> None:
 def test_tariff_apply_capacity_cost_accepts_unit_param() -> None:
     """Tariff.apply_capacity_cost passes unit=MW to each version's capacity component."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 capacity=CapacityComponent(

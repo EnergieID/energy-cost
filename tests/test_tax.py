@@ -231,13 +231,13 @@ class TestTaxYaml:
 
         tax = Tax.from_yaml(path)
 
-        assert len(tax.versions) == 2
-        assert tax.versions[0].default == 0.06
-        assert len(tax.versions[0].rates) == 2
-        assert tax.versions[0].rates[0].rate == 0.21
-        assert tax.versions[0].rates[0].columns == [("*", "capacity", "*")]
-        assert tax.versions[1].default == 0.09
-        assert tax.versions[1].rates == []
+        assert len(tax.root) == 2
+        assert tax.root[0].default == 0.06
+        assert len(tax.root[0].rates) == 2
+        assert tax.root[0].rates[0].rate == 0.21
+        assert tax.root[0].rates[0].columns == [("*", "capacity", "*")]
+        assert tax.root[1].default == 0.09
+        assert tax.root[1].rates == []
 
 
 # ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ class TestTaxYaml:
 
 class TestTaxApply:
     def test_single_version(self) -> None:
-        tax = Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)])
+        tax = Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)])
         df = pd.DataFrame(
             {
                 "timestamp": pd.date_range("2025-03-01", periods=2, freq="MS"),
@@ -261,7 +261,7 @@ class TestTaxApply:
 
     def test_version_switch_at_boundary(self) -> None:
         tax = Tax(
-            versions=[
+            [
                 TaxVersion(start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC), default=0.06),
                 TaxVersion(start=dt.datetime(2026, 1, 1, tzinfo=dt.UTC), default=0.10),
             ]
