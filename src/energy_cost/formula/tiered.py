@@ -19,7 +19,7 @@ from energy_cost.resolution import (
 from .base import FormulaBase
 
 if TYPE_CHECKING:
-    from energy_cost.formula import Formula
+    from .formula import Formula
 
 
 class TieringMode(StrEnum):

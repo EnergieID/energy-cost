@@ -13,7 +13,7 @@ from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_f
 from .base import FormulaBase
 
 if TYPE_CHECKING:
-    from energy_cost.formula import Formula
+    from .formula import Formula
 
 
 class DayOfWeek(StrEnum):
