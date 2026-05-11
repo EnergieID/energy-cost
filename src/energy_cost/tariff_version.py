@@ -35,6 +35,9 @@ def _coerce_meter_formulas(value: Any) -> Any:
     """Coerce shorthand MeterFormulas values."""
     if not isinstance(value, dict):
         return value
+    if not value:
+        # Empty dict means no formulas — pass through unchanged
+        return value
     if not any(key in value for key in _METER_KEYS):
         # No meter keys, assume it's a shorthand for ALL meters
         return {MeterType.ALL.value: _coerce_named_formulas(value)}
