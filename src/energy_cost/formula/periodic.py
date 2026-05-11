@@ -16,7 +16,7 @@ from energy_cost.resolution import (
     to_pandas_freq,
 )
 
-from .formula import FormulaBase
+from .base import FormulaBase
 
 
 class PeriodicFormula(FormulaBase):
