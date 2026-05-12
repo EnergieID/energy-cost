@@ -216,6 +216,7 @@ def redistribute_to_resolution(
     output_resolution: Resolution,
     start: dt.datetime,
     end: dt.datetime,
+    binning_anchor: dt.datetime | None = None,
 ) -> pd.DataFrame:
     """Convert *df* from *source_resolution* to *output_resolution*."""
 
@@ -229,9 +230,27 @@ def redistribute_to_resolution(
         result = _distribute(result, source_resolution, gcd, start, end)
 
     if gcd != output_resolution:
-        result = result.set_index("timestamp").resample(to_pandas_freq(output_resolution)).sum().reset_index()
+        anchor = binning_anchor if binning_anchor is not None else start
+        result = _aggregate_to_resolution(result, output_resolution, anchor, end)
 
     return result
+
+
+def _aggregate_to_resolution(
+    df: pd.DataFrame,
+    output_resolution: Resolution,
+    start: dt.datetime,
+    end: dt.datetime,
+) -> pd.DataFrame:
+    """Aggregate *df* into *output_resolution* bins anchored to *start*."""
+    freq = to_pandas_freq(output_resolution)
+    snapped_start, snapped_end = snap_billing_period(start, end, freq)
+    bin_df = pd.DataFrame({"__bin": pd.date_range(start=snapped_start, end=snapped_end, freq=freq, inclusive="left")})
+    merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
+    value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]
+    return (
+        merged.groupby("__bin")[value_cols].sum(numeric_only=True).reset_index().rename(columns={"__bin": "timestamp"})
+    )
 
 
 def detect_resolution_and_range(

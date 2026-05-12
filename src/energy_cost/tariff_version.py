@@ -116,6 +116,7 @@ class TariffVersion(Versioned):
         input_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
         output_resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data in [start, end), returning costs in €."""
         data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
@@ -129,7 +130,9 @@ class TariffVersion(Versioned):
         )
 
         if output_resolution is not None and result is not None:
-            result = redistribute_to_resolution(result, input_resolution, output_resolution, start, end)
+            result = redistribute_to_resolution(
+                result, input_resolution, output_resolution, start, end, binning_anchor=binning_anchor
+            )
         return result
 
     def apply_capacity_cost(
@@ -140,6 +143,7 @@ class TariffVersion(Versioned):
         timezone: dt.tzinfo = UTC,
         unit: Literal["MW", "MWh"] = "MWh",
         output_resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply capacity cost formula in [start, end), returning costs in €."""
         if self.capacity is None:
@@ -149,7 +153,9 @@ class TariffVersion(Versioned):
         result = result[(result["timestamp"] >= start) & (result["timestamp"] < end)].copy()
 
         if output_resolution is not None and not result.empty:
-            result = redistribute_to_resolution(result, self.capacity.billing_period, output_resolution, start, end)
+            result = redistribute_to_resolution(
+                result, self.capacity.billing_period, output_resolution, start, end, binning_anchor=binning_anchor
+            )
         return result
 
     def apply_periodic_costs(
@@ -158,19 +164,30 @@ class TariffVersion(Versioned):
         end: dt.datetime,
         output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply periodic cost formulas in [start, end), returning a DataFrame with a column per named cost."""
         if not self.periodic:
             return None
 
-        output_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
+        sentinel_start = binning_anchor if binning_anchor is not None else start
+        output_ts = pd.date_range(
+            start=sentinel_start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left"
+        )
         if output_ts.empty:
             return None
         sentinel = pd.DataFrame({"timestamp": output_ts})
 
         result: pd.DataFrame | None = None
         for name, formula in self.periodic.items():
-            df = formula.apply(sentinel, resolution=output_resolution, timezone=timezone, start=start, end=end)
+            df = formula.apply(
+                sentinel,
+                resolution=output_resolution,
+                timezone=timezone,
+                start=start,
+                end=end,
+                binning_anchor=binning_anchor,
+            )
             df = df.rename(columns={"value": name})
             result = df if result is None else result.merge(df, on="timestamp", how="outer")
         return result

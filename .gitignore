@@ -208,3 +208,5 @@ __marimo__/
 
 # ENTSOE index disk cache
 .cache/
+
+local/
