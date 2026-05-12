@@ -1,5 +1,6 @@
 import datetime
 import datetime as dt
+from typing import cast
 
 import isodate
 import pandas as pd
@@ -13,6 +14,7 @@ from energy_cost.resolution import (
     is_divisor,
     parse_resolution,
     redistribute_to_resolution,
+    snap_billing_period,
     to_pandas_freq,
 )
 
@@ -402,3 +404,80 @@ def test_redistribute_to_resolution_case_c_month_to_week_via_day() -> None:
     # Jan 1–7 (7 days), Jan 8–14 (7), Jan 15–21 (7), Jan 22–28 (7), Jan 29–31 (3)
     expected = [310.0 * n / 31 for n in (7, 7, 7, 7, 3)]
     assert result["value"].tolist() == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# snap_billing_period: anchor-based snapping
+# ---------------------------------------------------------------------------
+
+
+def test_snap_billing_period_7d_default_anchor_uses_billing_start() -> None:
+    """Without explicit anchor, snap points derive from billing_start (normalised to midnight)."""
+    billing_start = dt.datetime(2026, 2, 1, tzinfo=dt.UTC)  # Sunday
+    billing_end = dt.datetime(2026, 2, 22, tzinfo=dt.UTC)
+    snapped_start, snapped_end = snap_billing_period(billing_start, billing_end, "7D")
+    assert snapped_start == pd.Timestamp(billing_start)
+    assert snapped_end >= pd.Timestamp(billing_end)
+    delta = pd.Timedelta(snapped_end - pd.Timestamp(billing_start))
+    assert delta.value % pd.Timedelta("7D").value == 0
+
+
+def test_snap_billing_period_7d_explicit_anchor() -> None:
+    """With an explicit anchor, snap points are anchor_midnight + x*7D."""
+    anchor = dt.datetime(2026, 1, 5, tzinfo=dt.UTC)  # Monday
+    billing_start = dt.datetime(2026, 2, 1, tzinfo=dt.UTC)  # Sunday
+    billing_end = dt.datetime(2026, 2, 22, tzinfo=dt.UTC)
+    snapped_start, snapped_end = snap_billing_period(billing_start, billing_end, "7D", anchor=anchor)
+    anchor_norm = cast(pd.Timestamp, pd.Timestamp(anchor)).normalize()
+    # snapped_start must be <= billing_start and on the anchor grid
+    assert snapped_start <= pd.Timestamp(billing_start)
+    assert pd.Timedelta(snapped_start - anchor_norm).value % pd.Timedelta("7D").value == 0
+    # snapped_end must be >= billing_end and on the anchor grid
+    assert snapped_end >= pd.Timestamp(billing_end)
+    assert pd.Timedelta(snapped_end - anchor_norm).value % pd.Timedelta("7D").value == 0
+
+
+def test_snap_billing_period_7d_no_shift_when_billing_start_is_on_anchor_grid() -> None:
+    """When billing_start falls exactly on the anchor grid, snapped_start == billing_start."""
+    billing_start = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)  # Thursday
+    billing_end = dt.datetime(2026, 1, 29, tzinfo=dt.UTC)
+    snapped_start, snapped_end = snap_billing_period(billing_start, billing_end, "7D")
+    assert snapped_start == pd.Timestamp(billing_start)
+    assert snapped_end >= pd.Timestamp(billing_end)
+
+
+def test_snap_billing_period_consistent_across_different_starts_with_same_anchor() -> None:
+    """Two different billing windows with the same anchor must produce snap points on the same grid."""
+    anchor = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+    s1, e1 = snap_billing_period(
+        dt.datetime(2026, 1, 5, tzinfo=dt.UTC),
+        dt.datetime(2026, 1, 20, tzinfo=dt.UTC),
+        "7D",
+        anchor=anchor,
+    )
+    s2, e2 = snap_billing_period(
+        dt.datetime(2026, 2, 3, tzinfo=dt.UTC),
+        dt.datetime(2026, 2, 18, tzinfo=dt.UTC),
+        "7D",
+        anchor=anchor,
+    )
+    anchor_norm = cast(pd.Timestamp, pd.Timestamp(anchor)).normalize()
+    # Both snapped_starts must be on the same grid
+    assert pd.Timedelta(s1 - anchor_norm).value % pd.Timedelta("7D").value == 0
+    assert pd.Timedelta(s2 - anchor_norm).value % pd.Timedelta("7D").value == 0
+
+
+def test_redistribute_to_resolution_7d_bins_start_at_billing_start_not_epoch_thursday() -> None:
+    """Aggregating hourly data to P7D must produce bins aligned to billing_start, not
+    to the Unix epoch's Thursday, even when billing_start falls on another weekday."""
+    billing_start = dt.datetime(2026, 2, 2, tzinfo=dt.UTC)
+    billing_end = dt.datetime(2026, 2, 16, tzinfo=dt.UTC)
+    timestamps = pd.date_range(billing_start, billing_end, freq="1h", inclusive="left")
+    df = pd.DataFrame({"timestamp": timestamps, "value": [1.0] * len(timestamps)})
+
+    result = redistribute_to_resolution(df, dt.timedelta(hours=1), dt.timedelta(weeks=1), billing_start, billing_end)
+
+    assert len(result) == 2
+    assert result["timestamp"].iloc[0] == pd.Timestamp(billing_start)
+    assert result["timestamp"].iloc[1] == pd.Timestamp(billing_start) + pd.Timedelta("7D")
+    assert result["value"].sum() == pytest.approx(14 * 24)

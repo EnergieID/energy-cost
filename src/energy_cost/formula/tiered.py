@@ -53,6 +53,7 @@ class TieredFormula(Formula):
         *,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         data = align_timestamps_to_tz(data, timezone)
         if start is None or end is None or resolution is None:
@@ -64,7 +65,7 @@ class TieredFormula(Formula):
             period_freq = to_pandas_freq(self.band_period)
             resolution_freq = to_pandas_freq(resolution)
 
-            range_start, range_end = snap_billing_period(start, end, period_freq)
+            range_start, range_end = snap_billing_period(start, end, period_freq, anchor=binning_anchor)
 
             # Build a lookup: period_start → number of resolution slots in a complete period.
             # (Varies per period, e.g. months have different day counts.)
@@ -110,7 +111,12 @@ class TieredFormula(Formula):
                 mask = unmatched if band.up_to is None else unmatched & (period_total <= band.up_to)
                 if mask.any():
                     band_values = band.formula.apply(
-                        input_data.copy(), resolution=resolution, timezone=timezone, start=start, end=end
+                        input_data.copy(),
+                        resolution=resolution,
+                        timezone=timezone,
+                        start=start,
+                        end=end,
+                        binning_anchor=binning_anchor,
                     )
                     result_values = result_values.where(~mask, band_values.set_index("timestamp")["value"])
                 unmatched = unmatched & ~mask
@@ -128,7 +134,12 @@ class TieredFormula(Formula):
                 )
                 if fraction.any():
                     band_values = band.formula.apply(
-                        input_data.copy(), resolution=resolution, timezone=timezone, start=start, end=end
+                        input_data.copy(),
+                        resolution=resolution,
+                        timezone=timezone,
+                        start=start,
+                        end=end,
+                        binning_anchor=binning_anchor,
                     )
                     result_values = result_values + band_values.set_index("timestamp")["value"] * fraction
                 if band.up_to is not None:

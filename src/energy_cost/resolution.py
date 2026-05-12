@@ -122,30 +122,55 @@ def snap_billing_period(
     billing_start: dt.datetime,
     billing_end: dt.datetime,
     output_freq: str,
+    anchor: dt.datetime | None = None,
 ) -> tuple[dt.datetime, dt.datetime]:
-    """Snap billing start/end to clean output-period boundaries (floor start, ceil end).
+    """Snap billing start/end outward to output-period boundaries derived from *anchor*.
 
-    For example, with monthly output and data starting on 2026-04-09, billing_start
-    is snapped back to 2026-04-01 and billing_end forward to the next month start.
+    The snap points form the series ``anchor_norm + x * offset`` where *anchor_norm* is
+    *anchor* normalised to midnight (and for calendar offsets rolled back to the 1st of
+    the month/year).  When *anchor* is ``None`` it defaults to *billing_start*.
+
+    Returns ``(latest snap <= billing_start, earliest snap >= billing_end)``.
     """
+    if anchor is None:
+        anchor = billing_start
+
     offset = pd.tseries.frequencies.to_offset(output_freq)
     assert offset is not None
 
-    if not isinstance(offset, pd.tseries.offsets.Tick):
-        # Calendar offsets (MonthBegin, YearBegin, …) consider any day-1 timestamp
-        # "on-offset" regardless of time-of-day, so rollforward/rollback preserve
-        # non-midnight times. Normalize to midnight first (pd.Timestamp.normalize()
-        # handles DST-aware timezones correctly), then handle the ceiling case: if
-        # the original ts_end was after midnight on a day that rollforward considers
-        # already on-offset, advance one extra period.
+    ts_anchor = cast(pd.Timestamp, pd.Timestamp(anchor))
+
+    try:
+        tick_nanos = offset.nanos
+    except ValueError:
+        tick_nanos = None
+
+    if tick_nanos is None:
+        # Calendar offsets (MonthBegin, YearBegin, …): the anchor is normalised to
+        # midnight on the 1st of the month/year so the grid is always the natural
+        # calendar boundary.  Different anchors therefore always produce the same grid.
         snapped_start = cast(pd.Timestamp, pd.Timestamp(offset.rollback(billing_start))).normalize()
+
         end_norm = cast(pd.Timestamp, pd.Timestamp(billing_end)).normalize()
         snapped_end = offset.rollforward(end_norm)
         if end_norm < billing_end and snapped_end == end_norm:
             snapped_end = snapped_end + offset
     else:
-        snapped_start = offset.rollback(billing_start)
-        snapped_end = offset.rollforward(billing_end)
+        # Fixed-duration offsets (Day, Hour, Minute, …): normalise anchor to midnight
+        # and compute snap points as anchor_norm + n * offset.
+        anchor_norm = ts_anchor.normalize()
+        ts_start = cast(pd.Timestamp, pd.Timestamp(billing_start))
+        ts_end = cast(pd.Timestamp, pd.Timestamp(billing_end))
+
+        # Latest snap point <= billing_start  (floor division from anchor_norm)
+        delta_start = (ts_start - anchor_norm).value
+        n_start = delta_start // tick_nanos if delta_start >= 0 else -((-delta_start - 1) // tick_nanos + 1)
+        snapped_start = anchor_norm + n_start * offset
+
+        # Earliest snap point >= billing_end  (ceiling division from anchor_norm)
+        delta_end = (ts_end - anchor_norm).value
+        n_end = -(-delta_end // tick_nanos)  # ceiling division
+        snapped_end = anchor_norm + n_end * offset
 
     return snapped_start, snapped_end
 
@@ -181,13 +206,14 @@ def _distribute(
     output_resolution: Resolution,
     start: dt.datetime,
     end: dt.datetime,
+    binning_anchor: dt.datetime | None = None,
 ) -> pd.DataFrame:
     """Distribute coarse *source_resolution* values proportionally into finer *output_resolution* bins."""
     source_freq = to_pandas_freq(source_resolution)
     output_freq = to_pandas_freq(output_resolution)
 
     # Snap to full source periods so every coarse slot is fully populated in the target index.
-    snapped_start, snapped_end = snap_billing_period(start, end, source_freq)
+    snapped_start, snapped_end = snap_billing_period(start, end, source_freq, anchor=binning_anchor)
 
     target_df = pd.DataFrame(
         {
@@ -227,11 +253,10 @@ def redistribute_to_resolution(
     result = df
 
     if gcd != source_resolution:
-        result = _distribute(result, source_resolution, gcd, start, end)
+        result = _distribute(result, source_resolution, gcd, start, end, binning_anchor=binning_anchor)
 
     if gcd != output_resolution:
-        anchor = binning_anchor if binning_anchor is not None else start
-        result = _aggregate_to_resolution(result, output_resolution, anchor, end)
+        result = _aggregate_to_resolution(result, output_resolution, start, end, binning_anchor=binning_anchor)
 
     return result
 
@@ -241,10 +266,11 @@ def _aggregate_to_resolution(
     output_resolution: Resolution,
     start: dt.datetime,
     end: dt.datetime,
+    binning_anchor: dt.datetime | None = None,
 ) -> pd.DataFrame:
     """Aggregate *df* into *output_resolution* bins anchored to *start*."""
     freq = to_pandas_freq(output_resolution)
-    snapped_start, snapped_end = snap_billing_period(start, end, freq)
+    snapped_start, snapped_end = snap_billing_period(start, end, freq, anchor=binning_anchor)
     bin_df = pd.DataFrame({"__bin": pd.date_range(start=snapped_start, end=snapped_end, freq=freq, inclusive="left")})
     merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
     value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]

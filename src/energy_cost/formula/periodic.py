@@ -51,7 +51,7 @@ class PeriodicFormula(Formula):
         period_freq = to_pandas_freq(self.period)
 
         # Snap to period boundary so all periods in [start, end) are covered.
-        snapped_start, _ = snap_billing_period(start, end, period_freq)
+        snapped_start, _ = snap_billing_period(start, end, period_freq, anchor=binning_anchor)
         period_timestamps = pd.date_range(start=snapped_start, end=end, freq=period_freq, inclusive="left")
 
         coarse_df = pd.DataFrame({"timestamp": period_timestamps, "value": float(self.constant_cost)})

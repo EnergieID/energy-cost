@@ -126,7 +126,14 @@ class TariffVersion(Versioned):
         result = self._combine_energy_formulas(
             meter_type,
             direction,
-            lambda formula: formula.apply(data, timezone=timezone, resolution=input_resolution, start=start, end=end),
+            lambda formula: formula.apply(
+                data,
+                timezone=timezone,
+                resolution=input_resolution,
+                start=start,
+                end=end,
+                binning_anchor=binning_anchor,
+            ),
         )
 
         if output_resolution is not None and result is not None:
