@@ -91,6 +91,7 @@ class Contract(Versioned):
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Calculate the full energy bill."""
 
@@ -99,6 +100,7 @@ class Contract(Versioned):
             start = align_datetime_to_tz(start, self.timezone)
         if end is not None:
             end = align_datetime_to_tz(end, self.timezone)
+        binning_anchor = align_datetime_to_tz(binning_anchor, self.timezone) if binning_anchor is not None else start
         if resolution is None:
             resolution = Duration(months=1)
 
@@ -119,6 +121,7 @@ class Contract(Versioned):
                     end=end,
                     resolution=resolution,
                     timezone=self.timezone,
+                    binning_anchor=binning_anchor,
                 )
                 if optional_frame is not None:
                     optional_frame = optional_frame.set_index("timestamp")
@@ -177,7 +180,7 @@ class ContractHistory(VersionedCollection[Contract]):
 
         return self.collect_version_frames(
             lambda contract, seg_start, seg_end: contract.apply(
-                meters, start=seg_start, end=seg_end, resolution=resolution
+                meters, start=seg_start, end=seg_end, resolution=resolution, binning_anchor=start
             ),
             start,
             end,

@@ -1326,3 +1326,63 @@ def test_contract_history_from_yaml(tmp_path) -> None:
     assert len(history.versions) == 2
     assert history.versions[0].end == dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
     assert history.versions[1].end is None
+
+
+# ---------------------------------------------------------------------------
+# Regression — weekly binning anchor misalignment (fees vs. supplier)
+# ---------------------------------------------------------------------------
+
+
+def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segments() -> None:
+    """Regression: weekly (P7D) output must not produce NaN rows when a supplier tariff
+    has a version boundary mid-billing-window while the fees tariff is a single version
+    spanning the whole window.
+
+    Without the ``binning_anchor`` fix, each tariff component used its own segment
+    start as the resample anchor.  The supplier's January-2026 segment started on
+    2026-01-01 (Thursday), anchoring its weekly bins to Thursdays (Jan 1, Jan 8, …).
+    The fees component had a single version whose segment start equalled billing_start
+    (June 1, 2025 — a Sunday), anchoring its bins to Sundays (Jan 4, Jan 11, …).
+    The two DataFrames were then merged via ``pd.concat(axis=1)``, producing
+    alternating rows of NaN where timestamps didn't match.
+    """
+    # Supplier: version boundary at 2026-01-01 (Thursday in UTC), which is offset from
+    # billing_start so the two produce weekly bins on different days of week.
+    supplier = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+            ),
+            TariffVersion(
+                start=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
+                consumption={"all": {"energy": IndexFormula(constant_cost=20.0)}},
+            ),
+        ]
+    )
+    # Fees: single version (started long before billing window) with only a periodic
+    # monthly fixed cost, which must go through redistribute_to_resolution (P1M → P7D).
+    fees = Tariff(
+        versions=[
+            TariffVersion(
+                start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+                periodic={"fund": PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=5.0)},
+            )
+        ]
+    )
+    contract = Contract(supplier=supplier, fees=fees, timezone=dt.UTC)
+
+    billing_start = dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
+    # Daily data spanning the version boundary; enough to fill every weekly bin.
+    timestamps = pd.date_range(billing_start, dt.datetime(2026, 1, 15, tzinfo=dt.UTC), freq="D", inclusive="left")
+    consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+
+    result = contract.apply([Meter(data=consumption)], start=billing_start, resolution=isodate.parse_duration("P7D"))
+
+    assert result is not None
+    data_cols = [c for c in result.columns if c != "timestamp"]
+    nan_rows = result[result[data_cols].isnull().any(axis=1)]
+    assert len(nan_rows) == 0, (
+        f"Found {len(nan_rows)} NaN row(s) — weekly bins misaligned between tariff components:\n"
+        f"{nan_rows[['timestamp']].to_string()}"
+    )
