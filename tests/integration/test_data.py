@@ -119,3 +119,50 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
     # No row may contain any NaN — all weekly bins must carry distributed costs
     nan_rows = result[result.isna().any(axis=1)]
     assert nan_rows.empty, f"Unexpected NaN values in rows:\n{nan_rows}"
+
+
+def test_regression_gas_gives_correct_fees_in_october() -> None:
+    """Regression test: gas fees in BE Flanders should be correct in October."""
+    contract = Contract(
+        region="be_flanders", connection_type=ConnectionType.GAS, customer_type=CustomerType.RESIDENTIAL
+    )
+
+    meter = Meter(
+        data=pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(
+                    [
+                        "2025-05-01T00:00:00+02:00",
+                        "2025-06-01T00:00:00+02:00",
+                        "2025-07-01T00:00:00+02:00",
+                        "2025-08-01T00:00:00+02:00",
+                        "2025-09-01T00:00:00+02:00",
+                        "2025-10-01T00:00:00+02:00",
+                        "2025-11-01T00:00:00+01:00",
+                        "2025-12-01T00:00:00+01:00",
+                        "2026-01-01T00:00:00+01:00",
+                        "2026-02-01T00:00:00+01:00",
+                        "2026-03-01T00:00:00+01:00",
+                        "2026-04-01T00:00:00+02:00",
+                    ],
+                    format="ISO8601",
+                    utc=True,
+                ),
+                "value": 1,
+            }
+        )
+    )
+
+    result = contract.apply(meters=[meter], resolution=isodate.parse_duration("P1M"))
+    assert isinstance(result, pd.DataFrame)
+    assert not result.empty
+
+    # for october, november and december 2025, the fees should be:
+    # (fees, consumption, energy_contribution) = 0.9978
+    # (fees, consumption, excise) = 8.23
+
+    for month in ["2025-10", "2025-11", "2025-12"]:
+        row = result[result["timestamp"].dt.to_period("M") == month]
+        assert not row.empty, f"No data for month {month}"
+        assert row[("fees", "consumption", "energy_contribution")].iloc[0] == pytest.approx(0.9978)
+        assert row[("fees", "consumption", "excise")].iloc[0] == pytest.approx(8.23)
