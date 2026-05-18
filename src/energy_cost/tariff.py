@@ -49,6 +49,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         timezone: dt.tzinfo = UTC,
         unit: Literal["MW", "MWh"] = "MWh",
         output_resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply capacity cost formulas across all active versions.  Returns None when unavailable."""
         if start is None or end is None:
@@ -59,6 +60,7 @@ class Tariff(VersionedCollection[TariffVersion]):
                 end = detected_end
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
+        _binning_anchor = binning_anchor if binning_anchor is not None else start
         return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_capacity_cost(
                 data,
@@ -67,6 +69,7 @@ class Tariff(VersionedCollection[TariffVersion]):
                 timezone=timezone,
                 unit=unit,
                 output_resolution=output_resolution,
+                binning_anchor=_binning_anchor,
             ),
             start,
             end,
@@ -83,6 +86,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         timezone: dt.tzinfo = UTC,
         output_resolution: Resolution | None = None,
         input_resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply energy cost formulas to quantity data across all active versions."""
         if start is None or end is None or input_resolution is None:
@@ -95,6 +99,7 @@ class Tariff(VersionedCollection[TariffVersion]):
                 input_resolution = detected_resolution
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
+        _binning_anchor = binning_anchor if binning_anchor is not None else start
         return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_energy_cost(
                 data,
@@ -105,6 +110,7 @@ class Tariff(VersionedCollection[TariffVersion]):
                 end=seg_end,
                 input_resolution=input_resolution,
                 output_resolution=output_resolution,
+                binning_anchor=_binning_anchor,
             ),
             start,
             end,
@@ -117,13 +123,15 @@ class Tariff(VersionedCollection[TariffVersion]):
         end: dt.datetime,
         output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         """Apply periodic cost formulas across all active versions, returning a DataFrame with a column per named cost."""
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
+        _binning_anchor = binning_anchor if binning_anchor is not None else start
         return self.collect_version_frames(
             lambda version, seg_start, seg_end: version.apply_periodic_costs(
-                seg_start, seg_end, output_resolution, timezone
+                seg_start, seg_end, output_resolution, timezone, binning_anchor=_binning_anchor
             ),
             start,
             end,
@@ -139,6 +147,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         timezone: dt.tzinfo = UTC,
         include_meter_type: bool = False,
         tariff_category: TariffCategory | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         if resolution is None:
             resolution = isodate.Duration(months=1)
@@ -153,13 +162,16 @@ class Tariff(VersionedCollection[TariffVersion]):
             start = align_datetime_to_tz(start, timezone)
         if end is not None:
             end = align_datetime_to_tz(end, timezone)
+        if binning_anchor is not None:
+            binning_anchor = align_datetime_to_tz(binning_anchor, timezone)
 
         detected_start, detected_end, data_resolution = detect_resolution_and_range(combined_consumption)
         billing_start: dt.datetime = start if start is not None else detected_start
         billing_end: dt.datetime = end if end is not None else detected_end
         output_freq = to_pandas_freq(resolution)
 
-        billing_start, billing_end = snap_billing_period(billing_start, billing_end, output_freq)
+        billing_start, billing_end = snap_billing_period(billing_start, billing_end, output_freq, anchor=binning_anchor)
+        downstream_anchor = binning_anchor if binning_anchor is not None else billing_start
 
         frames: list[pd.DataFrame] = []
         for meter in meters:
@@ -173,13 +185,16 @@ class Tariff(VersionedCollection[TariffVersion]):
                 resolution,
                 timezone,
                 input_resolution=data_resolution,
+                binning_anchor=downstream_anchor,
             )
             if frame is not None:
                 frames.append(frame)
 
         for optional_frame in [
-            self._apply_capacity_costs(combined_consumption, billing_start, billing_end, resolution, timezone),
-            self._apply_fixed_costs(billing_start, billing_end, resolution, timezone),
+            self._apply_capacity_costs(
+                combined_consumption, billing_start, billing_end, resolution, timezone, binning_anchor=downstream_anchor
+            ),
+            self._apply_fixed_costs(billing_start, billing_end, resolution, timezone, binning_anchor=downstream_anchor),
         ]:
             if optional_frame is not None:
                 frames.append(optional_frame)
@@ -214,6 +229,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         resolution: Resolution,
         timezone: dt.tzinfo = UTC,
         input_resolution: Resolution | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         costs = self.apply_energy_cost(
             data,
@@ -224,6 +240,7 @@ class Tariff(VersionedCollection[TariffVersion]):
             timezone,
             output_resolution=resolution,
             input_resolution=input_resolution,
+            binning_anchor=billing_start if binning_anchor is None else binning_anchor,
         )
         if costs is None:
             return None
@@ -242,6 +259,7 @@ class Tariff(VersionedCollection[TariffVersion]):
         billing_end: dt.datetime,
         resolution: Resolution,
         timezone: dt.tzinfo = UTC,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         capacity_df = self.apply_capacity_cost(
             consumption,
@@ -249,6 +267,7 @@ class Tariff(VersionedCollection[TariffVersion]):
             billing_end,
             timezone,
             output_resolution=resolution,
+            binning_anchor=billing_start if binning_anchor is None else binning_anchor,
         )
         if capacity_df is None or capacity_df.empty:
             return None
@@ -262,9 +281,14 @@ class Tariff(VersionedCollection[TariffVersion]):
         billing_end: dt.datetime,
         resolution: Resolution,
         timezone: dt.tzinfo = UTC,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
         fixed_df = self.apply_periodic_costs(
-            billing_start, billing_end, output_resolution=resolution, timezone=timezone
+            billing_start,
+            billing_end,
+            output_resolution=resolution,
+            timezone=timezone,
+            binning_anchor=billing_start if binning_anchor is None else binning_anchor,
         )
         if fixed_df is None or fixed_df.empty:
             return None

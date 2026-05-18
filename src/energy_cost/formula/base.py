@@ -29,6 +29,7 @@ class FormulaBase(ABC, BaseModel):
         *,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Apply formula values to a dataframe of quantities and return a single value column."""
         if data.empty:
