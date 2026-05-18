@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 from datetime import UTC
+from typing import Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -9,7 +10,7 @@ from pydantic import BaseModel, Field
 from energy_cost.index.index import Index
 from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
 
-from .formula import Formula
+from .base import FormulaBase
 
 
 class IndexAdder(BaseModel):
@@ -26,8 +27,8 @@ class IndexAdder(BaseModel):
         return index_values
 
 
-class IndexFormula(Formula):
-    kind: str = "index"
+class IndexFormula(FormulaBase):
+    kind: Literal["index"] = "index"
     constant_cost: float = 0.0
     variable_costs: list[IndexAdder] = Field(default_factory=list)
 

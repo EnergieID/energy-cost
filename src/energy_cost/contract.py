@@ -14,6 +14,7 @@ from .meter import CostGroup, Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz, detect_resolution_and_range
 from .tariff import Tariff
 from .tax import Tax
+from .types import TzInfo
 from .versioning import Versioned, VersionedCollection
 
 
@@ -35,7 +36,7 @@ class Contract(Versioned):
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
     taxes: Tax | list[Tax] | None = None
-    timezone: dt.tzinfo = UTC
+    timezone: TzInfo = ZoneInfo("UTC")
     """All datetime operations use this timezone. Naive datetimes are treated as being
     in this timezone; tz-aware datetimes are converted to it."""
 
@@ -50,11 +51,6 @@ class Contract(Versioned):
         product_key = values.get("product_key")
         if values.get("supplier") is None and supplier_key is not None and product_key is not None:
             values["supplier"] = Supplier.get(supplier_key).products[product_key]
-
-        # Coerce a timezone string (e.g. "Europe/Brussels") to a ZoneInfo object
-        timezone_val = values.get("timezone")
-        if isinstance(timezone_val, str):
-            values["timezone"] = ZoneInfo(timezone_val)
 
         region = values.get("region")
         connection_type = values.get("connection_type")

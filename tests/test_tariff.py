@@ -32,9 +32,9 @@ def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
 
     tariff = Tariff.from_yaml(path)
 
-    assert len(tariff.versions) == 2
-    assert tariff.versions[0].start == dt.datetime(2025, 1, 1, 0, 0)
-    assert tariff.versions[1].start == dt.datetime(2026, 1, 1, 0, 0)
+    assert len(tariff.root) == 2
+    assert tariff.root[0].start == dt.datetime(2025, 1, 1, 0, 0)
+    assert tariff.root[1].start == dt.datetime(2026, 1, 1, 0, 0)
 
 
 def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
@@ -53,7 +53,7 @@ def test_tariff_from_yaml_supports_scheduled_formula_dict() -> None:
 
 def test_get_energy_cost_uses_correct_segment_for_time_range() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
@@ -78,7 +78,7 @@ def test_get_energy_cost_uses_correct_segment_for_time_range() -> None:
 
 
 def test_get_energy_cost_returns_none_when_no_formulas_found() -> None:
-    tariff = Tariff(versions=[TariffVersion(start=dt.datetime(2025, 1, 1, 0, 0))])
+    tariff = Tariff([TariffVersion(start=dt.datetime(2025, 1, 1, 0, 0))])
 
     result = tariff.get_energy_cost(
         start=dt.datetime(2025, 1, 1, 0, 0),
@@ -89,7 +89,7 @@ def test_get_energy_cost_returns_none_when_no_formulas_found() -> None:
 
 def test_get_energy_cost_returns_none_when_no_versions_overlap_interval() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 2, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
@@ -106,7 +106,7 @@ def test_get_energy_cost_returns_none_when_no_versions_overlap_interval() -> Non
 
 def test_apply_periodic_costs_spans_multiple_segments() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
@@ -130,7 +130,7 @@ def test_apply_periodic_costs_spans_multiple_segments() -> None:
 
 def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2026, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
@@ -150,7 +150,7 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions() -> Non
 
 def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_capacity_cost() -> None:
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=1.0)}},
@@ -171,7 +171,7 @@ def test_apply_capacity_returns_empty_dataframe_when_no_active_versions_with_cap
 def test_apply_energy_cost_detects_start_from_data_when_only_end_is_given() -> None:
     """When start is None but end is provided, start is detected from data."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=5.0)}},
@@ -198,7 +198,7 @@ def test_apply_energy_cost_detects_start_from_data_when_only_end_is_given() -> N
 def test_apply_energy_cost_detects_end_from_data_when_only_start_is_given() -> None:
     """When end is None but start is provided, end is detected from data."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=7.0)}},
@@ -225,7 +225,7 @@ def test_apply_energy_cost_detects_end_from_data_when_only_start_is_given() -> N
 def test_apply_energy_cost_detects_resolution_from_data_when_not_provided() -> None:
     """When input_resolution is None but start and end are given, resolution is detected from data."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=3.0)}},
@@ -264,7 +264,7 @@ def _tz_tariff(*, energy_rate: float = 100.0, daily_fixed: float | None = None) 
         else {}
     )
     return Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={"all": {"energy": IndexFormula(constant_cost=energy_rate)}},
@@ -358,7 +358,7 @@ def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_
 def test_apply_tou_peak_meter_uses_tou_formula() -> None:
     """A TOU_PEAK meter selects the tou_peak formula and the output column reflects the meter type."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
@@ -384,7 +384,7 @@ def test_apply_tou_peak_meter_uses_tou_formula() -> None:
 def test_apply_mixed_meter_types_produce_separate_columns() -> None:
     """A single_rate meter and a tou_peak meter each get their own output column group."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
@@ -418,7 +418,7 @@ def test_apply_mixed_meter_types_produce_separate_columns() -> None:
 def test_apply_tou_offpeak_and_injection_meters() -> None:
     """TOU_OFFPEAK consumption and injection meters are handled independently."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0, tzinfo=_CET),
                 consumption={
@@ -459,7 +459,7 @@ def test_apply_tou_offpeak_and_injection_meters() -> None:
 def test_apply_returns_extra_index_level_and_total_if_tariff_category_provided() -> None:
     """If a tariff category is provided, the output columns get an extra index level and a total column."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
@@ -482,7 +482,7 @@ def test_apply_returns_extra_index_level_and_total_if_tariff_category_provided()
 def test_apply_correctly_returns_four_index_levels_when_include_meter_type_and_tariff_category() -> None:
     """When both include_meter_type and tariff_category are set, the output columns have four index levels."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
@@ -520,7 +520,7 @@ def test_apply_correctly_returns_four_index_levels_when_include_meter_type_and_t
 def test_direction_cost_redistributed_evenly_to_finer_resolution() -> None:
     """15-min cost split into 3 equal 5-min rows; their sum equals the original 15-min cost."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
@@ -550,7 +550,7 @@ def test_direction_cost_redistributed_evenly_to_finer_resolution() -> None:
 def test_direction_cost_aggregated_correctly_to_coarser_resolution() -> None:
     """15-min costs summed to hourly buckets."""
     tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},

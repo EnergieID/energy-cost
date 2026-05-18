@@ -41,7 +41,7 @@ def _tariff(
         else {}
     )
     return Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=version_start,
                 consumption=consumption,
@@ -282,7 +282,7 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
         supplier=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=100.0),
         fees=_tariff(energy_rate=50.0),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     # 2 intervals × 1 MWh each
@@ -308,8 +308,8 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
 
 def test_contract_list_of_taxes() -> None:
     """Multiple Tax specs are summed independently."""
-    vat = Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)])
-    levy = Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.05)])
+    vat = Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)])
+    levy = Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.05)])
     contract = Contract(
         supplier=_tariff(energy_rate=100.0),
         taxes=[vat, levy],
@@ -341,7 +341,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
     contract = Contract(
         supplier=_tariff(energy_rate=10.0),
         distributor=_tariff(energy_rate=5.0),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min")
     result = contract.apply([Meter(data=_consumption(timestamps))])
@@ -355,7 +355,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     contract = Contract(
         supplier=_tariff(energy_rate=100.0),
         distributor=_tariff(energy_rate=50.0),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min")
     consumption = _consumption(timestamps, value=2.0)
@@ -395,7 +395,7 @@ def _tz_contract(
         else {}
     )
     version = TariffVersion(start=start, consumption=consumption, periodic=periodic)
-    tariff = Tariff(versions=[version])
+    tariff = Tariff([version])
     return Contract(supplier=tariff, distributor=tariff, timezone=_CET)
 
 
@@ -439,7 +439,7 @@ def test_apply_tou_peak_meter_billed_under_tou_column() -> None:
     """A TOU_PEAK meter uses the tou_peak formula; its column is prefixed with the meter type."""
     # a tariff that has both single_rate and tou_peak formulas.
     tou_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -466,7 +466,7 @@ def test_apply_tou_peak_meter_billed_under_tou_column() -> None:
 def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
     """A single_rate and a tou_peak consumption meter each get their own column group."""
     tou_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -500,7 +500,7 @@ def test_apply_multiple_consumption_meters_produce_separate_columns() -> None:
 def test_contract_with_tou_meter_routes_cost_correctly() -> None:
     """contract.apply routes a TOU_PEAK meter through the correct formula."""
     tou_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -525,7 +525,7 @@ def test_contract_with_tou_meter_routes_cost_correctly() -> None:
 def test_contract_with_injection_and_tou_meters() -> None:
     """Contract correctly handles a mix of injection and TOU consumption meters."""
     supplier_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -538,7 +538,7 @@ def test_contract_with_injection_and_tou_meters() -> None:
         ]
     )
     distributor_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -664,7 +664,7 @@ def test_avoid_regression_on_real_world_data() -> None:
       scalar: 1.10
 """
     contract = Contract(
-        supplier=Tariff.model_validate({"versions": yaml.safe_load(tariff)}),
+        supplier=Tariff.model_validate(yaml.safe_load(tariff)),
         distributor=data.distributors["fluvius_antwerpen"],
         fees=data.fees[CustomerType.RESIDENTIAL],
         taxes=data.taxes,
@@ -741,7 +741,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
 def test_contract_collapses_meter_types_by_default() -> None:
     """contract.apply collapses MeterType by default (3-level output)."""
     tou_tariff = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, 0, 0),
                 consumption={
@@ -831,7 +831,7 @@ def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -
 
     contract = Contract(
         supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
         timezone=dt.UTC,
     )
 
@@ -866,7 +866,7 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
 
     contract = Contract(
         supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
         timezone=dt.UTC,
     )
 
@@ -916,7 +916,7 @@ def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> Non
 
     contract = Contract(
         supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
         timezone=dt.UTC,
     )
 
@@ -957,7 +957,7 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
 
     contract = Contract(
         supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.21)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.21)]),
         timezone=dt.UTC,
     )
 
@@ -992,7 +992,7 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
 
     contract = Contract(
         supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax(versions=[TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
+        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
         timezone=dt.UTC,
     )
 
@@ -1161,7 +1161,7 @@ def test_contract_inline_supplier_overrides_supplier_key() -> None:
 def test_contract_history_single_contract() -> None:
     """A history with one contract produces the same result as calling contract.apply directly."""
     history = ContractHistory(
-        versions=[
+        [
             Contract(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 supplier=_tariff(energy_rate=10.0),
@@ -1182,7 +1182,7 @@ def test_contract_history_single_contract() -> None:
 def test_contract_history_two_contracts_sequential() -> None:
     """Two sequential contracts each produce rows for their respective period."""
     history = ContractHistory(
-        versions=[
+        [
             Contract(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
@@ -1217,7 +1217,7 @@ def test_contract_history_two_contracts_sequential() -> None:
 def test_contract_history_gap_produces_no_rows() -> None:
     """A gap between contracts produces no rows for the gap period."""
     history = ContractHistory(
-        versions=[
+        [
             Contract(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
@@ -1248,7 +1248,7 @@ def test_contract_history_gap_produces_no_rows() -> None:
 def test_contract_history_different_columns_zero_filled() -> None:
     """When contracts produce different columns, missing columns are zero-filled."""
     history = ContractHistory(
-        versions=[
+        [
             Contract(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
@@ -1284,7 +1284,7 @@ def test_contract_history_different_columns_zero_filled() -> None:
 def test_contract_history_returns_none_when_no_contracts_overlap() -> None:
     """Querying a period with no active contracts returns None."""
     history = ContractHistory(
-        versions=[
+        [
             Contract(
                 start=dt.datetime(2025, 6, 1, tzinfo=dt.UTC),
                 supplier=_tariff(energy_rate=10.0),
@@ -1323,9 +1323,9 @@ def test_contract_history_from_yaml(tmp_path) -> None:
 
     history = ContractHistory.from_yaml(path)
 
-    assert len(history.versions) == 2
-    assert history.versions[0].end == dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
-    assert history.versions[1].end is None
+    assert len(history.root) == 2
+    assert history.root[0].end == dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
+    assert history.root[1].end is None
 
 
 # ---------------------------------------------------------------------------
@@ -1349,7 +1349,7 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
     # Supplier: version boundary at 2026-01-01 (Thursday in UTC), which is offset from
     # billing_start so the two produce weekly bins on different days of week.
     supplier = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
@@ -1363,7 +1363,7 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
     # Fees: single version (started long before billing window) with only a periodic
     # monthly fixed cost, which must go through redistribute_to_resolution (P1M → P7D).
     fees = Tariff(
-        versions=[
+        [
             TariffVersion(
                 start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
                 periodic={"fund": PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=5.0)},

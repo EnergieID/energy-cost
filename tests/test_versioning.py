@@ -44,7 +44,7 @@ class TestFindActiveVersionsWithEnd:
     def test_explicit_end_limits_version_range(self) -> None:
         """A version with an explicit end should not cover time after that end."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(
                     dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 6, 1, tzinfo=dt.UTC), rate=10.0
                 ),
@@ -62,7 +62,7 @@ class TestFindActiveVersionsWithEnd:
     def test_gap_between_versions_produces_no_segment(self) -> None:
         """A gap between two versions should not produce any segment."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(
                     dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC), rate=10.0
                 ),
@@ -84,7 +84,7 @@ class TestFindActiveVersionsWithEnd:
     def test_contiguous_versions_without_end_behave_as_before(self) -> None:
         """Versions without explicit end fall back to next version's start."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(dt.datetime(2025, 1, 1, tzinfo=dt.UTC), rate=10.0),
                 _tariff_version(dt.datetime(2025, 7, 1, tzinfo=dt.UTC), rate=20.0),
             ]
@@ -102,7 +102,7 @@ class TestFindActiveVersionsWithEnd:
     def test_query_window_clips_version(self) -> None:
         """Query [start, end) clips a version that extends beyond the window."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(
                     dt.datetime(2024, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2026, 1, 1, tzinfo=dt.UTC), rate=10.0
                 ),
@@ -120,7 +120,7 @@ class TestFindActiveVersionsWithEnd:
     def test_no_segments_when_query_falls_in_gap(self) -> None:
         """Querying a range that falls entirely within a gap returns nothing."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(
                     dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC), rate=10.0
                 ),
@@ -143,7 +143,7 @@ class TestCollectVersionFramesWithGaps:
     def test_energy_cost_gap_returns_no_rows_for_gap_period(self) -> None:
         """get_energy_cost across a gap should only return rows for covered periods."""
         tariff = Tariff(
-            versions=[
+            [
                 _tariff_version(
                     dt.datetime(2025, 1, 1, tzinfo=dt.UTC), end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC), rate=10.0
                 ),
@@ -184,7 +184,7 @@ class TestFromYamlFromDict:
             {"start": "2025-01-01T00:00:00", "consumption": {"constant_cost": 100.0}},
         ]
         tariff = Tariff.model_validate(data)
-        assert len(tariff.versions) == 1
+        assert len(tariff.root) == 1
 
     def test_tariff_from_yaml(self, tmp_path) -> None:
         path = tmp_path / "tariff.yml"
@@ -193,7 +193,7 @@ class TestFromYamlFromDict:
             encoding="utf-8",
         )
         tariff = Tariff.from_yaml(path)
-        assert len(tariff.versions) == 1
+        assert len(tariff.root) == 1
 
     def test_from_list_with_end(self) -> None:
         data = [
@@ -204,4 +204,4 @@ class TestFromYamlFromDict:
             },
         ]
         tariff = Tariff.model_validate(data)
-        assert tariff.versions[0].end == dt.datetime(2025, 6, 1, 0, 0)
+        assert tariff.root[0].end == dt.datetime(2025, 6, 1, 0, 0)

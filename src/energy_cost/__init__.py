@@ -5,6 +5,7 @@ from .resolution import Resolution
 from .tariff import Tariff
 from .tariff_version import TariffVersion
 from .tax import Tax, TaxVersion
+from .types import TzInfo
 
 __all__ = [
     "Tariff",
@@ -20,4 +21,5 @@ __all__ = [
     "PowerDirection",
     "Resolution",
     "Meter",
+    "TzInfo",
 ]

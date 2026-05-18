@@ -1,8 +1,11 @@
 import pandas as pd
 import pytest
 import yaml
+from pydantic import TypeAdapter, ValidationError
 
 from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
+
+_formula_adapter = TypeAdapter(Formula)
 
 
 def test_tiered_formulas_are_correctly_coerced_by_model_validate() -> None:
@@ -15,7 +18,7 @@ bands:
       constant_cost: 100.0
 """
     formula_dict = yaml.safe_load(simple_yaml)
-    formula = Formula.model_validate(formula_dict)
+    formula = _formula_adapter.validate_python(formula_dict)
 
     assert isinstance(formula, TieredFormula)
     assert len(formula.bands) == 2
@@ -25,7 +28,7 @@ kind: tiered
 bands: []
 """
     formula_dict = yaml.safe_load(explicit_yaml)
-    formula = Formula.model_validate(formula_dict)
+    formula = _formula_adapter.validate_python(formula_dict)
 
     assert isinstance(formula, TieredFormula)
     assert len(formula.bands) == 0
@@ -37,7 +40,7 @@ period: P1M
 constant_cost: 100.0
 """
     formula_dict = yaml.safe_load(simple_yaml)
-    formula = Formula.model_validate(formula_dict)
+    formula = _formula_adapter.validate_python(formula_dict)
 
     assert isinstance(formula, PeriodicFormula)
     assert formula.constant_cost == 100.0
@@ -48,7 +51,7 @@ def test_index_formulas_are_correctly_coerced_by_model_validate() -> None:
 constant_cost: 100.0
 """
     formula_dict = yaml.safe_load(simple_yaml)
-    formula = Formula.model_validate(formula_dict)
+    formula = _formula_adapter.validate_python(formula_dict)
 
     assert isinstance(formula, IndexFormula)
 
@@ -66,7 +69,7 @@ schedule:
         constant_cost: 2.0
 """
     formula_dict = yaml.safe_load(simple_yaml)
-    formula = Formula.model_validate(formula_dict)
+    formula = _formula_adapter.validate_python(formula_dict)
 
     assert isinstance(formula, ScheduledFormulas)
     assert len(formula.schedule) == 2
@@ -78,7 +81,29 @@ def test_invalid_formulas_raise_on_model_validate() -> None:
 """
     invalid_formula = yaml.safe_load(invalid_yaml)
 
-    pytest.raises(ValueError, Formula.model_validate, invalid_formula)
+    pytest.raises(ValidationError, _formula_adapter.validate_python, invalid_formula)
+
+
+def test_formula_json_schema_generates_without_recursion() -> None:
+    """Regression: generating JSON schema for Formula must not recurse infinitely.
+
+    TierBand.formula and ScheduledFormula.formula are both typed as Formula,
+    which previously caused infinite recursion when generating the OpenAPI schema.
+    """
+    schema = _formula_adapter.json_schema()
+
+    # Should be a oneOf/anyOf with refs for each of the four concrete subtypes
+    assert any(k in schema for k in ("oneOf", "anyOf", "$defs"))
+
+
+def test_formula_json_schema_covers_all_subtypes() -> None:
+    from pydantic import TypeAdapter
+
+    schema = TypeAdapter(Formula).json_schema(mode="serialization")
+    schema_str = str(schema)
+
+    for subtype in ("IndexFormula", "PeriodicFormula", "ScheduledFormulas", "TieredFormula"):
+        assert subtype in schema_str, f"{subtype} missing from Formula JSON schema"
 
 
 def test_calling_apply_on_an_empty_dataframe_returns_empty_dataframe() -> None:

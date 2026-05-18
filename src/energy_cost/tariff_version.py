@@ -4,7 +4,7 @@ from datetime import UTC
 from typing import Annotated, Any, Literal
 
 import pandas as pd
-from pydantic import BeforeValidator, Field
+from pydantic import BeforeValidator, Field, TypeAdapter
 
 from energy_cost.versioning import Versioned
 
@@ -14,13 +14,14 @@ from .meter import MeterType, PowerDirection
 from .resolution import Resolution, redistribute_to_resolution, to_pandas_freq
 
 _METER_KEYS = {e.value for e in MeterType}
+_formula_adapter: TypeAdapter[Formula] = TypeAdapter(Formula)
 
 
 def _coerce_named_formulas(value: Any) -> Any:
     """Allow a bare Formula dict to be shorthand for ``{total: it}``."""
     try:
-        return {"total": Formula.model_validate(value)}
-    except ValueError:
+        return {"total": _formula_adapter.validate_python(value)}
+    except Exception:
         return value
 
 
@@ -33,6 +34,9 @@ NamedFormulas = Annotated[
 def _coerce_meter_formulas(value: Any) -> Any:
     """Coerce shorthand MeterFormulas values."""
     if not isinstance(value, dict):
+        return value
+    if not value:
+        # Empty dict means no formulas — pass through unchanged
         return value
     if not any(key in value for key in _METER_KEYS):
         # No meter keys, assume it's a shorthand for ALL meters

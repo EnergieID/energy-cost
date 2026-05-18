@@ -2,11 +2,11 @@ import bisect
 import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Self
+from typing import Self
 
 import pandas as pd
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, RootModel
 
 from energy_cost.resolution import align_datetime_to_tz
 
@@ -16,17 +16,7 @@ class Versioned(BaseModel):
     end: dt.datetime | None = None
 
 
-class VersionedCollection[V: Versioned](BaseModel):
-    versions: list[V]
-
-    @model_validator(mode="before")
-    @classmethod
-    def _accept_list(cls, data: Any) -> Any:
-        """Allow a plain list as shorthand for ``{"versions": [...]}``.."""
-        if isinstance(data, list):
-            return {"versions": data}
-        return data
-
+class VersionedCollection[V: Versioned](RootModel[list[V]]):
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file containing a list of version entries."""
@@ -48,9 +38,9 @@ class VersionedCollection[V: Versioned](BaseModel):
         def norm_end(v: V) -> dt.datetime | None:
             return align_datetime_to_tz(v.end, timezone) if v.end is not None else None
 
-        start_index = max(0, bisect.bisect_right(self.versions, start, key=norm_start) - 1)
-        end_index = bisect.bisect_right(self.versions, end, key=norm_start)
-        candidates = self.versions[start_index:end_index]
+        start_index = max(0, bisect.bisect_right(self.root, start, key=norm_start) - 1)
+        end_index = bisect.bisect_right(self.root, end, key=norm_start)
+        candidates = self.root[start_index:end_index]
         if not candidates:
             return []
 

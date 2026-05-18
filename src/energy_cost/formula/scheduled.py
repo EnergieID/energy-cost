@@ -3,13 +3,17 @@ from __future__ import annotations
 import datetime as dt
 from datetime import UTC
 from enum import StrEnum
+from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
 from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
 
-from .formula import Formula
+from .base import FormulaBase
+
+if TYPE_CHECKING:
+    from .formula import Formula
 
 
 class DayOfWeek(StrEnum):
@@ -61,7 +65,7 @@ class WhenClause(BaseModel):
         return day_mask & time_mask
 
 
-class ScheduledFormula(Formula):
+class ScheduledFormula(FormulaBase):
     when: list[WhenClause] | None = None
     formula: Formula
 
@@ -83,8 +87,8 @@ class ScheduledFormula(Formula):
         return df
 
 
-class ScheduledFormulas(Formula):
-    kind: str = "scheduled"
+class ScheduledFormulas(FormulaBase):
+    kind: Literal["scheduled"] = "scheduled"
     schedule: list[ScheduledFormula] = Field(default_factory=list)
 
     def get_values(

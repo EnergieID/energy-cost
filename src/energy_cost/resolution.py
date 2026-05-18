@@ -4,7 +4,7 @@ from typing import Annotated, cast
 
 import isodate
 import pandas as pd
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, PlainSerializer, WithJsonSchema
 
 
 def align_datetime_to_tz(d: dt.datetime, tz: dt.tzinfo | None) -> dt.datetime:
@@ -41,7 +41,12 @@ def parse_resolution(value: dt.timedelta | isodate.Duration | str) -> dt.timedel
 
 
 # A resolution is either a fixed timedelta or a calendar-aware Duration.
-Resolution = Annotated[dt.timedelta | isodate.Duration, BeforeValidator(parse_resolution)]
+Resolution = Annotated[
+    dt.timedelta | isodate.Duration,
+    BeforeValidator(parse_resolution),
+    PlainSerializer(isodate.duration_isoformat, return_type=str),
+    WithJsonSchema({"type": "string", "examples": ["PT15M", "P1M"]}),
+]
 
 
 def validate_non_mixed_duration(resolution: Resolution) -> None:
