@@ -10,13 +10,17 @@ _BELGIAN_DIR = _DIR.parent.parent / "gas"
 _BELGIAN_FEES_DIR = _BELGIAN_DIR / "fees"
 _DISTRIBUTORS_DIR = _DIR / "distributors"
 _TIMEZONE = ZoneInfo("Europe/Brussels")
+_BELGIAN_DISTRIBUTOR_TARIFF = Tariff.from_yaml(_BELGIAN_DIR / "distributors" / "fluxys.yml")
 
 data = RegionalData(
     fees={
         customer_type: Tariff.from_yaml(_BELGIAN_FEES_DIR / f"{customer_type.value}.yml")
         for customer_type in CustomerType
     },
-    distributors={path.stem: Tariff.from_yaml(path) for path in sorted(_DISTRIBUTORS_DIR.glob("*.yml"))},
+    distributors={
+        path.stem: [Tariff.from_yaml(path), _BELGIAN_DISTRIBUTOR_TARIFF]
+        for path in sorted(_DISTRIBUTORS_DIR.glob("*.yml"))
+    },
     taxes=Tax.from_yaml(_BELGIAN_DIR / "taxes.yml"),
     timezone=_TIMEZONE,
 )
