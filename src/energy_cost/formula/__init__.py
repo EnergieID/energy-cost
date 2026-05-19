@@ -1,7 +1,7 @@
 from .base import FormulaBase
 from .formula import Formula
 from .index import IndexAdder, IndexFormula
-from .minimum import MinimumFormula
+from .minmax import MaximumFormula, MinimumFormula
 from .periodic import PeriodicFormula
 from .scheduled import DayOfWeek, ScheduledFormula, ScheduledFormulas, WhenClause
 from .tiered import TierBand, TieredFormula, TieringMode
@@ -13,6 +13,7 @@ TieredFormula.model_rebuild(_types_namespace={"Formula": Formula})
 ScheduledFormula.model_rebuild(_types_namespace={"Formula": Formula})
 ScheduledFormulas.model_rebuild(_types_namespace={"Formula": Formula})
 MinimumFormula.model_rebuild(_types_namespace={"Formula": Formula})
+MaximumFormula.model_rebuild(_types_namespace={"Formula": Formula})
 
 __all__ = [
     "Formula",
@@ -20,6 +21,7 @@ __all__ = [
     "IndexAdder",
     "IndexFormula",
     "MinimumFormula",
+    "MaximumFormula",
     "PeriodicFormula",
     "DayOfWeek",
     "WhenClause",
