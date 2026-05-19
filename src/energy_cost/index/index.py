@@ -48,6 +48,12 @@ class Index(RegistryMixin[str, "Index"], ABC):
         fetch_start = start_ts - native_resolution_offset
         raw = self._get_values(fetch_start, end_ts, timezone)
 
+        if self.forward_fill and raw.empty:
+            # No data in the look-back window; find the most recent value before start_ts
+            fallback = self._get_values(pd.Timestamp.min.tz_localize(dt.UTC), fetch_start, timezone)
+            if not fallback.empty:
+                raw = fallback.tail(1).copy()
+
         if not raw.empty and not self.forward_fill:
             # explicitly add a timestamp one native resolution after the last raw timestamp with value `nan`
             # This way, they are not forward-filled with the last known value, but correctly marked as out-of-range.

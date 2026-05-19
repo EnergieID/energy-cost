@@ -47,17 +47,14 @@ class CachedEntsoeDayAheadIndex(Index):
         cache_dir: Path | str | None = None,
         old_threshold: dt.timedelta = _OLD_DATA_THRESHOLD,
         refresh_interval: dt.timedelta = _REFRESH_INTERVAL,
-        forward_fill: bool = False,
     ) -> None:
-        self._source = EntsoeDayAheadIndex(
-            country_code=country_code, api_key=api_key, resolution=resolution, forward_fill=forward_fill
-        )
+        self._source = EntsoeDayAheadIndex(country_code=country_code, api_key=api_key, resolution=resolution)
         self.country_code = country_code
         self.cache_dir = Path(cache_dir) if cache_dir is not None else _DEFAULT_CACHE_DIR
         self.old_threshold = old_threshold
         self.refresh_interval = refresh_interval
         self._mem_cache: pd.DataFrame | None = None
-        super().__init__(resolution=resolution, forward_fill=forward_fill)
+        super().__init__(resolution=resolution)
 
     def _cache_path(self) -> Path:
         self.cache_dir.mkdir(parents=True, exist_ok=True)

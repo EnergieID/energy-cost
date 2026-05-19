@@ -95,7 +95,7 @@ def test_index_returns_all_nan_if_no_data_in_range() -> None:
     assert all(pd.isna(df["value"].tolist()))
 
 
-def test_index_still_returns_all_nan_values_if_forward_fill_requested_but_no_data_in_range() -> None:
+def test_index_still_forward_fills_if_no_data_in_range() -> None:
     index = DataFrameIndex(
         pd.DataFrame(
             {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
@@ -112,7 +112,7 @@ def test_index_still_returns_all_nan_values_if_forward_fill_requested_but_no_dat
         resolution=dt.timedelta(minutes=15),
     )
 
-    assert all(pd.isna(df["value"].tolist()))
+    assert all(value == 4.0 for value in df["value"].tolist())
 
 
 def test_index_get_values_return_in_timezone_of_input() -> None:
