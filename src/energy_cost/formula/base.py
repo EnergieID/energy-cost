@@ -26,7 +26,6 @@ class FormulaBase(ABC, BaseModel):
         data: pd.DataFrame,
         resolution: Resolution | None = None,
         timezone: dt.tzinfo = UTC,
-        *,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         binning_anchor: dt.datetime | None = None,
