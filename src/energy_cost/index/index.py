@@ -50,7 +50,7 @@ class Index(RegistryMixin[str, "Index"], ABC):
 
         if self.forward_fill and raw.empty:
             # No data in the look-back window; find the most recent value before start_ts
-            fallback = self._get_values(pd.Timestamp.min.tz_localize(dt.UTC), fetch_start, timezone)
+            fallback = self._get_values(pd.Timestamp.min.tz_localize(timezone), fetch_start, timezone)
             if not fallback.empty:
                 raw = fallback.tail(1).copy()
 
