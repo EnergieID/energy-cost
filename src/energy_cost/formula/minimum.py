@@ -1,0 +1,93 @@
+import datetime as dt
+from typing import TYPE_CHECKING, Literal
+
+import pandas as pd
+from pydantic import ConfigDict, Field
+
+from energy_cost.resolution import (
+    Resolution,
+    align_timestamps_to_tz,
+    detect_resolution_and_range,
+    find_common_divisor,
+    redistribute_to_resolution,
+    snap_billing_period,
+    to_pandas_freq,
+)
+
+from .base import FormulaBase
+
+if TYPE_CHECKING:
+    from .formula import Formula
+
+
+def add_period_sum(df: pd.DataFrame, period_bins: pd.DatetimeIndex) -> pd.DataFrame:
+    """Helper function to add a column with the sum of values within each period."""
+    df = df.copy()
+    df["period"] = pd.cut(df["timestamp"], bins=period_bins, right=False)
+    period_sums = df.groupby("period")["value"].sum().reset_index(name="period_sum")
+    return df.merge(period_sums, on="period", how="left")
+
+
+class MinimumFormula(FormulaBase):
+    """A formula returns the minimum formula result of multiple formulas in a given period."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    kind: Literal["minimum"] = "minimum"
+    period: Resolution
+    minimum: list[Formula] = Field(default_factory=list)
+
+    def get_values(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        resolution: Resolution,
+        timezone: dt.tzinfo = dt.UTC,
+    ) -> pd.DataFrame:
+        raise NotImplementedError("Minimum formulas cannot be represented as time series. Use apply() instead.")
+
+    def apply(
+        self,
+        data: pd.DataFrame,
+        resolution: Resolution | None = None,
+        timezone: dt.tzinfo = dt.UTC,
+        *,
+        start: dt.datetime | None = None,
+        end: dt.datetime | None = None,
+        binning_anchor: dt.datetime | None = None,
+    ) -> pd.DataFrame:
+        data = align_timestamps_to_tz(data, timezone)
+        if start is None or end is None or resolution is None:
+            start, end, resolution = detect_resolution_and_range(data, resolution)
+
+        sub_resolution = find_common_divisor(resolution, self.period)
+
+        applied_dfs = [
+            formula.apply(data, sub_resolution, timezone, start=start, end=end, binning_anchor=binning_anchor)
+            for formula in self.minimum
+        ]
+
+        freq = to_pandas_freq(self.period)
+        snapped_start, snapped_end = snap_billing_period(start, end, freq, anchor=binning_anchor)
+        period_bins = pd.date_range(start=snapped_start, end=snapped_end, freq=freq)
+
+        summed_by_period = [add_period_sum(df, period_bins) for df in applied_dfs]
+
+        # add formula ID to handle ties later (arbitrary choice to take the first one in case of ties, but we want it to be deterministic)
+        for i, df in enumerate(summed_by_period):
+            df["formula_id"] = i
+
+        # Now we have a list of DataFrames with 'timestamp', 'value', 'period', and 'period_sum' columns.
+        # We want to find the minimum 'period_sum' across the formulas for each period, and keep the corresponding timestamps and values from the winning formula.
+        # First, concatenate all the DataFrames and find the minimum period_sum for each period.
+        all_data = pd.concat(summed_by_period, ignore_index=True)
+        min_period_sums = all_data.groupby("period")["period_sum"].min().reset_index(name="min_period_sum")
+        # Merge back to find the rows where period_sum equals min_period_sum
+        winners = all_data.merge(min_period_sums, on="period")
+        winners = winners[winners["period_sum"] == winners["min_period_sum"]]
+        # In case of ties, we take the first formula (lowest formula_id) for each period
+        winners = winners.sort_values(["timestamp", "formula_id"]).drop_duplicates(subset="timestamp", keep="first")
+        result = winners[["timestamp", "value"]].reset_index(drop=True)
+
+        return redistribute_to_resolution(
+            result, sub_resolution, resolution, start=start, end=end, binning_anchor=binning_anchor
+        )

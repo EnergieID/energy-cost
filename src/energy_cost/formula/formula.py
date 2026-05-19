@@ -3,6 +3,7 @@ from typing import Annotated, cast
 from pydantic import Discriminator, Tag
 
 from .index import IndexFormula
+from .minimum import MinimumFormula
 from .periodic import PeriodicFormula
 from .scheduled import ScheduledFormulas
 from .tiered import TieredFormula
@@ -21,6 +22,8 @@ def _formula_discriminator(v: object) -> str | None:
             return str(d["kind"])
         if "bands" in d:
             return "tiered"
+        if "minimum" in d:
+            return "minimum"
         if "period" in d:
             return "periodic"
         if "schedule" in d:
@@ -38,6 +41,7 @@ Formula = Annotated[
     Annotated[IndexFormula, Tag("index")]
     | Annotated[PeriodicFormula, Tag("periodic")]
     | Annotated[ScheduledFormulas, Tag("scheduled")]
-    | Annotated[TieredFormula, Tag("tiered")],
+    | Annotated[TieredFormula, Tag("tiered")]
+    | Annotated[MinimumFormula, Tag("minimum")],
     Discriminator(_formula_discriminator),
 ]
