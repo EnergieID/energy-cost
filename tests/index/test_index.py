@@ -55,6 +55,27 @@ def test_index_returns_nan_for_out_of_range_values() -> None:
     assert all(pd.isna(df["value"].tolist()[2:]))
 
 
+def test_index_forwards_fill_values_if_requested() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+        forward_fill=True,
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2020, 1, 1, 0, 30),
+        end=dt.datetime(2020, 1, 1, 7, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert df["value"].tolist()[:2] == [3.0, 4.0]
+    assert df["value"].tolist()[2:] == [4.0] * (len(df) - 2)
+
+
 def test_index_returns_all_nan_if_no_data_in_range() -> None:
     index = DataFrameIndex(
         pd.DataFrame(
@@ -74,7 +95,27 @@ def test_index_returns_all_nan_if_no_data_in_range() -> None:
     assert all(pd.isna(df["value"].tolist()))
 
 
-def test_index_ger_values_return_in_timezone_of_input() -> None:
+def test_index_still_returns_all_nan_values_if_forward_fill_requested_but_no_data_in_range() -> None:
+    index = DataFrameIndex(
+        pd.DataFrame(
+            {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        resolution=dt.timedelta(minutes=15),
+        forward_fill=True,
+    )
+
+    Index.register("dummy", index)
+
+    df = index.get_values(
+        start=dt.datetime(2021, 1, 1, 1, 0),
+        end=dt.datetime(2021, 1, 1, 2, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert all(pd.isna(df["value"].tolist()))
+
+
+def test_index_get_values_return_in_timezone_of_input() -> None:
     index = DataFrameIndex(
         pd.DataFrame(
             {"timestamp": pd.date_range("2020-01-01", periods=4, freq="15min"), "value": [1.0, 2.0, 3.0, 4.0]}

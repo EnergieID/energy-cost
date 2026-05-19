@@ -11,10 +11,16 @@ from .index import Index
 class EntsoeDayAheadIndex(Index):
     """An ENTSO-E day-ahead index for a given country."""
 
-    def __init__(self, country_code: str, api_key: str, resolution: dt.timedelta = dt.timedelta(minutes=15)) -> None:
+    def __init__(
+        self,
+        country_code: str,
+        api_key: str,
+        resolution: dt.timedelta = dt.timedelta(minutes=15),
+        forward_fill: bool = False,
+    ) -> None:
         self.client = EntsoePandasClient(api_key=api_key)
         self.country_code = country_code
-        super().__init__(resolution=resolution)
+        super().__init__(resolution=resolution, forward_fill=forward_fill)
 
     def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
         """Get the index values for the given time range in €/MWh."""

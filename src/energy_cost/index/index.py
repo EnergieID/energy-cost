@@ -18,8 +18,9 @@ from ..resolution import (
 class Index(RegistryMixin[str, "Index"], ABC):
     """An index used for calculating energy costs (€/MWh)."""
 
-    def __init__(self, resolution: Resolution) -> None:
+    def __init__(self, resolution: Resolution, forward_fill: bool = False) -> None:
         self.resolution = resolution
+        self.forward_fill = forward_fill
 
     def get_values(
         self,
@@ -47,9 +48,9 @@ class Index(RegistryMixin[str, "Index"], ABC):
         fetch_start = start_ts - native_resolution_offset
         raw = self._get_values(fetch_start, end_ts, timezone)
 
-        # explicitly add a timestamp one native resolution after the last raw timestamp with value `nan`
-        # This way, they are not forward-filled with the last known value, but correctly marked as out-of-range.
-        if not raw.empty:
+        if not raw.empty and not self.forward_fill:
+            # explicitly add a timestamp one native resolution after the last raw timestamp with value `nan`
+            # This way, they are not forward-filled with the last known value, but correctly marked as out-of-range.
             last_raw_ts = raw["timestamp"].max()
             last_period_end = last_raw_ts + native_resolution_offset
             raw = pd.concat(
