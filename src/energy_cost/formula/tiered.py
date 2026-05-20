@@ -39,15 +39,6 @@ class TieredFormula(FormulaBase):
     band_period: Resolution | None = None
     mode: TieringMode = TieringMode.PROGRESSIVE
 
-    def get_values(
-        self,
-        start: dt.datetime,
-        end: dt.datetime,
-        output_resolution: Resolution,
-        timezone: dt.tzinfo = UTC,
-    ) -> pd.DataFrame:
-        raise NotImplementedError("Tiered formulas cannot be represented as time series. Use apply() instead.")
-
     def apply(
         self,
         meter: Meter,

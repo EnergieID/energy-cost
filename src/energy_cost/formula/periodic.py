@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime as dt
-from datetime import UTC
 from typing import Literal
 
 import pandas as pd
@@ -23,15 +22,6 @@ class PeriodicFormula(FormulaBase):
     kind: Literal["periodic"] = "periodic"
     period: Resolution
     constant_cost: float
-
-    def get_values(
-        self,
-        start: dt.datetime,
-        end: dt.datetime,
-        output_resolution: Resolution,
-        timezone: dt.tzinfo = UTC,
-    ) -> pd.DataFrame:
-        raise NotImplementedError("Periodic formulas cannot be represented as time series. Use apply() instead.")
 
     def _apply(
         self,

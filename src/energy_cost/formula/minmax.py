@@ -90,15 +90,6 @@ class MinimumFormula(FormulaBase):
     period: Resolution
     minimum: list[Formula] = Field(default_factory=list)
 
-    def get_values(
-        self,
-        start: dt.datetime,
-        end: dt.datetime,
-        output_resolution: Resolution,
-        timezone: dt.tzinfo = dt.UTC,
-    ) -> pd.DataFrame:
-        raise NotImplementedError("Minimum formulas cannot be represented as time series. Use apply() instead.")
-
     def apply(
         self,
         meter: Meter,
@@ -128,15 +119,6 @@ class MaximumFormula(FormulaBase):
     kind: Literal["maximum"] = "maximum"
     period: Resolution
     maximum: list[Formula] = Field(default_factory=list)
-
-    def get_values(
-        self,
-        start: dt.datetime,
-        end: dt.datetime,
-        output_resolution: Resolution,
-        timezone: dt.tzinfo = dt.UTC,
-    ) -> pd.DataFrame:
-        raise NotImplementedError("Maximum formulas cannot be represented as time series. Use apply() instead.")
 
     def apply(
         self,

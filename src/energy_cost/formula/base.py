@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from abc import ABC, abstractmethod
+from abc import ABC
 from datetime import UTC
 
 import pandas as pd
@@ -14,7 +14,6 @@ from energy_cost.resolution import Resolution, redistribute_to_resolution
 class FormulaBase(ABC, BaseModel):
     capacity_based: bool = False
 
-    @abstractmethod
     def get_values(
         self,
         start: dt.datetime,
@@ -23,6 +22,7 @@ class FormulaBase(ABC, BaseModel):
         timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         """Return time-indexed values for the formula."""
+        raise NotImplementedError("This formula does not support get_values(). Use apply() instead.")
 
     def apply(
         self,
