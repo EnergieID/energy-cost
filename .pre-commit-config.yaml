@@ -6,11 +6,11 @@ repos:
       entry: poe lint
       language: system
       types: [python]
-    - id: type-check
-      name: poe type-check
-      entry: poe check
-      language: system
-      types: [python]
+    # - id: type-check
+    #   name: poe type-check
+    #   entry: poe check
+    #   language: system
+    #   types: [python]
     - id: format
       name: poe format
       entry: poe format

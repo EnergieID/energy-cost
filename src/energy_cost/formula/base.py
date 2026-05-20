@@ -7,38 +7,55 @@ from datetime import UTC
 import pandas as pd
 from pydantic import BaseModel
 
-from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
+from energy_cost.meter import Meter, TimeseriesFrame
+from energy_cost.resolution import Resolution, redistribute_to_resolution
 
 
 class FormulaBase(ABC, BaseModel):
+    capacity_based: bool = False
+
     @abstractmethod
     def get_values(
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: Resolution,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         """Return time-indexed values for the formula."""
 
     def apply(
         self,
-        data: pd.DataFrame,
-        resolution: Resolution | None = None,
+        meter: Meter,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
-        start: dt.datetime | None = None,
-        end: dt.datetime | None = None,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Apply formula values to a dataframe of quantities and return a single value column."""
-        if data.empty:
-            return data.copy()
-        data = align_timestamps_to_tz(data, timezone)
-        if start is None or end is None or resolution is None:
-            start, end, resolution = detect_resolution_and_range(data, resolution)
-        formula_values = self.get_values(start, end, resolution, timezone)
+        data = meter.power
+        if self.capacity_based:
+            if meter.capacity is None:
+                raise ValueError("Capacity is required for capacity-based formulas.")
+            data = meter.capacity
+        return self._apply(data, start, end, output_resolution, timezone=timezone, binning_anchor=binning_anchor)
+
+    def _apply(
+        self,
+        data: TimeseriesFrame,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = UTC,
+        binning_anchor: dt.datetime | None = None,
+    ) -> pd.DataFrame:
+        """Apply formula values to a dataframe of quantities and return a single value column."""
+        formula_values = self.get_values(start, end, data.resolution, timezone)
 
         result = data.reset_index(drop=True)
         formula_series = formula_values.set_index("timestamp")["value"].reindex(result["timestamp"])
         result["value"] = formula_series.values * result["value"].values
-        return result
+        return redistribute_to_resolution(
+            result, data.resolution, output_resolution, start, end, binning_anchor=binning_anchor
+        )

@@ -37,7 +37,7 @@ def test_tiered_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 1, 1, 0, 30),
-            resolution=dt.timedelta(minutes=15),
+            output_resolution=dt.timedelta(minutes=15),
         )
 
 
@@ -116,7 +116,7 @@ def test_tiered_formula_get_values_raises_not_implemented_with_no_bands() -> Non
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 1, 1, 0, 30),
-            resolution=dt.timedelta(minutes=15),
+            output_resolution=dt.timedelta(minutes=15),
         )
 
 

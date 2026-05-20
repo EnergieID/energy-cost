@@ -804,7 +804,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
         meters=[meter],
         start=dt.datetime.fromisoformat("2024-03-31T00:00:00+01:00"),
         end=dt.datetime.fromisoformat("2024-03-31T04:00:00+02:00"),
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -845,7 +845,7 @@ def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -
         [Meter(data=consumption)],
         start=start,
         end=end,
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -879,7 +879,7 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
         [Meter(data=consumption)],
         start=start,
         end=end,
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -929,7 +929,7 @@ def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> Non
         [Meter(data=consumption)],
         start=start,
         end=end,
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -970,7 +970,7 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
         [Meter(data=consumption)],
         start=start,
         end=end,
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -1006,7 +1006,7 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
         [Meter(data=consumption)],
         start=start,
         end=end,
-        resolution=Duration(months=1),
+        output_resolution=Duration(months=1),
     )
 
     assert result is not None
@@ -1377,7 +1377,9 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
     timestamps = pd.date_range(billing_start, dt.datetime(2026, 1, 15, tzinfo=dt.UTC), freq="D", inclusive="left")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = contract.apply([Meter(data=consumption)], start=billing_start, resolution=isodate.parse_duration("P7D"))
+    result = contract.apply(
+        [Meter(data=consumption)], start=billing_start, output_resolution=isodate.parse_duration("P7D")
+    )
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]

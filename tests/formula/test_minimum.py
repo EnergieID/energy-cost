@@ -19,7 +19,7 @@ def test_minimum_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 2, 1, 0, 0),
-            resolution=isodate.parse_duration("P1M"),
+            output_resolution=isodate.parse_duration("P1M"),
         )
 
 
@@ -219,7 +219,7 @@ def test_maximum_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 2, 1, 0, 0),
-            resolution=isodate.parse_duration("P1M"),
+            output_resolution=isodate.parse_duration("P1M"),
         )
 
 

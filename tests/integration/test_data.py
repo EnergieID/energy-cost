@@ -110,7 +110,7 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
         timezone=CET,
     )
 
-    result = contract.apply(meters=[meter], start=start, end=end, resolution=isodate.parse_duration("P7D"))
+    result = contract.apply(meters=[meter], start=start, end=end, output_resolution=isodate.parse_duration("P7D"))
 
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
@@ -153,7 +153,7 @@ def test_regression_gas_gives_correct_fees_in_october() -> None:
         )
     )
 
-    result = contract.apply(meters=[meter], resolution=isodate.parse_duration("P1M"))
+    result = contract.apply(meters=[meter], output_resolution=isodate.parse_duration("P1M"))
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
 

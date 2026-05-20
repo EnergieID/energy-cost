@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING, Literal
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
+from energy_cost.meter import Meter
 from energy_cost.resolution import (
     Resolution,
-    align_timestamps_to_tz,
-    detect_resolution_and_range,
     snap_billing_period,
     to_pandas_freq,
 )
@@ -44,29 +43,34 @@ class TieredFormula(FormulaBase):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: Resolution,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame:
         raise NotImplementedError("Tiered formulas cannot be represented as time series. Use apply() instead.")
 
     def apply(
         self,
-        data: pd.DataFrame,
-        resolution: Resolution | None = None,
+        meter: Meter,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
-        start: dt.datetime | None = None,
-        end: dt.datetime | None = None,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
-        data = align_timestamps_to_tz(data, timezone)
-        if start is None or end is None or resolution is None:
-            start, end, resolution = detect_resolution_and_range(data, resolution)
+        data = meter.power
+        if self.capacity_based:
+            if meter.capacity is None:
+                raise ValueError("Capacity is required for capacity-based formulas.")
+            data = meter.capacity
 
         # ── Step 1: estimate the full-period total for every data row ──
         indexed = data.set_index("timestamp")
         if self.band_period is not None:
             period_freq = to_pandas_freq(self.band_period)
-            resolution_freq = to_pandas_freq(resolution)
+            resolution_freq = to_pandas_freq(data.resolution)
+
+            if self.capacity_based:
+                raise NotImplementedError("Band periods are not yet supported for capacity-based tiered formulas.")
 
             range_start, range_end = snap_billing_period(start, end, period_freq, anchor=binning_anchor)
 
@@ -105,7 +109,6 @@ class TieredFormula(FormulaBase):
             period_total = indexed["value"].copy()
 
         # ── Step 2: apply band formulas, skipping bands with no contribution ──
-        input_data = data[["timestamp", "value"]]
         result_values = pd.Series(0.0, index=indexed.index)
 
         if self.mode == TieringMode.BANDED:
@@ -114,11 +117,11 @@ class TieredFormula(FormulaBase):
                 mask = unmatched if band.up_to is None else unmatched & (period_total <= band.up_to)
                 if mask.any():
                     band_values = band.formula.apply(
-                        input_data.copy(),
-                        resolution=resolution,
-                        timezone=timezone,
+                        meter,
                         start=start,
                         end=end,
+                        output_resolution=output_resolution,
+                        timezone=timezone,
                         binning_anchor=binning_anchor,
                     )
                     result_values = result_values.where(~mask, band_values.set_index("timestamp")["value"])
@@ -137,11 +140,11 @@ class TieredFormula(FormulaBase):
                 )
                 if fraction.any():
                     band_values = band.formula.apply(
-                        input_data.copy(),
-                        resolution=resolution,
-                        timezone=timezone,
+                        meter,
                         start=start,
                         end=end,
+                        output_resolution=output_resolution,
+                        timezone=timezone,
                         binning_anchor=binning_anchor,
                     )
                     result_values = result_values + band_values.set_index("timestamp")["value"] * fraction
@@ -150,7 +153,7 @@ class TieredFormula(FormulaBase):
                 else:
                     break
 
-        result_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(resolution), inclusive="left")
+        result_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
         result = pd.DataFrame({"timestamp": result_ts})
         result["value"] = result["timestamp"].map(result_values).astype(float)
         return result

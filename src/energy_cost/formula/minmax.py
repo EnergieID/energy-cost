@@ -5,10 +5,9 @@ from typing import TYPE_CHECKING, Literal
 import pandas as pd
 from pydantic import ConfigDict, Field
 
+from energy_cost.meter import Meter
 from energy_cost.resolution import (
     Resolution,
-    align_timestamps_to_tz,
-    detect_resolution_and_range,
     find_common_divisor,
     redistribute_to_resolution,
     snap_billing_period,
@@ -33,21 +32,24 @@ def apply_extreme_formula(
     formulas: list[Formula],
     extreme_func: Callable[[pd.Series], float],
     period: Resolution,
-    data: pd.DataFrame,
-    resolution: Resolution | None = None,
+    meter: Meter,
+    start: dt.datetime,
+    end: dt.datetime,
+    output_resolution: Resolution,
     timezone: dt.tzinfo = dt.UTC,
-    start: dt.datetime | None = None,
-    end: dt.datetime | None = None,
     binning_anchor: dt.datetime | None = None,
 ) -> pd.DataFrame:
-    data = align_timestamps_to_tz(data, timezone)
-    if start is None or end is None or resolution is None:
-        start, end, resolution = detect_resolution_and_range(data, resolution)
-
-    sub_resolution = find_common_divisor(resolution, period)
+    sub_resolution = find_common_divisor(output_resolution, period)
 
     applied_dfs = [
-        formula.apply(data, sub_resolution, timezone, start=start, end=end, binning_anchor=binning_anchor)
+        formula.apply(
+            meter,
+            start=start,
+            end=end,
+            output_resolution=sub_resolution,
+            timezone=timezone,
+            binning_anchor=binning_anchor,
+        )
         for formula in formulas
     ]
 
@@ -76,7 +78,7 @@ def apply_extreme_formula(
     result = winners[["timestamp", "value"]].reset_index(drop=True)
 
     return redistribute_to_resolution(
-        result, sub_resolution, resolution, start=start, end=end, binning_anchor=binning_anchor
+        result, sub_resolution, output_resolution, start=start, end=end, binning_anchor=binning_anchor
     )
 
 
@@ -92,29 +94,29 @@ class MinimumFormula(FormulaBase):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: Resolution,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = dt.UTC,
     ) -> pd.DataFrame:
         raise NotImplementedError("Minimum formulas cannot be represented as time series. Use apply() instead.")
 
     def apply(
         self,
-        data: pd.DataFrame,
-        resolution: Resolution | None = None,
+        meter: Meter,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = dt.UTC,
-        start: dt.datetime | None = None,
-        end: dt.datetime | None = None,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         return apply_extreme_formula(
             formulas=self.minimum,
             extreme_func=min,
             period=self.period,
-            data=data,
-            resolution=resolution,
-            timezone=timezone,
+            meter=meter,
             start=start,
             end=end,
+            output_resolution=output_resolution,
+            timezone=timezone,
             binning_anchor=binning_anchor,
         )
 
@@ -131,28 +133,28 @@ class MaximumFormula(FormulaBase):
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: Resolution,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = dt.UTC,
     ) -> pd.DataFrame:
         raise NotImplementedError("Maximum formulas cannot be represented as time series. Use apply() instead.")
 
     def apply(
         self,
-        data: pd.DataFrame,
-        resolution: Resolution | None = None,
+        meter: Meter,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
         timezone: dt.tzinfo = dt.UTC,
-        start: dt.datetime | None = None,
-        end: dt.datetime | None = None,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         return apply_extreme_formula(
             formulas=self.maximum,
             extreme_func=max,
             period=self.period,
-            data=data,
-            resolution=resolution,
-            timezone=timezone,
+            meter=meter,
             start=start,
             end=end,
+            output_resolution=output_resolution,
+            timezone=timezone,
             binning_anchor=binning_anchor,
         )

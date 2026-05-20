@@ -16,7 +16,7 @@ def test_periodic_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 1, 1, 1, 0),
-            resolution=dt.timedelta(minutes=15),
+            output_resolution=dt.timedelta(minutes=15),
         )
 
 
@@ -29,7 +29,7 @@ def test_periodic_formula_apply_uses_input_resolution() -> None:
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    out = formula.apply(data, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [100.0, 100.0]
 
@@ -40,7 +40,7 @@ def test_periodic_formula_apply_distributes_cost_over_fine_slots() -> None:
     timestamps = pd.date_range("2025-01-01", periods=24, freq="h")
     data = pd.DataFrame({"timestamp": timestamps})
 
-    out = formula.apply(data, resolution=dt.timedelta(hours=1))
+    out = formula.apply(data, output_resolution=dt.timedelta(hours=1))
 
     assert out["value"].sum() == pytest.approx(24.0)
     assert out["value"].iloc[0] == pytest.approx(1.0)
