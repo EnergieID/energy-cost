@@ -1,58 +1,62 @@
 - start: '2025-01-01T00:00:00+01:00'
   capacity:
-    measurement_period: PT15M
-    billing_period: P1M
-    window_periods: 12
     formula:
-      mode: banded
-      bands:
-      - up_to: 0.0025
-        formula:
-          period: P1M
-          constant_cost: 10.2172144
-      - formula:
-          constant_cost: 4086.8857583
+      period: P1M
+      maximum:
+      - period: P1M
+        constant_cost: 10.217214395833334
+      - period: P1M
+        minimum:
+        - capacity_based: true
+          constant_cost: 4086.8857583333333
+        - by_meter_type:
+            default:
+              constant_cost: 274.7188
+            night_only:
+              constant_cost: 283.0354
   consumption:
-    all:
-      transmission:
-        constant_cost: 23.6764
-      public_service_fee:
-        constant_cost: 27.722
-      levies:
-        constant_cost: 1.4996
-    night_only:
-      public_service_fee:
-        constant_cost: 19.4054
-  periodic:
+    transmission:
+      constant_cost: 23.6764
+    levies:
+      constant_cost: 1.4996
+    public_service_fee:
+      by_meter_type:
+        default:
+          constant_cost: 27.722
+        night_only:
+          constant_cost: 19.4054
+  fixed:
     data_management:
       period: P1Y
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
   capacity:
-    measurement_period: PT15M
-    billing_period: P1M
-    window_periods: 12
     formula:
-      mode: banded
-      bands:
-      - up_to: 0.0025
-        formula:
-          period: P1M
-          constant_cost: 10.4424962
-      - formula:
-          constant_cost: 4176.9984833
+      period: P1M
+      maximum:
+      - period: P1M
+        constant_cost: 10.442496208333335
+      - period: P1M
+        minimum:
+        - capacity_based: true
+          constant_cost: 4176.998483333334
+        - by_meter_type:
+            default:
+              constant_cost: 277.81069999999994
+            night_only:
+              constant_cost: 282.53839999999997
   consumption:
-    all:
-      transmission:
-        constant_cost: 24.8638
-      public_service_fee:
-        constant_cost: 23.6385
-      levies:
-        constant_cost: 1.3038
-    night_only:
-      public_service_fee:
-        constant_cost: 18.9108
-  periodic:
+    transmission:
+      constant_cost: 24.863799999999998
+    levies:
+      constant_cost: 1.3037999999999998
+    public_service_fee:
+      by_meter_type:
+        default:
+          constant_cost: 23.6385
+        night_only:
+          constant_cost: 18.9108
+  fixed:
     data_management:
       period: P1Y
       constant_cost: 17.85

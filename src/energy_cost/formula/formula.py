@@ -3,6 +3,7 @@ from typing import Annotated, cast
 from pydantic import Discriminator, Tag
 
 from .index import IndexFormula
+from .metertype import MeterTypeFormula
 from .minmax import MaximumFormula, MinimumFormula
 from .periodic import PeriodicFormula
 from .scheduled import ScheduledFormulas
@@ -26,6 +27,8 @@ def _formula_discriminator(v: object) -> str | None:
             return "minimum"
         if "maximum" in d:
             return "maximum"
+        if "by_meter_type" in d:
+            return "meter_type"
         if "period" in d:
             return "periodic"
         if "schedule" in d:
@@ -45,6 +48,7 @@ Formula = Annotated[
     | Annotated[ScheduledFormulas, Tag("scheduled")]
     | Annotated[TieredFormula, Tag("tiered")]
     | Annotated[MinimumFormula, Tag("minimum")]
-    | Annotated[MaximumFormula, Tag("maximum")],
+    | Annotated[MaximumFormula, Tag("maximum")]
+    | Annotated[MeterTypeFormula, Tag("meter_type")],
     Discriminator(_formula_discriminator),
 ]

@@ -1,13 +1,16 @@
 from datetime import UTC, datetime, tzinfo
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pandas.core.api import DataFrame as DataFrame
 from pydantic import Field
 
-from energy_cost.formula.base import FormulaBase
-from energy_cost.formula.formula import Formula
 from energy_cost.meter import Meter, MeterType
 from energy_cost.resolution import Resolution
+
+from .base import FormulaBase
+
+if TYPE_CHECKING:
+    from .formula import Formula
 
 
 class MeterTypeFormula(FormulaBase):

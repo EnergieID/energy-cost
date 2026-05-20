@@ -1,13 +1,11 @@
 - start: 2025-01-01T00:00:00+01:00
-  capacity:
-    measurement_period: PT15M 
-    billing_period: P1M
-    window_periods: 12 # Setting this means the capacity will be avaraged over the last 12 billing periods (eg 12 months if billing_period is P1M) instead of being based on the single billing period in which the cost is being calculated, as is used by the Flemish capacity tariff.
-    formula: 
+  consumption:
+    formula:
+      band_period: P1M # the period over which consumption is measured for tiering purposes in ISO 8601 duration format
       bands:
-      - up_to: 0.5 # if capacity in a billing period does not exceed 0.5 MW, it is billed according to this formula
+      - up_to: 0.5 # if consumption in a band period does not exceed 0.5 MWh, it is billed according to this formula
         formula: # a fixed cost component of 5 €/month
           period: P1M
           constant_cost: 5.0 
-      - formula: # the capacity above 0.5 MW is billed according to this formula
-          constant_cost: 10.0 # usage based costs of 10 €/MW
+      - formula: # the consumption above 0.5 MWh is billed according to this formula
+          constant_cost: 10.0 # usage based costs of 10 €/MWh

@@ -9,7 +9,7 @@ supplier:
 
 distributor:
 - start: 2025-01-01T00:00:00+01:00
-  consumption:
+  capacity:
     constant_cost: 50.0
   periodic:
     grid_fee:
@@ -28,5 +28,9 @@ taxes:
   - rate: 0.0
     columns:
     - ["*", "injection", "*"]
+
+capacity_rule:
+  measurement_period: PT15M
+  billing_period: P1M
 
 timezone: Europe/Brussels
