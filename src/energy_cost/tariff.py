@@ -39,7 +39,7 @@ class Tariff(VersionedCollection[TariffVersion]):
     def apply(
         self,
         consumption: Meter,
-        injection: Meter,
+        injection: Meter | None = None,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         output_resolution: Resolution | None = None,

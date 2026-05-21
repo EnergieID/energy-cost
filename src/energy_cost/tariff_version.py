@@ -77,7 +77,7 @@ class TariffVersion(Versioned):
     def apply(
         self,
         consumption: Meter,
-        injection: Meter,
+        injection: Meter | None,
         start: dt.datetime,
         end: dt.datetime,
         output_resolution: Resolution,
@@ -90,6 +90,9 @@ class TariffVersion(Versioned):
         results = []
         for cost_group in CostGroup:
             meter = injection if cost_group == CostGroup.INJECTION else consumption
+            if meter is None:
+                continue
+
             result = self._combine_energy_formulas(
                 cost_group,
                 lambda formula, meter=meter: formula.apply(

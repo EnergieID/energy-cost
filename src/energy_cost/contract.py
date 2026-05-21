@@ -12,7 +12,7 @@ from pydantic import ConfigDict, model_validator
 from energy_cost.capacity import CapacityRule
 
 from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
-from .meter import CostGroup, Meter, TariffCategory
+from .meter import Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
@@ -90,7 +90,7 @@ class Contract(Versioned):
     def apply(
         self,
         consumption: Meter,
-        injection: Meter,
+        injection: Meter | None = None,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         output_resolution: Resolution | None = None,
@@ -108,7 +108,8 @@ class Contract(Versioned):
             output_resolution = Duration(months=1)
 
         consumption = consumption.align_to_timezone(self.timezone)
-        injection = injection.align_to_timezone(self.timezone)
+        if injection is not None:
+            injection = injection.align_to_timezone(self.timezone)
         if self.capacity_rule is not None:
             consumption = self.capacity_rule.apply(consumption)
 
@@ -147,9 +148,9 @@ class Contract(Versioned):
         result = pd.concat(frames, axis=1, sort=True)
 
         result = result.reset_index()
-        _total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")
+        _total = ("total", "total", "total")
 
-        total_cols = [c for c in result.columns if c[-2:] == (CostGroup.TOTAL, "total")]
+        total_cols = [c for c in result.columns if c[-2:] == ("total", "total")]
         result[_total] = result[total_cols].sum(axis=1)
 
         if self.taxes is not None:
@@ -165,7 +166,7 @@ class Contract(Versioned):
                 result = result.set_index("timestamp").join(tax_frame).reset_index()
 
         # Recompute grand total including taxes
-        total_cols = [c for c in result.columns if c[-2:] == (CostGroup.TOTAL, "total") and c != _total]
+        total_cols = [c for c in result.columns if c[-2:] == ("total", "total") and c != _total]
         result[_total] = result[total_cols].sum(axis=1)
 
         return result
@@ -175,7 +176,7 @@ class ContractHistory(VersionedCollection[Contract]):
     def apply(
         self,
         consumption: Meter,
-        injection: Meter,
+        injection: Meter | None = None,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
         output_resolution: Resolution | None = None,
