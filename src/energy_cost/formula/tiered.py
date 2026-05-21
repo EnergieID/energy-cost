@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from energy_cost.meter import Meter
 from energy_cost.resolution import (
     Resolution,
+    redistribute_to_resolution,
     snap_billing_period,
     to_pandas_freq,
 )
@@ -111,7 +112,7 @@ class TieredFormula(FormulaBase):
                         meter,
                         start=start,
                         end=end,
-                        output_resolution=output_resolution,
+                        output_resolution=data.resolution,
                         timezone=timezone,
                         binning_anchor=binning_anchor,
                     )
@@ -134,7 +135,7 @@ class TieredFormula(FormulaBase):
                         meter,
                         start=start,
                         end=end,
-                        output_resolution=output_resolution,
+                        output_resolution=data.resolution,
                         timezone=timezone,
                         binning_anchor=binning_anchor,
                     )
@@ -144,7 +145,8 @@ class TieredFormula(FormulaBase):
                 else:
                     break
 
-        result_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
+        result_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(data.resolution), inclusive="left")
         result = pd.DataFrame({"timestamp": result_ts})
         result["value"] = result["timestamp"].map(result_values).astype(float)
-        return result
+
+        return redistribute_to_resolution(result, data.resolution, output_resolution, start, end, binning_anchor)

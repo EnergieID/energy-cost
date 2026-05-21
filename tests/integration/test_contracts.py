@@ -16,7 +16,7 @@ import pytest
 from energy_cost.contract import Contract, ContractHistory
 from energy_cost.data.models import Supplier
 from energy_cost.index import DataFrameIndex, Index
-from energy_cost.meter import Meter
+from energy_cost.meter import Meter, TimeseriesFrame
 from energy_cost.tariff import Tariff
 
 EXAMPLES = Path(__file__).resolve().parent.parent.parent / "examples"
@@ -28,10 +28,10 @@ _END = dt.datetime(2026, 7, 1, tzinfo=CET)
 
 @pytest.fixture
 def fake_index() -> None:
-    """Register a fake Belpex15min index covering the test period."""
+    """Register a fake spot index covering the test period."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
     Index.register(
-        "Belpex15min",
+        "spot",
         DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": 50.0})),
     )
 
@@ -55,7 +55,7 @@ def fake_supplier() -> None:
 def consumption_meter() -> Meter:
     """Constant-consumption meter at 4 kW (1 kWh / 15 min)."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
-    return Meter(data=pd.DataFrame({"timestamp": timestamps, "value": 0.001}))
+    return Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": 0.001})))
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class TestContractConfigs:
         consumption_meter: Meter,
     ) -> None:
         contract = Contract.from_yaml(EXAMPLES / "contracts" / config_name)
-        result = contract.apply(meters=[consumption_meter])
+        result = contract.apply(consumption_meter)
 
         assert isinstance(result, pd.DataFrame)
         assert not result.empty
@@ -93,7 +93,7 @@ class TestContractHistoryConfigs:
 
         assert len(history.root) == 2
         result = history.apply(
-            meters=[consumption_meter],
+            consumption_meter,
             start=dt.datetime(2024, 6, 1, tzinfo=CET),
             end=dt.datetime(2026, 1, 1, tzinfo=CET),
         )
@@ -106,7 +106,7 @@ class TestContractHistoryConfigs:
 
         assert len(history.root) == 2
         result = history.apply(
-            meters=[consumption_meter],
+            consumption_meter,
             start=dt.datetime(2024, 6, 1, tzinfo=CET),
             end=dt.datetime(2026, 1, 1, tzinfo=CET),
         )

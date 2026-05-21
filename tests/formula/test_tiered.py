@@ -16,6 +16,7 @@ from energy_cost.formula import (
     TieringMode,
 )
 from energy_cost.formula.scheduled import DayOfWeek, WhenClause
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_tier_band_coerces_nested_formula_dict() -> None:
@@ -51,12 +52,13 @@ def test_tiered_formula_apply_uses_first_matching_band() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
             "value": [9.0, 15.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [36.0, 90.0]
 
@@ -71,12 +73,13 @@ def test_tiered_formula_apply_supports_fixed_periodic_band() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
             "value": [9.0, 15.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [100.0, 180.0]
 
@@ -99,12 +102,13 @@ def test_tiered_formula_apply_supports_scheduled_formula_band() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
             "value": [3.0, 8.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [15.0, 16.0]
 
@@ -133,12 +137,13 @@ def test_tiered_formula_apply_skips_band_that_matches_no_rows() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
             "value": [8.0, 12.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     # Both rows fall through to the catch-all band (constant_cost=10).
     assert out["value"].tolist() == [80.0, 120.0]
@@ -157,12 +162,13 @@ def test_tiered_formula_band_resolution_selects_band_by_annual_sum() -> None:
     # 12 monthly rows summing to 12 MWh/year — below the 15 MWh threshold → band 1
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS", tz=dt.UTC),
             "value": [1.0] * 12,
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [2.0] * 12
 
@@ -182,12 +188,13 @@ def test_tiered_formula_band_resolution_extrapolates_incomplete_period() -> None
     # Only Jan–Feb 2025 — extrapolated annual sum ≈ 10 × (365/59) ≈ 62 MWh > 20 → band 2
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=2, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=2, freq="MS", tz=dt.UTC),
             "value": [5.0, 5.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [25.0, 25.0]
 
@@ -207,12 +214,13 @@ def test_tiered_formula_band_resolution_handles_multiple_periods() -> None:
     # 2026: 12 × 2 MWh = 24 MWh/year → band 2 (cost 5.0)
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=24, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=24, freq="MS", tz=dt.UTC),
             "value": [1.0] * 12 + [2.0] * 12,
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [2.0] * 12 + [10.0] * 12
 
@@ -228,14 +236,16 @@ def test_tiered_formula_progressive_is_default() -> None:
     # value 10 is fully within the first band → fraction = 1.0 → same in both modes
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00"]),
-            "value": [10.0],
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
+            "value": [10.0, 10.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
+    out = formula.apply(meter, start, end, output_resolution=isodate.parse_duration("P1M"))
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == [20.0]
+    assert pytest.approx(out["value"].iloc[0]) == 20.0
 
 
 def test_tiered_formula_progressive_rowwise_splits_across_bands() -> None:
@@ -256,14 +266,16 @@ def test_tiered_formula_progressive_rowwise_splits_across_bands() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00"]),
-            "value": [20.0],
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
+            "value": [20.0, 20.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
+    start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
+    out = formula.apply(meter, start, end, output_resolution=isodate.parse_duration("P1M"))
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == [100.0]
+    assert pytest.approx(out["value"].iloc[0]) == 100.0
 
 
 def test_tiered_formula_progressive_with_band_period_splits_across_bands() -> None:
@@ -285,12 +297,13 @@ def test_tiered_formula_progressive_with_band_period_splits_across_bands() -> No
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS", tz=dt.UTC),
             "value": [1.0] * 12,  # 12 MWh/year total
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     expected = pytest.approx([3.5] * 12)
     assert out["value"].tolist() == expected
@@ -316,12 +329,13 @@ def test_tiered_formula_progressive_with_band_period_notebook_scenario() -> None
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS", tz=dt.UTC),
             "value": [1.0] * 12,
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     # blended rate = (3*5 + 2*7 + 7*10) / 12 = (15 + 14 + 70) / 12 = 99/12 = 8.25
     assert out["value"].tolist() == pytest.approx([99 / 12] * 12)
@@ -342,10 +356,11 @@ def test_banded_tiers_raises_when_no_band_matches_estimated_total() -> None:
     # 12 MWh/year — exceeds the highest up_to of 10 MWh with no catch-all to fall back on
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS"),
+            "timestamp": pd.date_range("2025-01-01", periods=12, freq="MS", tz=dt.UTC),
             "value": [1.0] * 12,
         }
     )
 
     with pytest.raises(ValueError, match="No tier band matches"):
-        formula.apply(data, resolution=isodate.parse_duration("P1M"))
+        meter = Meter(power=TimeseriesFrame(data))
+        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))

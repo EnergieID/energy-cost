@@ -11,7 +11,7 @@ distributor:
 - start: 2025-01-01T00:00:00+01:00
   capacity:
     constant_cost: 50.0
-  periodic:
+  fixed:
     grid_fee:
       period: P1M
       constant_cost: 10.0

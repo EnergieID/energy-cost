@@ -7,14 +7,9 @@ import pandas as pd
 import pytest
 
 from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas
+from energy_cost.meter import CostGroup, Meter, TimeseriesFrame
 from energy_cost.resolution import Resolution
-from energy_cost.tariff_version import (
-    MeterType,
-    PowerDirection,
-    TariffVersion,
-    _coerce_meter_formulas,
-    _coerce_named_formulas,
-)
+from energy_cost.tariff_version import TariffVersion, _coerce_named_formulas
 
 
 def _constant_cost(formula: Formula) -> float:
@@ -22,73 +17,21 @@ def _constant_cost(formula: Formula) -> float:
     return formula.constant_cost
 
 
-def test_all_meter_type_formula_is_used_for_single_rate_injection() -> None:
-    segment = TariffVersion(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
-    )
-
-    single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.INJECTION)
-
-    assert _constant_cost(single["energy"]) == -5.0
-
-
-def test_all_meter_type_formula_is_used_for_tou_peak_injection() -> None:
-    segment = TariffVersion(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
-    )
-
-    tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.INJECTION)
-
-    assert _constant_cost(tou["energy"]) == -5.0
-
-
-def test_meter_specific_formula_overrides_all_formula_for_single_rate_consumption() -> None:
+def test_get_values_returns_one_column_per_cost_type() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
         consumption={
-            "all": {"energy": IndexFormula(constant_cost=1.0)},
-            "single_rate": {"energy": IndexFormula(constant_cost=99.0)},
+            "energy": IndexFormula(constant_cost=10.0),
+            "chp_certificates": IndexFormula(constant_cost=2.0),
+            "renewable_certificates": IndexFormula(constant_cost=3.0),
         },
     )
 
-    single = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-    assert _constant_cost(single["energy"]) == 99.0
-
-
-def test_all_formula_is_kept_when_no_meter_specific_override_exists() -> None:
-    segment = TariffVersion(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={
-            "all": {"energy": IndexFormula(constant_cost=1.0)},
-            "single_rate": {"energy": IndexFormula(constant_cost=99.0)},
-        },
-    )
-
-    tou = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
-
-    assert _constant_cost(tou["energy"]) == 1.0
-
-
-def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
-    segment = TariffVersion(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={
-            "all": {
-                "energy": IndexFormula(constant_cost=10.0),
-                "chp_certificates": IndexFormula(constant_cost=2.0),
-                "renewable_certificates": IndexFormula(constant_cost=3.0),
-            }
-        },
-    )
-
-    out = segment.get_energy_cost(
+    out = segment.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
+        output_resolution=dt.timedelta(minutes=15),
+        cost_group=CostGroup.CONSUMPTION,
     )
 
     assert out is not None
@@ -99,27 +42,50 @@ def test_get_energy_cost_returns_one_column_per_resolved_cost_type() -> None:
     assert out["total"].tolist() == [15.0, 15.0, 15.0, 15.0]
 
 
-def test_apply_periodic_costs_returns_prorated_cost_for_each_periodic_entry() -> None:
+def test_get_values_returns_injection_cost_types() -> None:
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        periodic={
+        injection={"energy": IndexFormula(constant_cost=-5.0)},
+    )
+
+    out = segment.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        output_resolution=dt.timedelta(minutes=15),
+        cost_group=CostGroup.INJECTION,
+    )
+
+    assert out is not None
+    assert out["energy"].tolist() == [-5.0, -5.0, -5.0, -5.0]
+
+
+def test_fixed_costs_returns_prorated_cost_for_each_entry() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        fixed={
             "admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0),
             "billing": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=12.0),
         },
     )
+    ts = pd.date_range("2025-01-01", "2025-01-02", freq="h", tz=dt.UTC, inclusive="left")
+    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
+    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
+    end = dt.datetime(2025, 1, 2, 0, 0, tzinfo=dt.UTC)
 
-    result = segment.apply_periodic_costs(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        end=dt.datetime(2025, 1, 2, 0, 0),
+    result = segment.apply(
+        consumption=meter,
+        injection=None,
+        start=start,
+        end=end,
         output_resolution=dt.timedelta(hours=1),
     )
 
     assert result is not None
-    assert result["admin"].sum() == pytest.approx(24.0)
-    assert result["billing"].sum() == pytest.approx(12.0)
+    assert result[(CostGroup.FIXED, "admin")].sum() == pytest.approx(24.0)
+    assert result[(CostGroup.FIXED, "billing")].sum() == pytest.approx(12.0)
 
 
-def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_total() -> None:
+def test_model_validation_treats_bare_consumption_formula_as_total() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00",
@@ -127,12 +93,10 @@ def test_model_validation_treats_bare_consumption_formula_as_all_meter_type_tota
         }
     )
 
-    resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-
-    assert _constant_cost(resolved["total"]) == 1.0
+    assert _constant_cost(segment.consumption["total"]) == 1.0
 
 
-def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types() -> None:
+def test_model_validation_treats_cost_type_map_as_named_formulas() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00",
@@ -143,13 +107,11 @@ def test_model_validation_treats_cost_type_map_as_shared_across_all_meter_types(
         }
     )
 
-    resolved = segment._resolve_energy_formulas(MeterType.TOU_PEAK, PowerDirection.CONSUMPTION)
-
-    assert _constant_cost(resolved["energy"]) == 1.0
-    assert _constant_cost(resolved["chp_certificates"]) == 2.0
+    assert _constant_cost(segment.consumption["energy"]) == 1.0
+    assert _constant_cost(segment.consumption["chp_certificates"]) == 2.0
 
 
-def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_total() -> None:
+def test_model_validation_treats_scheduled_formula_dict_as_total() -> None:
     segment = TariffVersion.model_validate(
         {
             "start": "2025-01-01T00:00:00+01:00",
@@ -166,9 +128,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_total(
         }
     )
 
-    resolved = segment._resolve_energy_formulas(MeterType.SINGLE_RATE, PowerDirection.CONSUMPTION)
-    formula = resolved["total"]
-
+    formula = segment.consumption["total"]
     assert isinstance(formula, ScheduledFormulas)
 
     out = formula.get_values(
@@ -180,7 +140,7 @@ def test_model_validation_treats_scheduled_formula_dict_as_all_meter_type_total(
     assert out["value"].tolist() == [100.0, 300.0]
 
 
-def test_cost_type_formula_coercion_wraps_bare_formula_as_total_cost() -> None:
+def test_coerce_named_formulas_wraps_bare_formula_as_total() -> None:
     bare_formula = {"constant_cost": 1.0}
 
     result = _coerce_named_formulas(bare_formula)
@@ -189,86 +149,98 @@ def test_cost_type_formula_coercion_wraps_bare_formula_as_total_cost() -> None:
     assert result["total"] == IndexFormula(constant_cost=1.0)
 
 
-def test_meter_formula_coercion_leaves_non_dict_values_unchanged() -> None:
-    sentinel = "not-a-dict"
+def test_get_values_returns_none_when_no_formulas_configured() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"energy": IndexFormula(constant_cost=-5.0)},
+    )
 
-    assert _coerce_meter_formulas(sentinel) == sentinel
+    result = segment.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 1, 0),
+        output_resolution=dt.timedelta(minutes=15),
+        cost_group=CostGroup.CONSUMPTION,
+    )
+    assert result is None
 
 
-def test_get_energy_cost_returns_none_when_all_resolved_formulas_return_empty_series() -> None:
+def test_get_values_returns_none_when_formulas_return_empty_series() -> None:
     class EmptyIndexFormula(IndexFormula):
         def get_values(
-            self, start: dt.datetime, end: dt.datetime, resolution: Resolution, timezone: dt.tzinfo = dt.UTC
+            self, start: dt.datetime, end: dt.datetime, output_resolution: Resolution, timezone: dt.tzinfo = dt.UTC
         ) -> pd.DataFrame:
             return pd.DataFrame({"timestamp": pd.Series(dtype="datetime64[ns]"), "value": pd.Series(dtype=float)})
 
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={"all": {"energy": EmptyIndexFormula()}},
+        consumption={"energy": EmptyIndexFormula()},
     )
 
-    result = segment.get_energy_cost(
+    result = segment.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
+        output_resolution=dt.timedelta(minutes=15),
+        cost_group=CostGroup.CONSUMPTION,
     )
     assert result is None
 
 
-def test_apply_energy_cost_returns_none_when_data_is_outside_start_end() -> None:
-    """Data that falls entirely outside [start, end) becomes empty after slicing → returns None."""
+def test_apply_returns_none_when_data_is_outside_start_end() -> None:
+    """Data that falls entirely outside [start, end) becomes empty after slicing -> all NaN energy values."""
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        consumption={"all": {"energy": IndexFormula(constant_cost=10.0)}},
+        consumption={"energy": IndexFormula(constant_cost=10.0)},
     )
 
-    data = pd.DataFrame(
-        {
-            "timestamp": pd.date_range("2025-03-01", periods=4, freq="15min", tz=dt.UTC),
-            "value": [1.0] * 4,
-        }
-    )
+    ts = pd.date_range("2025-03-01", periods=4, freq="15min", tz=dt.UTC)
+    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [1.0] * 4})))
 
-    result = segment.apply_energy_cost(
-        data,
-        meter_type=MeterType.SINGLE_RATE,
-        direction=PowerDirection.CONSUMPTION,
+    result = segment.apply(
+        consumption=meter,
+        injection=None,
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
         end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
-        input_resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
+    )
+
+    # All energy values are NaN since data is outside the billed range.
+    assert result is None or result[(CostGroup.CONSUMPTION, "energy")].isna().all()
+
+
+def test_apply_returns_none_when_no_formulas_match_cost_group() -> None:
+    segment = TariffVersion(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        injection={"energy": IndexFormula(constant_cost=-5.0)},
+    )
+
+    ts = pd.date_range("2025-01-01", periods=1, freq="h", tz=dt.UTC)
+    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [10.0]})))
+
+    result = segment.apply(
+        consumption=meter,
+        injection=None,
+        start=dt.datetime(2025, 1, 1),
+        end=dt.datetime(2025, 2, 1),
+        output_resolution=dt.timedelta(hours=1),
     )
 
     assert result is None
 
 
-def test_apply_capacity_cost_returns_none_when_no_capacity_component_configured() -> None:
-    segment = TariffVersion(
-        start=dt.datetime(2025, 1, 1, 0, 0),
-        injection={"all": {"energy": IndexFormula(constant_cost=-5.0)}},
-    )
-
-    assert (
-        segment.apply_capacity_cost(
-            pd.DataFrame({"timestamp": pd.to_datetime(["2025-01-01 00:00:00"]), "value": [10.0]}),
-            start=dt.datetime(2025, 1, 1),
-            end=dt.datetime(2025, 2, 1),
-        )
-        is None
-    )
-
-
-def test_apply_periodic_costs_returns_none_when_output_range_is_empty() -> None:
+def test_fixed_costs_returns_none_when_output_range_is_empty() -> None:
     """When end < start the output timestamp grid is empty and the result is None."""
     segment = TariffVersion(
         start=dt.datetime(2025, 1, 1, 0, 0),
-        periodic={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
+        fixed={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
     )
+    ts = pd.date_range("2025-01-01", periods=2, freq="h", tz=dt.UTC)
+    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
 
-    result = segment.apply_periodic_costs(
-        start=dt.datetime(2025, 1, 2, 0, 0),
-        end=dt.datetime(2025, 1, 1, 0, 0),  # end before start → empty grid
+    result = segment.apply(
+        consumption=meter,
+        injection=None,
+        start=dt.datetime(2025, 1, 2, 0, 0, tzinfo=dt.UTC),
+        end=dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC),  # end before start -> empty grid
         output_resolution=dt.timedelta(hours=1),
     )
 

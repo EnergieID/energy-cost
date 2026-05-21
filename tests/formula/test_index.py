@@ -7,6 +7,7 @@ import pandas as pd
 
 from energy_cost.formula import IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_index_formula_merges_with_timezone_conversion():
@@ -39,7 +40,7 @@ def test_index_adder_multiplies_index_values() -> None:
     out = adder.get_values(
         start=dt.datetime(2025, 1, 1),
         end=dt.datetime(2025, 1, 1, 0, 30),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["value"].tolist() == [1.0, 2.0]
@@ -85,12 +86,13 @@ def test_index_formula_apply_multiplies_input_dataframe() -> None:
     formula = IndexFormula(constant_cost=2.0)
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=3, freq="15min"),
+            "timestamp": pd.date_range("2025-01-01", periods=3, freq="15min", tz=dt.UTC),
             "value": [1.0, 2.0, 3.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
 
-    out = formula.apply(data)
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
 
     assert out["value"].tolist() == [2.0, 4.0, 6.0]
 

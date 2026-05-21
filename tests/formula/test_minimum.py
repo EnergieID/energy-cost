@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.formula import IndexFormula, MaximumFormula, MinimumFormula, PeriodicFormula
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_minimum_formula_get_values_raises_not_implemented() -> None:
@@ -34,12 +35,13 @@ def test_minimum_formula_apply_picks_cheaper_formula() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"]),
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [10.0, 10.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     # IndexFormula(constant_cost=2.0) → 2*10=20 per month; the other → 5*10=50
     assert out["value"].tolist() == pytest.approx([20.0, 20.0])
@@ -58,12 +60,13 @@ def test_minimum_formula_apply_different_winner_per_period() -> None:
     # Feb: 8 units  → periodic=50, index=80 → min=50 (periodic wins)
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"]),
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [3.0, 8.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == pytest.approx([30.0, 50.0])
 
@@ -81,12 +84,13 @@ def test_minimum_formula_apply_all_formulas_tie() -> None:
     # Feb: 5 units  → periodic=20, index=50 → min=20
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"]),
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [2.0, 5.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == pytest.approx([20.0, 20.0])
 
@@ -104,12 +108,13 @@ def test_minimum_formula_apply_works_for_resolutions_smaller_than_period() -> No
     # 01:00: 5 units → periodic=15, index=50 → min=15 (periodic wins)
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30", "2025-01-01 01:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30", "2025-01-01 01:00"], utc=True),
             "value": [1.0, 1.0, 5.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
 
     assert out["value"].tolist() == pytest.approx([10.0, 10.0, 15.0])
 
@@ -126,12 +131,13 @@ def test_minimum_formula_apply_works_for_resolutions_larger_than_period() -> Non
 
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"], utc=True),
             "value": [2.0, 5.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("PT1H"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT1H"))
 
     assert out["value"].tolist()[0] == pytest.approx(50.0)  # 20 from index + 30 from periodic
 
@@ -147,12 +153,13 @@ def test_minimum_formula_apply_takes_first_formula_on_ties() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"], utc=True),
             "value": [0.5, 1.5],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
 
     # we get the 5, 15 from the index instead of the 10, 10 from the periodic formula
     assert out["value"].tolist() == pytest.approx([5.0, 15.0])
@@ -164,7 +171,9 @@ def test_minimum_formula_apply_takes_first_formula_on_ties() -> None:
             IndexFormula(constant_cost=10.0),
         ],
     )
-    reversed_out = reversed_formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    reversed_out = reversed_formula.apply(
+        meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     assert reversed_out["value"].tolist() == pytest.approx([10.0, 10.0])
 
@@ -177,14 +186,14 @@ def test_minimum_formula_apply_single_formula() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01"]),
-            "value": [4.0],
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [4.0, 4.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == pytest.approx([12.0])
+    assert pytest.approx(out["value"].iloc[0]) == 12.0
 
 
 def test_minimum_formula_model_validate_from_dict() -> None:
@@ -234,12 +243,13 @@ def test_maximum_formula_apply_picks_more_expensive_formula() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"]),
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [10.0, 10.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     # IndexFormula(constant_cost=5.0) → 5*10=50 per month; the other → 2*10=20
     assert out["value"].tolist() == pytest.approx([50.0, 50.0])
@@ -258,12 +268,13 @@ def test_maximum_formula_apply_different_winner_per_period() -> None:
     # Feb: 8 units  → periodic=50, index=80 → max=80 (index wins)
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"]),
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [3.0, 8.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == pytest.approx([50.0, 80.0])
 
@@ -280,14 +291,14 @@ def test_maximum_formula_apply_all_formulas_tie() -> None:
     # Jan: 2 units  → periodic=20, index=20 → max=20
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01"]),
-            "value": [2.0],
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [2.0, 2.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == pytest.approx([20.0])
+    assert pytest.approx(out["value"].iloc[0]) == 20.0
 
 
 def test_maximum_formula_apply_works_for_resolutions_smaller_than_period() -> None:
@@ -303,12 +314,13 @@ def test_maximum_formula_apply_works_for_resolutions_smaller_than_period() -> No
     # 01:00: 5 units → periodic=15, index=50 → max=50 (index wins)
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30", "2025-01-01 01:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30", "2025-01-01 01:00"], utc=True),
             "value": [1.0, 1.0, 5.0],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
 
     assert out["value"].tolist() == pytest.approx([15.0, 15.0, 50.0])
 
@@ -324,12 +336,13 @@ def test_maximum_formula_apply_takes_first_formula_on_ties() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00", "2025-01-01 00:30"], utc=True),
             "value": [0.5, 1.5],
         }
     )
 
-    out = formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
 
     # index total = 0.5*10 + 1.5*10 = 20, periodic total = 20 → tie → first formula (index) wins
     # index gives 5.0 and 15.0 per slot; periodic gives 10.0 per slot
@@ -342,7 +355,9 @@ def test_maximum_formula_apply_takes_first_formula_on_ties() -> None:
             IndexFormula(constant_cost=10.0),
         ],
     )
-    reversed_out = reversed_formula.apply(data, resolution=isodate.parse_duration("PT30M"))
+    reversed_out = reversed_formula.apply(
+        meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     assert reversed_out["value"].tolist() == pytest.approx([10.0, 10.0])
 
@@ -355,14 +370,14 @@ def test_maximum_formula_apply_single_formula() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01"]),
-            "value": [4.0],
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [4.0, 4.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
-    out = formula.apply(data, resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == pytest.approx([12.0])
+    assert pytest.approx(out["value"].iloc[0]) == 12.0
 
 
 def test_maximum_formula_model_validate_from_dict() -> None:

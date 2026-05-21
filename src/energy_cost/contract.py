@@ -186,7 +186,7 @@ class ContractHistory(VersionedCollection[Contract]):
         if end is None:
             end = consumption.power.end
         if output_resolution is None:
-            output_resolution = consumption.power.resolution
+            output_resolution = Duration(months=1)
 
         return self.collect_version_frames(
             lambda contract, seg_start, seg_end: contract.apply(

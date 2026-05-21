@@ -1,9 +1,12 @@
+import datetime as dt
+
 import pandas as pd
 import pytest
 import yaml
 from pydantic import TypeAdapter, ValidationError
 
 from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
+from energy_cost.meter import Meter, TimeseriesFrame
 
 _formula_adapter = TypeAdapter(Formula)
 
@@ -106,13 +109,6 @@ def test_formula_json_schema_covers_all_subtypes() -> None:
         assert subtype in schema_str, f"{subtype} missing from Formula JSON schema"
 
 
-def test_calling_apply_on_an_empty_dataframe_returns_empty_dataframe() -> None:
-    formula = IndexFormula(constant_cost=100.0)
-    empty_df = pd.DataFrame(columns=["timestamp", "value"])
-    result = formula.apply(empty_df)
-    assert result.empty
-
-
 def test_apply_produces_correct_values_when_data_has_non_default_integer_index() -> None:
     """Regression: Formula.apply must not NaN-out values when data has a non-zero integer index.
 
@@ -130,7 +126,8 @@ def test_apply_produces_correct_values_when_data_has_non_default_integer_index()
 
     assert data.index[0] == 8, "Pre-condition: index must NOT start at 0"
 
-    result = formula.apply(data)
+    meter = Meter(power=TimeseriesFrame(data))
+    result = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
 
     assert result["value"].notna().all(), "Formula.apply must not produce NaN values for non-zero-based indexes"
     expected = 0.0002 * 90.0

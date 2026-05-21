@@ -20,7 +20,7 @@ import pytest
 
 from energy_cost.contract import Contract
 from energy_cost.data import ConnectionType, CustomerType, RegionalData
-from energy_cost.meter import Meter
+from energy_cost.meter import Meter, TimeseriesFrame
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -41,7 +41,7 @@ def consumption_meter_15min() -> Meter:
     """Constant-consumption meter at 4 kW (1 kWh / 15 min) for 1.5 years."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
     data = pd.DataFrame({"timestamp": timestamps, "value": 0.001})
-    return Meter(data=data)
+    return Meter(power=TimeseriesFrame(data))
 
 
 # ---------------------------------------------------------------------------
@@ -68,18 +68,16 @@ def test_contract_produces_valid_dataframe(
     consumption_meter_15min: Meter,
 ) -> None:
     """Contract with fees + distributor + taxes returns a non-empty DataFrame."""
-    regional_data = RegionalData.get((region, connection_type))
-
     meter = consumption_meter_15min
 
     contract = Contract(
-        fees=regional_data.fees[customer_type],
-        distributor=regional_data.distributors[distributor_name],
-        taxes=regional_data.taxes,
-        timezone=regional_data.timezone,
+        region=region,
+        connection_type=connection_type,
+        customer_type=customer_type,
+        distributor_key=distributor_name,
     )
 
-    result = contract.apply(meters=[meter])
+    result = contract.apply(meter)
 
     assert isinstance(result, pd.DataFrame), "apply must return a DataFrame"
     assert not result.empty, "result DataFrame must not be empty"
@@ -100,17 +98,16 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
         pd.Timestamp("2025-01-01T00:00:00+01:00"),
         pd.Timestamp("2025-01-01T00:15:00+01:00"),
     ]
-    meter = Meter(data=pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]}))
+    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]})))
 
-    regional_data = RegionalData.get(("be_flanders", ConnectionType.ELECTRICITY))
     contract = Contract(
-        fees=regional_data.fees[CustomerType.RESIDENTIAL],
-        distributor=regional_data.distributors["fluvius_antwerpen"],
-        taxes=regional_data.taxes,
-        timezone=CET,
+        region="be_flanders",
+        connection_type=ConnectionType.ELECTRICITY,
+        customer_type=CustomerType.RESIDENTIAL,
+        distributor_key="fluvius_antwerpen",
     )
 
-    result = contract.apply(meters=[meter], start=start, end=end, output_resolution=isodate.parse_duration("P7D"))
+    result = contract.apply(meter, start=start, end=end, output_resolution=isodate.parse_duration("P7D"))
 
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
@@ -128,7 +125,7 @@ def test_regression_gas_gives_correct_fees_in_october() -> None:
     )
 
     meter = Meter(
-        data=pd.DataFrame(
+        power=TimeseriesFrame(
             {
                 "timestamp": pd.to_datetime(
                     [
@@ -153,7 +150,7 @@ def test_regression_gas_gives_correct_fees_in_october() -> None:
         )
     )
 
-    result = contract.apply(meters=[meter], output_resolution=isodate.parse_duration("P1M"))
+    result = contract.apply(meter, output_resolution=isodate.parse_duration("P1M"))
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
 

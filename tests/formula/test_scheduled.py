@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from energy_cost.formula import DayOfWeek, IndexFormula, ScheduledFormula, ScheduledFormulas, WhenClause
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_when_clause_rejects_start_after_end() -> None:
@@ -133,11 +134,12 @@ def test_scheduled_formulas_apply_multiplies_matching_formula_values() -> None:
     )
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2026-03-16 00:00:00", "2026-03-17 00:00:00"]),
+            "timestamp": pd.to_datetime(["2026-03-16 00:00:00", "2026-03-17 00:00:00"], utc=True),
             "value": [3.0, 4.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
 
-    out = formula.apply(data, resolution=dt.timedelta(days=1))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=1))
 
     assert out["value"].tolist() == [15.0, 8.0]

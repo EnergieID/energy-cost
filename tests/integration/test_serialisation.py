@@ -66,18 +66,12 @@ def _assert_yaml_keys_in_dump(yaml_data: Any, dump: Any, path: str = "") -> None
         assert isinstance(dump, dict), f"{path}: expected dict, got {type(dump).__name__}"
         if yaml_data and dump and not set(yaml_data.keys()) & set(dump.keys()):
             # The only expected cause: a bare formula dict was coerced by
-            # _coerce_meter_formulas (wraps in {"all": ...}) and then by
             # _coerce_named_formulas (wraps in {"total": ...}).
-            assert "all" in dump, (
-                f"{path}: no common keys between YAML {set(yaml_data.keys())} and dump "
-                f"{set(dump.keys())}; expected MeterType.ALL coercion (key 'all' missing)"
-            )
-            all_bucket = dump["all"]
-            assert isinstance(all_bucket, dict) and "total" in all_bucket, (
+            assert isinstance(dump, dict) and "total" in dump, (
                 f"{path}.all: expected NamedFormulas coercion to produce a 'total' key, "
-                f"got {set(all_bucket.keys()) if isinstance(all_bucket, dict) else type(all_bucket).__name__}"
+                f"got {set(dump.keys()) if isinstance(dump, dict) else type(dump).__name__}"
             )
-            _assert_yaml_keys_in_dump(yaml_data, all_bucket["total"], f"{path}.all.total")
+            _assert_yaml_keys_in_dump(yaml_data, dump["total"], f"{path}.all.total")
             return
         for key in yaml_data:
             assert key in dump, f"{path}.{key}: key found in YAML but missing from dump"

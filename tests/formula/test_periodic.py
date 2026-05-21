@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from energy_cost.formula import PeriodicFormula
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_periodic_formula_get_values_raises_not_implemented() -> None:
@@ -24,12 +25,13 @@ def test_periodic_formula_apply_uses_input_resolution() -> None:
     formula = PeriodicFormula(period=isodate.parse_duration("P1M"), constant_cost=100.0)
     data = pd.DataFrame(
         {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"]),
+            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
             "value": [1.0, 1.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
 
-    out = formula.apply(data, output_resolution=isodate.parse_duration("P1M"))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [100.0, 100.0]
 
@@ -37,10 +39,11 @@ def test_periodic_formula_apply_uses_input_resolution() -> None:
 def test_periodic_formula_apply_distributes_cost_over_fine_slots() -> None:
     """A daily cost of 24 distributed across 24 hourly slots gives 1.0 per slot."""
     formula = PeriodicFormula(period=dt.timedelta(days=1), constant_cost=24.0)
-    timestamps = pd.date_range("2025-01-01", periods=24, freq="h")
-    data = pd.DataFrame({"timestamp": timestamps})
+    timestamps = pd.date_range("2025-01-01", periods=24, freq="h", tz=dt.UTC)
+    data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
+    meter = Meter(power=TimeseriesFrame(data))
 
-    out = formula.apply(data, output_resolution=dt.timedelta(hours=1))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(hours=1))
 
     assert out["value"].sum() == pytest.approx(24.0)
     assert out["value"].iloc[0] == pytest.approx(1.0)

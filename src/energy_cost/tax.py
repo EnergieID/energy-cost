@@ -87,7 +87,7 @@ class TaxVersion(Versioned):
                             total_col = col[:i] + ("total",) * (3 - i)  # type: ignore[tuple-item]
                             remaining[total_col] -= amount
 
-        _col = (TariffCategory.TAXES, CostGroup.TOTAL, "total")
+        _col = (TariffCategory.TAXES, "total", "total")
         return pd.DataFrame({"timestamp": tax.index, _col: tax.to_numpy()})
 
 

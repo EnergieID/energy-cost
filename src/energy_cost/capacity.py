@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from energy_cost.meter import Meter
+from energy_cost.meter import Meter, TimeseriesFrame
 
 from .resolution import Resolution, is_divisor, to_pandas_freq
 
@@ -48,4 +48,9 @@ class CapacityRule(BaseModel):
         if self.window_periods is not None:
             data["value"] = data["value"].rolling(window=self.window_periods, min_periods=1).mean()
 
-        return Meter(power=meter.power, capacity=data, direction=meter.direction, type=meter.type)
+        return Meter(
+            power=meter.power,
+            capacity=TimeseriesFrame(data, resolution=self.billing_period),
+            direction=meter.direction,
+            type=meter.type,
+        )

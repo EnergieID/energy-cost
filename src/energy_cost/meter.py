@@ -38,8 +38,12 @@ class TimeseriesFrame(pd.DataFrame):
     _end: dt.datetime | None = None
     _resolution: Resolution | None = None
 
+    def __init__(self, *args, resolution: Resolution | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._resolution = resolution
+
     def _calc_properties(self):
-        self._start, self._end, self._resolution = detect_resolution_and_range(self)
+        self._start, self._end, self._resolution = detect_resolution_and_range(self, self._resolution)
 
     @property
     def start(self) -> dt.datetime:
@@ -61,6 +65,10 @@ class TimeseriesFrame(pd.DataFrame):
             self._calc_properties()
         assert self._resolution is not None
         return self._resolution
+
+    @resolution.setter
+    def resolution(self, value: Resolution) -> None:
+        self._resolution = value
 
 
 class Meter(BaseModel):

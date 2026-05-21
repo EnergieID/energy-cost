@@ -33,7 +33,7 @@ def _tariff_version(start: dt.datetime, end: dt.datetime | None = None, rate: fl
     return TariffVersion(
         start=start,
         end=end,
-        consumption={"all": {"energy": IndexFormula(constant_cost=rate)}},
+        consumption={"energy": IndexFormula(constant_cost=rate)},
     )
 
 
@@ -150,10 +150,10 @@ class TestCollectVersionFramesWithGaps:
                 _tariff_version(dt.datetime(2025, 4, 1, tzinfo=dt.UTC), rate=20.0),
             ]
         )
-        result = tariff.get_energy_cost(
+        result = tariff.get_values(
             start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
             end=dt.datetime(2025, 5, 1, tzinfo=dt.UTC),
-            resolution=dt.timedelta(hours=1),
+            output_resolution=dt.timedelta(hours=1),
         )
         assert result is not None
         # January should have rate 10, April should have rate 20
