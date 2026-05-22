@@ -83,8 +83,10 @@ class Meter(BaseModel):
         return Meter(
             direction=self.direction,
             type=self.type,
-            power=TimeseriesFrame(align_timestamps_to_tz(self.power, timezone)),
-            capacity=TimeseriesFrame(align_timestamps_to_tz(self.capacity, timezone))
+            power=TimeseriesFrame(align_timestamps_to_tz(self.power, timezone), resolution=self.power.resolution),
+            capacity=TimeseriesFrame(
+                align_timestamps_to_tz(self.capacity, timezone), resolution=self.capacity.resolution
+            )
             if self.capacity is not None
             else None,
         )
