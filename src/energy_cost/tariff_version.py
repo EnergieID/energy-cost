@@ -112,7 +112,7 @@ class TariffVersion(Versioned):
         if not results:
             return None
 
-        result = pd.concat(results, axis=1)
+        result = pd.concat(results, axis=1, sort=True)
         result[("total", "total")] = result[[col for col in result.columns if col[-1] == "total"]].sum(axis=1)
 
         return result.reset_index()

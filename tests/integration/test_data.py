@@ -159,7 +159,7 @@ def test_regression_gas_gives_correct_fees_in_october() -> None:
     # (fees, consumption, excise) = 8.23
 
     for month in ["2025-10", "2025-11", "2025-12"]:
-        row = result[result["timestamp"].dt.to_period("M") == month]
+        row = result[result["timestamp"].dt.strftime("%Y-%m") == month]
         assert not row.empty, f"No data for month {month}"
         assert row[("fees", "consumption", "energy_contribution")].iloc[0] == pytest.approx(0.9978)
         assert row[("fees", "consumption", "excise")].iloc[0] == pytest.approx(8.23)
