@@ -70,6 +70,9 @@ class TimeseriesFrame(pd.DataFrame):
     def resolution(self, value: Resolution) -> None:
         self._resolution = value
 
+    def align_to_timezone(self, timezone: dt.tzinfo) -> "TimeseriesFrame":
+        return TimeseriesFrame(align_timestamps_to_tz(self, timezone), resolution=self._resolution)
+
 
 class Meter(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -83,10 +86,6 @@ class Meter(BaseModel):
         return Meter(
             direction=self.direction,
             type=self.type,
-            power=TimeseriesFrame(align_timestamps_to_tz(self.power, timezone), resolution=self.power.resolution),
-            capacity=TimeseriesFrame(
-                align_timestamps_to_tz(self.capacity, timezone), resolution=self.capacity.resolution
-            )
-            if self.capacity is not None
-            else None,
+            power=self.power.align_to_timezone(timezone),
+            capacity=self.capacity.align_to_timezone(timezone) if self.capacity is not None else None,
         )
