@@ -364,3 +364,84 @@ def test_banded_tiers_raises_when_no_band_matches_estimated_total() -> None:
     with pytest.raises(ValueError, match="No tier band matches"):
         meter = Meter(power=TimeseriesFrame(data))
         formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+
+
+def test_tiered_formula_capacity_based_uses_capacity_data() -> None:
+    """A capacity_based TieredFormula applies band selection to meter.capacity (tiered.py line 55-56)."""
+    formula = TieredFormula(
+        capacity_based=True,
+        mode=TieringMode.BANDED,
+        bands=[
+            TierBand(up_to=3.0, formula=IndexFormula(constant_cost=10.0)),
+            TierBand(formula=IndexFormula(constant_cost=20.0)),
+        ],
+    )
+    # Capacity: 2 monthly rows with values below/above threshold.
+    cap_df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [2.0, 5.0],
+        }
+    )
+    power_df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [1.0, 1.0],
+        }
+    )
+    meter = Meter(
+        power=TimeseriesFrame(power_df),
+        capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("P1M")),
+    )
+
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+
+    # Jan capacity 2.0 <= 3.0 → band 1 (rate 10) applied to power (1.0): 10.0 * 1.0 = 10
+    # Feb capacity 5.0 > 3.0  → band 2 (rate 20) applied to power (1.0): 20.0 * 1.0 = 20
+    assert out["value"].tolist() == pytest.approx([10.0, 20.0])
+
+
+def test_tiered_formula_capacity_based_raises_when_no_capacity() -> None:
+    """A capacity_based TieredFormula raises ValueError when meter has no capacity (tiered.py line 54)."""
+    formula = TieredFormula(
+        capacity_based=True,
+        bands=[TierBand(formula=IndexFormula(constant_cost=10.0))],
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [1.0, 1.0],
+        }
+    )
+    meter = Meter(power=TimeseriesFrame(data))  # no capacity
+
+    with pytest.raises(ValueError, match="Capacity is required"):
+        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+
+
+def test_tiered_formula_capacity_based_with_band_period_raises_not_implemented() -> None:
+    """capacity_based + band_period combination is not yet supported (tiered.py line 65)."""
+    formula = TieredFormula(
+        capacity_based=True,
+        band_period=isodate.parse_duration("P1M"),
+        bands=[TierBand(formula=IndexFormula(constant_cost=10.0))],
+    )
+    cap_df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [2.0, 5.0],
+        }
+    )
+    power_df = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
+            "value": [1.0, 1.0],
+        }
+    )
+    meter = Meter(
+        power=TimeseriesFrame(power_df),
+        capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("P1M")),
+    )
+
+    with pytest.raises(NotImplementedError, match="Band periods are not yet supported"):
+        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))

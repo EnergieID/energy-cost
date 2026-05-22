@@ -4,6 +4,7 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pytest
 
 from energy_cost.formula import IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
@@ -129,3 +130,18 @@ def test_index_formula_with_only_constant_value_returns_valid_for_all_timestamps
     )
 
     assert out["value"].tolist() == [5.0] * 4
+
+
+def test_capacity_based_formula_raises_when_meter_has_no_capacity() -> None:
+    """FormulaBase.apply raises ValueError when capacity_based=True but meter.capacity is None (base.py line 40)."""
+    formula = IndexFormula(constant_cost=1.0, capacity_based=True)
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC),
+            "value": [1.0, 1.0],
+        }
+    )
+    meter = Meter(power=TimeseriesFrame(data))  # no capacity
+
+    with pytest.raises(ValueError, match="Capacity is required"):
+        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))

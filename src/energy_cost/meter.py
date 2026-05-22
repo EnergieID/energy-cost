@@ -66,10 +66,6 @@ class TimeseriesFrame(pd.DataFrame):
         assert self._resolution is not None
         return self._resolution
 
-    @resolution.setter
-    def resolution(self, value: Resolution) -> None:
-        self._resolution = value
-
     def align_to_timezone(self, timezone: dt.tzinfo) -> "TimeseriesFrame":
         return TimeseriesFrame(align_timestamps_to_tz(self, timezone), resolution=self._resolution)
 

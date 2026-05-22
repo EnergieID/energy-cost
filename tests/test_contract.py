@@ -1203,3 +1203,24 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
         f"Found {len(nan_rows)} NaN row(s) — weekly bins misaligned between tariff components:\n"
         f"{nan_rows[['timestamp']].to_string()}"
     )
+
+
+def test_contract_apply_with_injection_aligns_to_contract_timezone() -> None:
+    """Contract.apply must align injection data to the contract timezone (contract.py line 112)."""
+    contract = Contract(
+        supplier=_tariff(energy_rate=10.0, injection_rate=5.0),
+        timezone=dt.UTC,
+    )
+    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=2.0)
+    injection = _consumption(timestamps, value=1.0)
+
+    result = contract.apply(
+        Meter(power=TimeseriesFrame(consumption)),
+        injection=Meter(power=TimeseriesFrame(injection)),
+    )
+
+    assert result is not None
+    assert (TariffCategory.SUPPLIER, CostGroup.INJECTION, "energy") in result.columns
+    # 2 intervals × 1 MWh × 5 €/MWh = 10 €
+    assert result[(TariffCategory.SUPPLIER, CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(10.0)
