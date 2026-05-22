@@ -17,7 +17,7 @@ def fake_indexes() -> None:
     timestamps = pd.date_range("2026-03-08 00:00:00+01:00", periods=8, freq="15min")
 
     Index.register(
-        "Belpex15min",
+        "spot",
         DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": [10, 20, 30, 40, 50, 60, 70, 80]})),
     )
     Index.register(
@@ -47,7 +47,7 @@ def test_single_segment_consumption(tmp_path: Path, fake_indexes: None) -> None:
             energy:
               constant_cost: 1.0
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.1
         """,
     )
@@ -75,7 +75,7 @@ def test_injection_and_consumption_separate_formulas(tmp_path: Path, fake_indexe
             energy:
               constant_cost: 1.0
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.1
           injection:
             energy:
@@ -120,14 +120,14 @@ def test_versioned_segments_switch_at_boundary(tmp_path: Path, fake_indexes: Non
             energy:
               constant_cost: 1.0
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.1
         - start: 2026-03-08T00:30:00+01:00
           consumption:
             energy:
               constant_cost: 2.0
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.05
         """,
     )
@@ -154,7 +154,7 @@ def test_multiple_variable_cost_indexes(tmp_path: Path, fake_indexes: None) -> N
             energy:
               constant_cost: 0.5
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.1
                 - index: BelpexRLPO
                   scalar: 0.2
@@ -190,7 +190,7 @@ def test_multiple_named_cost_types(tmp_path: Path, fake_indexes: None) -> None:
             energy:
               constant_cost: 1.0
               variable_costs:
-                - index: Belpex15min
+                - index: spot
                   scalar: 0.1
         """,
     )

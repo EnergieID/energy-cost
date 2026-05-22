@@ -499,7 +499,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     from energy_cost.index import DataFrameIndex, Index
 
     Index.register(
-        "Belpex15min",
+        "spot",
         DataFrameIndex(
             pd.DataFrame(
                 {
@@ -515,13 +515,13 @@ def test_avoid_regression_on_real_world_data() -> None:
   consumption:
     constant_cost: 10.0
     variable_costs:
-    - index: Belpex15min
+    - index: spot
       scalar: 1.05
 - start: 2026-01-01T00:00:00+01:00
   consumption:
     constant_cost: 12.0
     variable_costs:
-    - index: Belpex15min
+    - index: spot
       scalar: 1.10
 """
     contract = Contract(

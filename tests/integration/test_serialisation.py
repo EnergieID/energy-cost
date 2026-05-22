@@ -30,10 +30,10 @@ _END = dt.datetime(2026, 7, 1, tzinfo=CET)
 
 @pytest.fixture
 def fake_index() -> None:
-    """Register a fake Belpex15min index covering the test period."""
+    """Register a fake spot index covering the test period."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
     Index.register(
-        "Belpex15min",
+        "spot",
         DataFrameIndex(pd.DataFrame({"timestamp": timestamps, "value": 50.0})),
     )
 
