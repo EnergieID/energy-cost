@@ -53,6 +53,10 @@ class Tariff(VersionedCollection[TariffVersion]):
         if end is None:
             end = consumption.power.end
 
+        consumption = consumption.align_to_timezone(timezone)
+        if injection is not None:
+            injection = injection.align_to_timezone(timezone)
+
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
         output_freq = to_pandas_freq(output_resolution)

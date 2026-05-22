@@ -1,0 +1,16 @@
+- start: 2025-01-01T00:00:00+01:00
+  consumption:
+    constant_cost: 10.0
+    variable_costs:
+      - index: spot
+        scalar: 1.05
+  injection:
+    variable_costs:
+      - index: spot
+        scalar: -0.95
+  fixed:
+    period: P1M
+    constant_cost: 5.0
+  capacity:
+    capacity_based: true
+    constant_cost: 2.0
