@@ -160,15 +160,3 @@
             constant_cost: 8.23
         - formula:
             constant_cost: 9.0782
-- start: "2026-04-01T00:00:00+02:00"
-  consumption:
-    energy_contribution:
-      constant_cost: 0.9978
-    excise:
-      band_period: P1Y
-      bands:
-        - up_to: 12
-          formula:
-            constant_cost: 8.23
-        - formula:
-            constant_cost: 9.3061
