@@ -16,8 +16,6 @@ class CostGroup(StrEnum):
 
 class MeterType(StrEnum):
     SINGLE_RATE = "single_rate"
-    TOU_PEAK = "tou_peak"
-    TOU_OFFPEAK = "tou_offpeak"
     NIGHT_ONLY = "night_only"
 
 

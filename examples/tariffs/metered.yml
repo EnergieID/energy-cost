@@ -7,12 +7,12 @@
       scalar: 0.9876
   consumption:
     by_meter_type:
-      tou_peak:
+      single_rate:
         constant_cost: 23.45
         variable_costs:
         - index: Belpex15min
           scalar: 2.34
-      tou_offpeak:
+      night_only:
         constant_cost: 10.0
         variable_costs:
         - index: Belpex15min
