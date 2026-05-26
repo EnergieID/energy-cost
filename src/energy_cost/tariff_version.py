@@ -4,7 +4,7 @@ from datetime import UTC
 from typing import Annotated, Any
 
 import pandas as pd
-from pydantic import BeforeValidator, Field, TypeAdapter
+from pydantic import BeforeValidator, Field, TypeAdapter, field_validator
 
 from energy_cost.versioning import Versioned
 
@@ -31,6 +31,15 @@ NamedFormulas = Annotated[
 
 
 class TariffVersion(Versioned):
+    @field_validator("end")
+    @classmethod
+    def end_must_be_none(cls, v: dt.datetime | None) -> None:
+        if v is not None:
+            raise ValueError(
+                "TariffVersion does not support an end date; It always applies until the next version starts."
+            )
+        return v
+
     injection: NamedFormulas = Field(default_factory=dict)
     consumption: NamedFormulas = Field(default_factory=dict)
     capacity: NamedFormulas = Field(default_factory=dict)

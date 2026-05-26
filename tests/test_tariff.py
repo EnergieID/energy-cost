@@ -373,3 +373,13 @@ def test_capacity_cost_aggregated_to_yearly_output(tmp_path: Path) -> None:
     # Peak = 4 MW each month; cost = 4 * 1.0 = 4.0 € per month; Jan + Feb = 8.0 €
     assert len(result) == 1
     assert result[cap_col].iloc[0] == pytest.approx(8.0, rel=1e-6)
+
+
+def test_tariff_version_should_not_allow_end_to_be_set() -> None:
+    """TariffVersion should raise ValidationError if 'end' is set (line 17)."""
+    with pytest.raises(ValueError):
+        TariffVersion(
+            start=dt.datetime(2025, 1, 1, 0, 0),
+            end=dt.datetime(2025, 2, 1, 0, 0),  # not allowed
+            consumption={"energy": IndexFormula(constant_cost=1.0)},
+        )
