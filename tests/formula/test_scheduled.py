@@ -143,3 +143,46 @@ def test_scheduled_formulas_apply_multiplies_matching_formula_values() -> None:
     out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=1))
 
     assert out["value"].tolist() == [15.0, 8.0]
+
+
+def test_scheduled_formulas_apply_schedule_before_aggregating_to_output_resolution() -> None:
+    formula = ScheduledFormulas(
+        schedule=[
+            ScheduledFormula(
+                when=[WhenClause(days=[DayOfWeek.MONDAY])],
+                formula=IndexFormula(constant_cost=5.0),
+            ),
+            ScheduledFormula(formula=IndexFormula(constant_cost=2.0)),
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-03-16", periods=48, freq="h", tz=dt.UTC),
+            "value": 1.0,
+        }
+    )
+    meter = Meter(power=TimeseriesFrame(data))
+
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=2))
+
+    assert out["value"].tolist() == [24 * 5.0 + 24 * 2.0]
+    formula = ScheduledFormulas(
+        schedule=[
+            ScheduledFormula(
+                when=[WhenClause(days=[DayOfWeek.MONDAY], start=dt.time(1, 30), end=dt.time(13, 30))],
+                formula=IndexFormula(constant_cost=5.0),
+            ),
+            ScheduledFormula(formula=IndexFormula(constant_cost=2.0)),
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2026-03-16", periods=192, freq="15min", tz=dt.UTC),
+            "value": 0.25,
+        }
+    )
+    meter = Meter(power=TimeseriesFrame(data))
+
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=2))
+
+    assert out["value"].tolist() == [12 * 5.0 + 36 * 2.0]

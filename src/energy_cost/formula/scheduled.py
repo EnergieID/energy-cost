@@ -10,7 +10,13 @@ import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
 from energy_cost.meter import Meter
-from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
+from energy_cost.resolution import (
+    Resolution,
+    align_datetime_to_tz,
+    find_common_divisor,
+    redistribute_to_resolution,
+    to_pandas_freq,
+)
 
 from .base import FormulaBase
 
@@ -37,6 +43,26 @@ _PANDAS_DAYOFWEEK: dict[DayOfWeek, int] = {
     DayOfWeek.SATURDAY: 5,
     DayOfWeek.SUNDAY: 6,
 }
+
+
+def maximal_resolution(time: dt.time) -> dt.timedelta:
+    if time.second != 0:
+        return dt.timedelta(seconds=1)
+    if time.minute % 5 != 0:
+        return dt.timedelta(minutes=1)
+    if time.minute % 15 != 0:
+        return dt.timedelta(minutes=5)
+    if time.minute % 30 != 0:
+        return dt.timedelta(minutes=15)
+    if time.minute != 0:
+        return dt.timedelta(minutes=30)
+    if time.hour % 6 != 0:
+        return dt.timedelta(hours=1)
+    if time.hour % 12 != 0:
+        return dt.timedelta(hours=6)
+    if time.hour != 0:
+        return dt.timedelta(hours=12)
+    return dt.timedelta(days=1)
 
 
 class WhenClause(BaseModel):
@@ -66,6 +92,13 @@ class WhenClause(BaseModel):
 
         return day_mask & time_mask
 
+    def maximal_resolution(self) -> dt.timedelta:
+        """Return the maximal resolution allowed by this clause's time range."""
+        time_res = maximal_resolution(self.start)
+        if self.end is not None:
+            time_res = min(time_res, maximal_resolution(self.end))
+        return time_res
+
 
 class ScheduledFormula(FormulaBase):
     when: list[WhenClause] | None = None
@@ -80,6 +113,12 @@ class ScheduledFormula(FormulaBase):
             mask = mask | clause.matches(df["timestamp"])
         df["value"] = df["value"].where(mask)
         return df
+
+    def maximal_resolution(self) -> dt.timedelta | None:
+        """Return the maximal resolution allowed by this formula's schedule."""
+        if self.when is None:
+            return None
+        return min(clause.maximal_resolution() for clause in self.when)
 
     def get_values(
         self,
@@ -108,22 +147,38 @@ class ScheduledFormulas(FormulaBase):
     kind: Literal["scheduled"] = "scheduled"
     schedule: list[ScheduledFormula] = Field(default_factory=list)
 
+    def maximal_resolution(self) -> dt.timedelta | None:
+        """Return the maximal resolution allowed by this formula's schedule."""
+        if not self.schedule:
+            return None
+        resolutions = [formula.maximal_resolution() for formula in self.schedule]
+        resolutions = [r for r in resolutions if r is not None]
+        return min(resolutions) if resolutions else None
+
     def _combine(
         self,
         start: dt.datetime,
         end: dt.datetime,
         output_resolution: Resolution,
         timezone: dt.tzinfo,
-        func: Callable[[ScheduledFormula], pd.DataFrame],
+        func: Callable[[ScheduledFormula, Resolution], pd.DataFrame],
+        binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         start = align_datetime_to_tz(start, timezone)
         end = align_datetime_to_tz(end, timezone)
-        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left")
+
+        intermediate_resolution = self.maximal_resolution() or output_resolution
+        if intermediate_resolution.total_seconds() > output_resolution.total_seconds():
+            intermediate_resolution = find_common_divisor(intermediate_resolution, output_resolution)
+        timestamps = pd.date_range(start=start, end=end, freq=to_pandas_freq(intermediate_resolution), inclusive="left")
         result: pd.Series = pd.Series(float("nan"), index=timestamps, dtype=float)
         for schedule in self.schedule:
-            values = func(schedule).set_index("timestamp")["value"]
+            values = func(schedule, intermediate_resolution).set_index("timestamp")["value"]
             result = result.combine_first(values)
-        return pd.DataFrame({"timestamp": timestamps, "value": result.to_numpy()})
+        merged = pd.DataFrame({"timestamp": timestamps, "value": result.to_numpy()})
+        return redistribute_to_resolution(
+            merged, intermediate_resolution, output_resolution, start, end, binning_anchor=binning_anchor
+        )
 
     def get_values(
         self,
@@ -137,7 +192,9 @@ class ScheduledFormulas(FormulaBase):
             end,
             output_resolution,
             timezone,
-            lambda schedule: schedule.get_values(start, end, output_resolution, timezone),
+            lambda schedule, intermediate_resolution: schedule.get_values(
+                start, end, intermediate_resolution, timezone
+            ),
         )
 
     def apply(
@@ -154,5 +211,8 @@ class ScheduledFormulas(FormulaBase):
             end,
             output_resolution,
             timezone,
-            lambda schedule: schedule.apply(meter, start, end, output_resolution, timezone, binning_anchor),
+            lambda schedule, intermediate_resolution: schedule.apply(
+                meter, start, end, intermediate_resolution, timezone, binning_anchor
+            ),
+            binning_anchor,
         )
