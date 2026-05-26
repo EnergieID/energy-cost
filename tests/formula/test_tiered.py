@@ -9,13 +9,10 @@ import pytest
 from energy_cost.formula import (
     IndexFormula,
     PeriodicFormula,
-    ScheduledFormula,
-    ScheduledFormulas,
     TierBand,
     TieredFormula,
     TieringMode,
 )
-from energy_cost.formula.scheduled import DayOfWeek, WhenClause
 from energy_cost.meter import Meter, TimeseriesFrame
 
 
@@ -82,35 +79,6 @@ def test_tiered_formula_apply_supports_fixed_periodic_band() -> None:
     out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
 
     assert out["value"].tolist() == [100.0, 180.0]
-
-
-def test_tiered_formula_apply_supports_scheduled_formula_band() -> None:
-    formula = TieredFormula(
-        bands=[
-            TierBand(
-                formula=ScheduledFormulas(
-                    schedule=[
-                        ScheduledFormula(
-                            when=[WhenClause(days=[DayOfWeek.WEDNESDAY])],
-                            formula=IndexFormula(constant_cost=5.0),
-                        ),
-                        ScheduledFormula(formula=IndexFormula(constant_cost=2.0)),
-                    ]
-                )
-            )
-        ]
-    )
-    data = pd.DataFrame(
-        {
-            "timestamp": pd.to_datetime(["2025-01-01 00:00:00", "2025-02-01 00:00:00"], utc=True),
-            "value": [3.0, 8.0],
-        }
-    )
-
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
-
-    assert out["value"].tolist() == [15.0, 16.0]
 
 
 def test_tiered_formula_get_values_raises_not_implemented_with_no_bands() -> None:

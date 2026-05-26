@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+import isodate
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -186,3 +187,29 @@ def test_scheduled_formulas_apply_schedule_before_aggregating_to_output_resoluti
     out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=2))
 
     assert out["value"].tolist() == [12 * 5.0 + 36 * 2.0]
+
+
+def test_scheduled_formulas_spread_out_to_resolution_to_culculate_partial_matches() -> None:
+    formula = ScheduledFormulas(
+        schedule=[
+            ScheduledFormula(
+                when=[WhenClause(days=[DayOfWeek.THURSDAY])],
+                formula=IndexFormula(constant_cost=5.0),
+            ),
+            ScheduledFormula(formula=IndexFormula(constant_cost=2.0)),
+        ]
+    )
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2026-01-01 00:00:00", "2026-02-01 00:00:00"], utc=True),
+            "value": [7.0, 9.0],
+        }
+    )
+
+    meter = Meter(power=TimeseriesFrame(data))
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+
+    # January has 5 thursdays, February has 4
+    assert out["value"].tolist() == pytest.approx(
+        [5 / 31 * 5.0 * 7.0 + 26 / 31 * 2.0 * 7.0, 4 / 28 * 5.0 * 9.0 + 24 / 28 * 2.0 * 9.0]
+    )
