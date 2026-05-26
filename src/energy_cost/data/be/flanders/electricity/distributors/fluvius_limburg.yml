@@ -1,87 +1,93 @@
 - start: '2024-01-01T00:00:00+01:00'
   capacity:
-    measurement_period: PT15M
-    billing_period: P1M
-    window_periods: 12
     formula:
-      mode: banded
-      bands:
-      - up_to: 0.0025
-        formula:
-          period: P1M
-          constant_cost: 8.1188409
-      - formula:
-          constant_cost: 3247.5363667
+      period: P1M
+      maximum:
+      - period: P1M
+        constant_cost: 8.118840916666667
+      - period: P1M
+        minimum:
+        - capacity_based: true
+          constant_cost: 3247.5363666666667
+        - by_meter_type:
+            default:
+              constant_cost: 145.42780000000002
+            night_only:
+              constant_cost: 158.26430000000002
   consumption:
-    all:
-      transmission:
-        constant_cost: 10.198
-      public_service_fee:
-        constant_cost: 32.0912
-      levies:
-        constant_cost: 4.3094
-    night_only:
-      public_service_fee:
-        constant_cost: 19.2547
-  periodic:
+    transmission:
+      constant_cost: 10.198
+    levies:
+      constant_cost: 4.3094
+    public_service_fee:
+      by_meter_type:
+        default:
+          constant_cost: 32.0912
+        night_only:
+          constant_cost: 19.2547
+  fixed:
     data_management:
       period: P1Y
       constant_cost: 14.28
 - start: '2025-01-01T00:00:00+01:00'
   capacity:
-    measurement_period: PT15M
-    billing_period: P1M
-    window_periods: 12
     formula:
-      mode: banded
-      bands:
-      - up_to: 0.0025
-        formula:
-          period: P1M
-          constant_cost: 10.1819423
-      - formula:
-          constant_cost: 4072.7769333
+      period: P1M
+      maximum:
+      - period: P1M
+        constant_cost: 10.181942333333334
+      - period: P1M
+        minimum:
+        - capacity_based: true
+          constant_cost: 4072.776933333333
+        - by_meter_type:
+            default:
+              constant_cost: 263.49049999999994
+            night_only:
+              constant_cost: 274.4697
   consumption:
-    all:
-      transmission:
-        constant_cost: 22.7614
-      public_service_fee:
-        constant_cost: 36.5973
-      levies:
-        constant_cost: 4.7676
-    night_only:
-      public_service_fee:
-        constant_cost: 25.6181
-  periodic:
+    transmission:
+      constant_cost: 22.761400000000002
+    levies:
+      constant_cost: 4.767600000000001
+    public_service_fee:
+      by_meter_type:
+        default:
+          constant_cost: 36.5973
+        night_only:
+          constant_cost: 25.618100000000002
+  fixed:
     data_management:
       period: P1Y
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
   capacity:
-    measurement_period: PT15M
-    billing_period: P1M
-    window_periods: 12
     formula:
-      mode: banded
-      bands:
-      - up_to: 0.0025
-        formula:
-          period: P1M
-          constant_cost: 10.2181122
-      - formula:
-          constant_cost: 4087.2448667
+      period: P1M
+      maximum:
+      - period: P1M
+        constant_cost: 10.218112166666666
+      - period: P1M
+        minimum:
+        - capacity_based: true
+          constant_cost: 4087.2448666666664
+        - by_meter_type:
+            default:
+              constant_cost: 273.34729999999996
+            night_only:
+              constant_cost: 278.68149999999997
   consumption:
-    all:
-      transmission:
-        constant_cost: 23.2082
-      public_service_fee:
-        constant_cost: 26.6707
-      levies:
-        constant_cost: 4.3906
-    night_only:
-      public_service_fee:
-        constant_cost: 21.3365
-  periodic:
+    transmission:
+      constant_cost: 23.208199999999998
+    levies:
+      constant_cost: 4.3906
+    public_service_fee:
+      by_meter_type:
+        default:
+          constant_cost: 26.6707
+        night_only:
+          constant_cost: 21.3365
+  fixed:
     data_management:
       period: P1Y
       constant_cost: 17.85

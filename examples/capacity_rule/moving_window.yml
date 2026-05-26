@@ -1,0 +1,3 @@
+measurement_period: PT15M # the period over which capacity is measured in ISO 8601 duration format
+billing_period: P1M # the period over which capacity costs are billed in ISO 8601 duration format
+window_periods: 12 # the number of billing periods to average out for the final capacity cost calculation, e.g. 12 for a 12 month moving window

@@ -9,9 +9,11 @@ import yaml
 from isodate import Duration
 from pydantic import ConfigDict, model_validator
 
+from energy_cost.capacity import CapacityRule
+
 from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
-from .meter import CostGroup, Meter, TariffCategory
-from .resolution import Resolution, align_datetime_to_tz, detect_resolution_and_range
+from .meter import Meter, TariffCategory
+from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
 from .types import TzInfo
@@ -36,6 +38,7 @@ class Contract(Versioned):
     distributor: Tariff | list[Tariff] | None = None
     fees: Tariff | list[Tariff] | None = None
     taxes: Tax | list[Tax] | None = None
+    capacity_rule: CapacityRule | None = None
     timezone: TzInfo = ZoneInfo("UTC")
     """All datetime operations use this timezone. Naive datetimes are treated as being
     in this timezone; tz-aware datetimes are converted to it."""
@@ -72,6 +75,9 @@ class Contract(Versioned):
             if values.get("distributor") is None and distributor_key is not None:
                 values["distributor"] = regional.distributors[distributor_key]
 
+            if values.get("capacity_rule") is None and regional.capacity_rule is not None:
+                values["capacity_rule"] = regional.capacity_rule
+
         return values
 
     @classmethod
@@ -83,10 +89,11 @@ class Contract(Versioned):
 
     def apply(
         self,
-        meters: list[Meter],
+        consumption: Meter,
+        injection: Meter | None = None,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
-        resolution: Resolution | None = None,
+        output_resolution: Resolution | None = None,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Calculate the full energy bill."""
@@ -97,8 +104,14 @@ class Contract(Versioned):
         if end is not None:
             end = align_datetime_to_tz(end, self.timezone)
         binning_anchor = align_datetime_to_tz(binning_anchor, self.timezone) if binning_anchor is not None else start
-        if resolution is None:
-            resolution = Duration(months=1)
+        if output_resolution is None:
+            output_resolution = Duration(months=1)
+
+        consumption = consumption.align_to_timezone(self.timezone)
+        if injection is not None:
+            injection = injection.align_to_timezone(self.timezone)
+        if self.capacity_rule is not None:
+            consumption = self.capacity_rule.apply(consumption)
 
         tariffs: dict[TariffCategory, Tariff | list[Tariff]] = {}
         for category in [TariffCategory.SUPPLIER, TariffCategory.DISTRIBUTOR, TariffCategory.FEES]:
@@ -112,10 +125,11 @@ class Contract(Versioned):
             category_frame: pd.DataFrame | None = None
             for tariff in tariff_list:
                 optional_frame = tariff.apply(
-                    meters=meters,
+                    consumption=consumption,
+                    injection=injection,
                     start=start,
                     end=end,
-                    resolution=resolution,
+                    output_resolution=output_resolution,
                     timezone=self.timezone,
                     binning_anchor=binning_anchor,
                 )
@@ -134,16 +148,16 @@ class Contract(Versioned):
         result = pd.concat(frames, axis=1, sort=True)
 
         result = result.reset_index()
-        _total = (TariffCategory.TOTAL, CostGroup.TOTAL, "total")
+        _total = ("total", "total", "total")
 
-        total_cols = [c for c in result.columns if c[-2:] == (CostGroup.TOTAL, "total")]
+        total_cols = [c for c in result.columns if c[-2:] == ("total", "total")]
         result[_total] = result[total_cols].sum(axis=1)
 
         if self.taxes is not None:
             tax_list = self.taxes if isinstance(self.taxes, list) else [self.taxes]
             tax_frame: pd.DataFrame | None = None
             for tax in tax_list:
-                frame = tax.apply(result, start, end, resolution, timezone=self.timezone)
+                frame = tax.apply(result, start, end, output_resolution, timezone=self.timezone)
                 if frame is not None and not frame.empty:
                     frame = frame.set_index("timestamp")
                     frame.columns = pd.MultiIndex.from_tuples(frame.columns)
@@ -152,7 +166,7 @@ class Contract(Versioned):
                 result = result.set_index("timestamp").join(tax_frame).reset_index()
 
         # Recompute grand total including taxes
-        total_cols = [c for c in result.columns if c[-2:] == (CostGroup.TOTAL, "total") and c != _total]
+        total_cols = [c for c in result.columns if c[-2:] == ("total", "total") and c != _total]
         result[_total] = result[total_cols].sum(axis=1)
 
         return result
@@ -161,22 +175,27 @@ class Contract(Versioned):
 class ContractHistory(VersionedCollection[Contract]):
     def apply(
         self,
-        meters: list[Meter],
+        consumption: Meter,
+        injection: Meter | None = None,
         start: dt.datetime | None = None,
         end: dt.datetime | None = None,
-        resolution: Resolution | None = None,
+        output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
-        if start is None or end is None:
-            combined = pd.concat([m.data for m in meters], ignore_index=True)
-            detected_start, detected_end, _ = detect_resolution_and_range(combined)
-            if start is None:
-                start = detected_start
-            if end is None:
-                end = detected_end
+        if start is None:
+            start = consumption.power.start
+        if end is None:
+            end = consumption.power.end
+        if output_resolution is None:
+            output_resolution = Duration(months=1)
 
         return self.collect_version_frames(
             lambda contract, seg_start, seg_end: contract.apply(
-                meters, start=seg_start, end=seg_end, resolution=resolution, binning_anchor=start
+                consumption,
+                injection,
+                start=seg_start,
+                end=seg_end,
+                output_resolution=output_resolution,
+                binning_anchor=start,
             ),
             start,
             end,

@@ -1,0 +1,3 @@
+# rule to convert consumption to capacity for a contract
+measurement_period: PT15M # the period over which capacity is measured in ISO 8601 duration format
+billing_period: P1M # the period over which capacity costs are billed in ISO 8601 duration format

@@ -7,10 +7,10 @@ import pandas as pd
 import pytest
 
 from energy_cost.resolution import (
-    _find_common_divisor,
     align_datetime_to_tz,
     align_timestamps_to_tz,
     detect_resolution_and_range,
+    find_common_divisor,
     is_divisor,
     parse_resolution,
     redistribute_to_resolution,
@@ -292,39 +292,39 @@ def test_distribute_aligned_window_divides_by_slots_in_source_period() -> None:
 
 
 def test_find_common_divisor_returns_gcd_for_two_timedeltas() -> None:
-    assert _find_common_divisor(dt.timedelta(hours=2), dt.timedelta(hours=3)) == dt.timedelta(hours=1)
-    assert _find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
-    assert _find_common_divisor(dt.timedelta(days=1), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
-    assert _find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=1)) == dt.timedelta(minutes=1)
+    assert find_common_divisor(dt.timedelta(hours=2), dt.timedelta(hours=3)) == dt.timedelta(hours=1)
+    assert find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
+    assert find_common_divisor(dt.timedelta(days=1), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert find_common_divisor(dt.timedelta(hours=1), dt.timedelta(minutes=1)) == dt.timedelta(minutes=1)
 
 
 def test_find_common_divisor_returns_gcd_for_two_calendar_durations() -> None:
-    assert _find_common_divisor(isodate.parse_duration("P1Y"), isodate.parse_duration("P1M")) == isodate.Duration(
+    assert find_common_divisor(isodate.parse_duration("P1Y"), isodate.parse_duration("P1M")) == isodate.Duration(
         months=1
     )
-    assert _find_common_divisor(isodate.parse_duration("P3M"), isodate.parse_duration("P2M")) == isodate.Duration(
+    assert find_common_divisor(isodate.parse_duration("P3M"), isodate.parse_duration("P2M")) == isodate.Duration(
         months=1
     )
-    assert _find_common_divisor(isodate.parse_duration("P6M"), isodate.parse_duration("P4M")) == isodate.Duration(
+    assert find_common_divisor(isodate.parse_duration("P6M"), isodate.parse_duration("P4M")) == isodate.Duration(
         months=2
     )
 
 
 def test_find_common_divisor_returns_timedelta_for_mixed_types_when_timedelta_divides_calendar() -> None:
-    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(days=1)) == dt.timedelta(days=1)
-    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
-    assert _find_common_divisor(isodate.parse_duration("P1Y"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
-    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
+    assert find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(days=1)) == dt.timedelta(days=1)
+    assert find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert find_common_divisor(isodate.parse_duration("P1Y"), dt.timedelta(hours=1)) == dt.timedelta(hours=1)
+    assert find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(minutes=15)) == dt.timedelta(minutes=15)
 
 
 def test_find_common_divisor_mixed_uses_gcd_with_one_day() -> None:
     # Mixed calendar + timedelta: common divisor is gcd(timedelta, P1D).
     # P7D and P1D share P1D as GCD, so P1M + P7D → P1D.
-    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(weeks=1)) == dt.timedelta(days=1)
+    assert find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(weeks=1)) == dt.timedelta(days=1)
     # P8H and P1D share P8H as GCD, so P1M + P8H → P8H.
-    assert _find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=8)) == dt.timedelta(hours=8)
+    assert find_common_divisor(isodate.parse_duration("P1M"), dt.timedelta(hours=8)) == dt.timedelta(hours=8)
     # P25H and P1D: gcd(90000s, 86400s) = 3600s = P1H.
-    assert _find_common_divisor(dt.timedelta(hours=25), dt.timedelta(hours=24)) == dt.timedelta(hours=1)
+    assert find_common_divisor(dt.timedelta(hours=25), dt.timedelta(hours=24)) == dt.timedelta(hours=1)
 
 
 # ---------------------------------------------------------------------------

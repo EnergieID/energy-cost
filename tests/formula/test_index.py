@@ -4,9 +4,11 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pytest
 
 from energy_cost.formula import IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
+from energy_cost.meter import Meter, TimeseriesFrame
 
 
 def test_index_formula_merges_with_timezone_conversion():
@@ -19,7 +21,7 @@ def test_index_formula_merges_with_timezone_conversion():
     start_utc = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
     end_utc = dt.datetime(2025, 1, 1, 0, 45, tzinfo=dt.UTC)
     formula = IndexFormula(constant_cost=1.0, variable_costs=[IndexAdder(index="tztest", scalar=1.0)])
-    out = formula.get_values(start=start_utc, end=end_utc, resolution=dt.timedelta(minutes=15))
+    out = formula.get_values(start=start_utc, end=end_utc, output_resolution=dt.timedelta(minutes=15))
     # All timestamps should be UTC
     assert all(ts.tzinfo == dt.UTC for ts in out["timestamp"])
     # Values should be correct (constant + index values)
@@ -39,7 +41,7 @@ def test_index_adder_multiplies_index_values() -> None:
     out = adder.get_values(
         start=dt.datetime(2025, 1, 1),
         end=dt.datetime(2025, 1, 1, 0, 30),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["value"].tolist() == [1.0, 2.0]
@@ -52,7 +54,7 @@ def test_index_formula_constant_only() -> None:
     out = formula.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 0, 45),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["timestamp"].tolist() == list(pd.date_range("2025-01-01", periods=3, freq="15min", tz=dt.UTC))
@@ -75,7 +77,7 @@ def test_index_formula_adds_multiple_variable_costs() -> None:
     out = formula.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 0, 45),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["value"].tolist() == [2.5, 3.5, 6.5]
@@ -85,12 +87,13 @@ def test_index_formula_apply_multiplies_input_dataframe() -> None:
     formula = IndexFormula(constant_cost=2.0)
     data = pd.DataFrame(
         {
-            "timestamp": pd.date_range("2025-01-01", periods=3, freq="15min"),
+            "timestamp": pd.date_range("2025-01-01", periods=3, freq="15min", tz=dt.UTC),
             "value": [1.0, 2.0, 3.0],
         }
     )
+    meter = Meter(power=TimeseriesFrame(data))
 
-    out = formula.apply(data)
+    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
 
     assert out["value"].tolist() == [2.0, 4.0, 6.0]
 
@@ -111,7 +114,7 @@ def test_index_formula_returns_nan_outside_index_range() -> None:
     out = formula.get_values(
         start=dt.datetime(2024, 12, 31, 23, 30),
         end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["value"].isna().tolist() == [True, True, False, False, True, True]
@@ -123,7 +126,22 @@ def test_index_formula_with_only_constant_value_returns_valid_for_all_timestamps
     out = formula.get_values(
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 1, 0),
-        resolution=dt.timedelta(minutes=15),
+        output_resolution=dt.timedelta(minutes=15),
     )
 
     assert out["value"].tolist() == [5.0] * 4
+
+
+def test_capacity_based_formula_raises_when_meter_has_no_capacity() -> None:
+    """FormulaBase.apply raises ValueError when capacity_based=True but meter.capacity is None (base.py line 40)."""
+    formula = IndexFormula(constant_cost=1.0, capacity_based=True)
+    data = pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC),
+            "value": [1.0, 1.0],
+        }
+    )
+    meter = Meter(power=TimeseriesFrame(data))  # no capacity
+
+    with pytest.raises(ValueError, match="Capacity is required"):
+        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))

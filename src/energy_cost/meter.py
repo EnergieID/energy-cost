@@ -1,7 +1,10 @@
+import datetime as dt
 from enum import StrEnum
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
+
+from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_resolution_and_range
 
 
 class CostGroup(StrEnum):
@@ -9,15 +12,11 @@ class CostGroup(StrEnum):
     INJECTION = "injection"
     CAPACITY = "capacity"
     FIXED = "fixed"
-    TOTAL = "total"
 
 
 class MeterType(StrEnum):
     SINGLE_RATE = "single_rate"
-    TOU_PEAK = "tou_peak"
-    TOU_OFFPEAK = "tou_offpeak"
     NIGHT_ONLY = "night_only"
-    ALL = "all"  # The "all" meter type is used for formulas that apply to all meter types. It should not be used in actual Meter instances.
 
 
 class PowerDirection(StrEnum):
@@ -30,7 +29,43 @@ class TariffCategory(StrEnum):
     DISTRIBUTOR = "distributor"
     FEES = "fees"
     TAXES = "taxes"
-    TOTAL = "total"
+
+
+class TimeseriesFrame(pd.DataFrame):
+    _start: dt.datetime | None = None
+    _end: dt.datetime | None = None
+    _resolution: Resolution | None = None
+
+    def __init__(self, *args, resolution: Resolution | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._resolution = resolution
+
+    def _calc_properties(self):
+        self._start, self._end, self._resolution = detect_resolution_and_range(self, self._resolution)
+
+    @property
+    def start(self) -> dt.datetime:
+        if self._start is None:
+            self._calc_properties()
+        assert self._start is not None
+        return self._start
+
+    @property
+    def end(self) -> dt.datetime:
+        if self._end is None:
+            self._calc_properties()
+        assert self._end is not None
+        return self._end
+
+    @property
+    def resolution(self) -> Resolution:
+        if self._resolution is None:
+            self._calc_properties()
+        assert self._resolution is not None
+        return self._resolution
+
+    def align_to_timezone(self, timezone: dt.tzinfo) -> "TimeseriesFrame":
+        return TimeseriesFrame(align_timestamps_to_tz(self, timezone), resolution=self._resolution)
 
 
 class Meter(BaseModel):
@@ -38,14 +73,13 @@ class Meter(BaseModel):
 
     direction: PowerDirection = PowerDirection.CONSUMPTION
     type: MeterType = MeterType.SINGLE_RATE
-    data: pd.DataFrame
+    power: TimeseriesFrame
+    capacity: TimeseriesFrame | None = None
 
-
-def as_single_meter(meters: list[Meter], direction: PowerDirection) -> Meter:
-    direction_meters = [m for m in meters if m.direction == direction]
-    if not direction_meters:
-        raise ValueError(f"No meters found for direction {direction}")
-    if len(direction_meters) > 1:
-        combined_data = pd.concat([m.data for m in direction_meters]).groupby("timestamp", as_index=False).sum()
-        return Meter(direction=direction, type=MeterType.SINGLE_RATE, data=combined_data)
-    return direction_meters[0]
+    def align_to_timezone(self, timezone: dt.tzinfo) -> "Meter":
+        return Meter(
+            direction=self.direction,
+            type=self.type,
+            power=self.power.align_to_timezone(timezone),
+            capacity=self.capacity.align_to_timezone(timezone) if self.capacity is not None else None,
+        )

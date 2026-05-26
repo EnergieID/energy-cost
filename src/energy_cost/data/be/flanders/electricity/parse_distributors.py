@@ -70,6 +70,7 @@ _LAYOUTS = {
         row_odv_norm=29,  # Row 30 – ODV kWh-tarief normaal  EUR/kWh
         row_odv_nacht=30,  # Row 31 – ODV kWh-tarief exclusief nacht  EUR/kWh
         row_toeslagen=32,  # Row 33 – Toeslagen  EUR/kWh
+        row_max_kwh_price=36,  # Row 37 – Maximum kWh-tarief  EUR/kWh
     ),
     # 2024 – different column mapping and extra 'overige transmissienetkosten' row
     "old": dict(
@@ -80,6 +81,7 @@ _LAYOUTS = {
         row_odv_norm=31,  # Row 32 – ODV kWh-tarief normaal  EUR/kWh
         row_odv_nacht=32,  # Row 33 – ODV kWh-tarief exclusief nacht  EUR/kWh
         row_toeslagen=34,  # Row 35 – Toeslagen  EUR/kWh
+        row_max_kwh_price=40,  # Row 41 – Maximum kWh-tarief  EUR/kWh
     ),
 }
 
@@ -131,20 +133,29 @@ def extract_tariffs(ws) -> dict:
     odv_normaal = rows[layout["row_odv_norm"]][col]
     odv_nacht = rows[layout["row_odv_nacht"]][col]
     toeslagen = rows[layout["row_toeslagen"]][col]
+    max_kwh_price = rows[layout["row_max_kwh_price"]][col]
 
     # Convert capacity: EUR/kW/year → EUR/MW/month
     cap_per_month = cap_kw_year * 1000 / 12
     min_band = MIN_CAPACITY_MW * cap_per_month
 
+    # max capacity kwh price, is the max kwh price minus the sum of the other kwh prices (transmission + odv + toeslagen)
+    other_kwh_costs_normaal = kwh_net + odv_normaal + toeslagen
+    max_capacity_kwh_price_normaal = max_kwh_price - other_kwh_costs_normaal
+    other_kwh_costs_nacht = kwh_net + odv_nacht + toeslagen
+    max_capacity_kwh_price_nacht = max_kwh_price - other_kwh_costs_nacht
+
     # Convert EUR/kWh → EUR/MWh
     return {
-        "capacity_per_month": round(cap_per_month, 7),
-        "min_band_cost": round(min_band, 7),
-        "transmission": round(kwh_net * 1000, 4),
-        "public_service_all": round(odv_normaal * 1000, 4),
-        "public_service_night": round(odv_nacht * 1000, 4),
-        "levies": round(toeslagen * 1000, 4),
+        "capacity_per_month": cap_per_month,
+        "min_band_cost": min_band,
+        "transmission": kwh_net * 1000,
+        "public_service_all": odv_normaal * 1000,
+        "public_service_night": odv_nacht * 1000,
+        "levies": toeslagen * 1000,
         "databeheer": databeheer,
+        "max_capacity_normaal": max_capacity_kwh_price_normaal * 1000,
+        "max_capacity_nacht": max_capacity_kwh_price_nacht * 1000,
     }
 
 
@@ -153,38 +164,42 @@ def build_entry(year: int, tariffs: dict) -> dict:
     return {
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "capacity": {
-            "measurement_period": "PT15M",
-            "billing_period": "P1M",
-            "window_periods": 12,
             "formula": {
-                "mode": "banded",
-                "bands": [
+                "period": "P1M",
+                "maximum": [
                     {
-                        "up_to": MIN_CAPACITY_MW,
-                        "formula": {
-                            "period": "P1M",
-                            "constant_cost": tariffs["min_band_cost"],
-                        },
+                        "period": "P1M",
+                        "constant_cost": tariffs["min_band_cost"],
                     },
                     {
-                        "formula": {
-                            "constant_cost": tariffs["capacity_per_month"],
-                        }
+                        "period": "P1M",
+                        "minimum": [
+                            {
+                                "capacity_based": True,
+                                "constant_cost": tariffs["capacity_per_month"],
+                            },
+                            {
+                                "by_meter_type": {
+                                    "default": {"constant_cost": tariffs["max_capacity_normaal"]},
+                                    "night_only": {"constant_cost": tariffs["max_capacity_nacht"]},
+                                },
+                            },
+                        ],
                     },
                 ],
             },
         },
         "consumption": {
-            "all": {
-                "transmission": {"constant_cost": tariffs["transmission"]},
-                "public_service_fee": {"constant_cost": tariffs["public_service_all"]},
-                "levies": {"constant_cost": tariffs["levies"]},
-            },
-            "night_only": {
-                "public_service_fee": {"constant_cost": tariffs["public_service_night"]},
+            "transmission": {"constant_cost": tariffs["transmission"]},
+            "levies": {"constant_cost": tariffs["levies"]},
+            "public_service_fee": {
+                "by_meter_type": {
+                    "default": {"constant_cost": tariffs["public_service_all"]},
+                    "night_only": {"constant_cost": tariffs["public_service_night"]},
+                },
             },
         },
-        "periodic": {
+        "fixed": {
             "data_management": {
                 "period": "P1Y",
                 "constant_cost": tariffs["databeheer"],

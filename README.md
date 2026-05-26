@@ -41,13 +41,12 @@ distributor_key: fluvius_imewo
 Then, you can use the `Contract` class to calculate your costs based on your consumption data:
 
 ```python
-from energy_cost import Contract, Meter
-import pandas as pd
+from energy_cost import Contract, Meter, TimeseriesFrame
 
-Contract.from_yaml("../examples/contracts/inline.yml")
+contract = Contract.from_yaml("../examples/contracts/inline.yml")
 
 consumption = Meter(
-    data=pd.DataFrame(
+    power=TimeseriesFrame(
         {
             "timestamp": pd.date_range("2024-01-01T00:00:00+01:00", "2024-03-01T00:00:00+01:00", freq="15min"),
             "value": 0.0002,
@@ -55,7 +54,7 @@ consumption = Meter(
     )
 )
 
-contract.apply([consumption])
+contract.apply(consumption)
 ```
 
 For more detailed examples, see the notebooks in the [`notebooks`](notebooks) directory.

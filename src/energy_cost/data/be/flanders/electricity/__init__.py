@@ -1,6 +1,9 @@
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import isodate
+
+from energy_cost.capacity import CapacityRule
 from energy_cost.data.models import ConnectionType, CustomerType, RegionalData
 from energy_cost.tariff import Tariff
 from energy_cost.tax import Tax
@@ -22,6 +25,11 @@ data = RegionalData(
     },
     distributors={path.stem: Tariff.from_yaml(path) for path in sorted(_DISTRIBUTORS_DIR.glob("*.yml"))},
     taxes=Tax.from_yaml(_BELGIAN_DIR / "taxes.yml"),
+    capacity_rule=CapacityRule(
+        measurement_period=isodate.parse_duration("PT15M"),
+        billing_period=isodate.parse_duration("P1M"),
+        window_periods=12,
+    ),
     timezone=_TIMEZONE,
 )
 

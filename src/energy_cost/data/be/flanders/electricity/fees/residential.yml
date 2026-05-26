@@ -1,5 +1,5 @@
 - start: 2022-01-01T00:00:00+01:00
-  periodic:
+  fixed:
     energy_fund:
       period: P1M
       constant_cost: 0.45

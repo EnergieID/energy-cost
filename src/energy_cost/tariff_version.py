@@ -1,17 +1,16 @@
 import datetime as dt
 from collections.abc import Callable
 from datetime import UTC
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 import pandas as pd
-from pydantic import BeforeValidator, Field, TypeAdapter
+from pydantic import BeforeValidator, Field, TypeAdapter, field_validator
 
 from energy_cost.versioning import Versioned
 
-from .capacity_cost import CapacityComponent
-from .formula import Formula, PeriodicFormula
-from .meter import MeterType, PowerDirection
-from .resolution import Resolution, redistribute_to_resolution, to_pandas_freq
+from .formula import Formula
+from .meter import CostGroup, Meter, MeterType
+from .resolution import Resolution, align_datetime_to_tz
 
 _METER_KEYS = {e.value for e in MeterType}
 _formula_adapter: TypeAdapter[Formula] = TypeAdapter(Formula)
@@ -31,51 +30,27 @@ NamedFormulas = Annotated[
 ]
 
 
-def _coerce_meter_formulas(value: Any) -> Any:
-    """Coerce shorthand MeterFormulas values."""
-    if not isinstance(value, dict):
-        return value
-    if not value:
-        # Empty dict means no formulas — pass through unchanged
-        return value
-    if not any(key in value for key in _METER_KEYS):
-        # No meter keys, assume it's a shorthand for ALL meters
-        return {MeterType.ALL.value: _coerce_named_formulas(value)}
-    return value
-
-
-MeterFormulas = Annotated[
-    dict[str, NamedFormulas],
-    BeforeValidator(_coerce_meter_formulas),
-]
-
-
 class TariffVersion(Versioned):
-    injection: MeterFormulas = Field(default_factory=dict)
-    consumption: MeterFormulas = Field(default_factory=dict)
-    capacity: CapacityComponent | None = None
-    periodic: dict[str, PeriodicFormula] = Field(default_factory=dict)
+    @field_validator("end")
+    @classmethod
+    def end_must_be_none(cls, v: dt.datetime | None) -> None:
+        if v is not None:
+            raise ValueError(
+                "TariffVersion does not support an end date; It always applies until the next version starts."
+            )
+        return v
 
-    def _resolve_energy_formulas(
-        self,
-        meter_type: MeterType,
-        direction: PowerDirection,
-    ) -> dict[str, Formula]:
-        direction_formulas: MeterFormulas = getattr(self, direction)
-        result: dict[str, Formula] = {}
-        if MeterType.ALL in direction_formulas:
-            result.update(direction_formulas[MeterType.ALL])
-        if meter_type in direction_formulas:
-            result.update(direction_formulas[meter_type])
-        return result
+    injection: NamedFormulas = Field(default_factory=dict)
+    consumption: NamedFormulas = Field(default_factory=dict)
+    capacity: NamedFormulas = Field(default_factory=dict)
+    fixed: NamedFormulas = Field(default_factory=dict)
 
     def _combine_energy_formulas(
         self,
-        meter_type: MeterType,
-        direction: PowerDirection,
+        cost_group: CostGroup,
         get_df: Callable[[Formula], pd.DataFrame],
     ) -> pd.DataFrame | None:
-        resolved = self._resolve_energy_formulas(meter_type, direction)
+        resolved = getattr(self, cost_group.value)
         series: dict[str, pd.Series] = {}
         for cost_type, formula in resolved.items():
             df = get_df(formula)
@@ -94,111 +69,59 @@ class TariffVersion(Versioned):
             result["total"] = result[cost_columns].sum(axis=1)
         return result
 
-    def get_energy_cost(
+    def get_values(
         self,
         start: dt.datetime,
         end: dt.datetime,
-        resolution: Resolution,
-        meter_type: MeterType,
-        direction: PowerDirection,
+        output_resolution: Resolution,
+        cost_group: CostGroup,
         timezone: dt.tzinfo = UTC,
     ) -> pd.DataFrame | None:
         """Get energy cost rates in €/MWh. Returns None if no formulas are configured."""
         return self._combine_energy_formulas(
-            meter_type,
-            direction,
-            lambda formula: formula.get_values(start, end, resolution, timezone),
+            cost_group,
+            lambda formula: formula.get_values(start, end, output_resolution, timezone),
         )
 
-    def apply_energy_cost(
+    def apply(
         self,
-        data: pd.DataFrame,
-        meter_type: MeterType,
-        direction: PowerDirection,
-        start: dt.datetime,
-        end: dt.datetime,
-        input_resolution: Resolution,
-        timezone: dt.tzinfo = UTC,
-        output_resolution: Resolution | None = None,
-        binning_anchor: dt.datetime | None = None,
-    ) -> pd.DataFrame | None:
-        """Apply energy cost formulas to quantity data in [start, end), returning costs in €."""
-        data = data[(data["timestamp"] >= start) & (data["timestamp"] < end)].copy()
-        if data.empty:
-            return None
-
-        result = self._combine_energy_formulas(
-            meter_type,
-            direction,
-            lambda formula: formula.apply(
-                data,
-                timezone=timezone,
-                resolution=input_resolution,
-                start=start,
-                end=end,
-                binning_anchor=binning_anchor,
-            ),
-        )
-
-        if output_resolution is not None and result is not None:
-            result = redistribute_to_resolution(
-                result, input_resolution, output_resolution, start, end, binning_anchor=binning_anchor
-            )
-        return result
-
-    def apply_capacity_cost(
-        self,
-        capacity_data: pd.DataFrame,
-        start: dt.datetime,
-        end: dt.datetime,
-        timezone: dt.tzinfo = UTC,
-        unit: Literal["MW", "MWh"] = "MWh",
-        output_resolution: Resolution | None = None,
-        binning_anchor: dt.datetime | None = None,
-    ) -> pd.DataFrame | None:
-        """Apply capacity cost formula in [start, end), returning costs in €."""
-        if self.capacity is None:
-            return None
-
-        result = self.capacity.apply(capacity_data, timezone=timezone, unit=unit)
-        result = result[(result["timestamp"] >= start) & (result["timestamp"] < end)].copy()
-
-        if output_resolution is not None and not result.empty:
-            result = redistribute_to_resolution(
-                result, self.capacity.billing_period, output_resolution, start, end, binning_anchor=binning_anchor
-            )
-        return result
-
-    def apply_periodic_costs(
-        self,
+        consumption: Meter,
+        injection: Meter | None,
         start: dt.datetime,
         end: dt.datetime,
         output_resolution: Resolution,
         timezone: dt.tzinfo = UTC,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame | None:
-        """Apply periodic cost formulas in [start, end), returning a DataFrame with a column per named cost."""
-        if not self.periodic:
-            return None
+        start = align_datetime_to_tz(start, timezone)
+        end = align_datetime_to_tz(end, timezone)
 
-        sentinel_start = binning_anchor if binning_anchor is not None else start
-        output_ts = pd.date_range(
-            start=sentinel_start, end=end, freq=to_pandas_freq(output_resolution), inclusive="left"
-        )
-        if output_ts.empty:
-            return None
-        sentinel = pd.DataFrame({"timestamp": output_ts})
+        results = []
+        for cost_group in CostGroup:
+            meter = injection if cost_group == CostGroup.INJECTION else consumption
+            if meter is None:
+                continue
 
-        result: pd.DataFrame | None = None
-        for name, formula in self.periodic.items():
-            df = formula.apply(
-                sentinel,
-                resolution=output_resolution,
-                timezone=timezone,
-                start=start,
-                end=end,
-                binning_anchor=binning_anchor,
+            result = self._combine_energy_formulas(
+                cost_group,
+                lambda formula, meter=meter: formula.apply(
+                    meter,
+                    timezone=timezone,
+                    start=start,
+                    end=end,
+                    output_resolution=output_resolution,
+                    binning_anchor=binning_anchor,
+                ),
             )
-            df = df.rename(columns={"value": name})
-            result = df if result is None else result.merge(df, on="timestamp", how="outer")
-        return result
+            if result is not None:
+                result = result.set_index("timestamp")
+                result.columns = pd.MultiIndex.from_tuples([(cost_group, c) for c in result.columns])
+                results.append(result)
+
+        if not results:
+            return None
+
+        result = pd.concat(results, axis=1, sort=True)
+        result[("total", "total")] = result[[col for col in result.columns if col[-1] == "total"]].sum(axis=1)
+
+        return result.reset_index()

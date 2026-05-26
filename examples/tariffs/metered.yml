@@ -3,16 +3,17 @@
   injection:
     constant_cost: -14.56
     variable_costs:
-    - index: Belpex15min
+    - index: spot
       scalar: 0.9876
   consumption:
-    tou_peak:
-      constant_cost: 23.45
-      variable_costs:
-      - index: Belpex15min
-        scalar: 2.34
-    tou_offpeak:
-      constant_cost: 10.0
-      variable_costs:
-      - index: Belpex15min
-        scalar: 0.56
+    by_meter_type:
+      single_rate:
+        constant_cost: 23.45
+        variable_costs:
+        - index: spot
+          scalar: 2.34
+      night_only:
+        constant_cost: 10.0
+        variable_costs:
+        - index: spot
+          scalar: 0.56

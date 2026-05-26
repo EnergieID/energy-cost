@@ -180,7 +180,7 @@ def snap_billing_period(
     return snapped_start, snapped_end
 
 
-def _find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
+def find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
     """Return a common divisor of *a* and *b*, i.e. the coarsest resolution C such that
     C divides both *a* and *b* (both are integer multiples of C).
     """
@@ -202,7 +202,7 @@ def _find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
     # Mixed: one calendar, one timedelta. 1 day is a divisor of every calendar duration
     # So a common divisor between P1D and the timedelta also divides the calendar duration.
     td = b if a_is_cal else a
-    return _find_common_divisor(td, isodate.parse_duration("P1D"))
+    return find_common_divisor(td, isodate.parse_duration("P1D"))
 
 
 def _distribute(
@@ -254,7 +254,7 @@ def redistribute_to_resolution(
     if source_resolution == output_resolution:
         return df
 
-    gcd = _find_common_divisor(source_resolution, output_resolution)
+    gcd = find_common_divisor(source_resolution, output_resolution)
     result = df
 
     if gcd != source_resolution:

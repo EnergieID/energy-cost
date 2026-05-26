@@ -157,14 +157,14 @@ def build_entry(year: int, tariffs: dict) -> dict:
     """Build the YAML-serialisable dict for one year's gas tariff entry."""
     return {
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
-        "periodic": {
+        "fixed": {
             "data_management": {
                 "period": "P1Y",
                 "constant_cost": tariffs["databeheer"],
-            }
+            },
+            "fixed_distribution_fee": _banded_mwh(tariffs["fixed_distribution_fee"], yearly=True),
         },
         "consumption": {
-            "fixed_distribution_fee": _banded_mwh(tariffs["fixed_distribution_fee"], yearly=True),
             "proportional_distribution_fee": _banded_mwh(tariffs["proportional_distribution_fee"]),
             "public_service_obligation": _banded_mwh(tariffs["public_service_obligation"]),
             "pension_levy": _banded_mwh(tariffs["pension_levy"]),

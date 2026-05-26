@@ -1,6 +1,6 @@
 # Fixed periodic costs
 - start: 2025-01-01T00:00:00+01:00
-  periodic:
+  fixed:
     connection_fee:
       period: P1D
       constant_cost: 1.5
