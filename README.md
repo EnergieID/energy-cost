@@ -46,7 +46,7 @@ from energy_cost import Contract, Meter, TimeseriesFrame
 contract = Contract.from_yaml("../examples/contracts/inline.yml")
 
 consumption = Meter(
-    data=TimeseriesFrame(
+    power=TimeseriesFrame(
         {
             "timestamp": pd.date_range("2024-01-01T00:00:00+01:00", "2024-03-01T00:00:00+01:00", freq="15min"),
             "value": 0.0002,
