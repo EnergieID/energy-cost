@@ -45,24 +45,22 @@ _PANDAS_DAYOFWEEK: dict[DayOfWeek, int] = {
 }
 
 
+_CANDIDATE_RESOLUTIONS = [
+    dt.timedelta(days=1),
+    dt.timedelta(hours=12),
+    dt.timedelta(hours=6),
+    dt.timedelta(hours=1),
+    dt.timedelta(minutes=30),
+    dt.timedelta(minutes=15),
+    dt.timedelta(minutes=5),
+    dt.timedelta(minutes=1),
+    dt.timedelta(seconds=1),
+]
+
+
 def maximal_resolution(time: dt.time) -> dt.timedelta:
-    if time.second != 0:
-        return dt.timedelta(seconds=1)
-    if time.minute % 5 != 0:
-        return dt.timedelta(minutes=1)
-    if time.minute % 15 != 0:
-        return dt.timedelta(minutes=5)
-    if time.minute % 30 != 0:
-        return dt.timedelta(minutes=15)
-    if time.minute != 0:
-        return dt.timedelta(minutes=30)
-    if time.hour % 6 != 0:
-        return dt.timedelta(hours=1)
-    if time.hour % 12 != 0:
-        return dt.timedelta(hours=6)
-    if time.hour != 0:
-        return dt.timedelta(hours=12)
-    return dt.timedelta(days=1)
+    total_seconds = time.hour * 3600 + time.minute * 60 + time.second
+    return next(r for r in _CANDIDATE_RESOLUTIONS if total_seconds % int(r.total_seconds()) == 0)
 
 
 class WhenClause(BaseModel):

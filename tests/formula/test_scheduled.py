@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from energy_cost.formula import DayOfWeek, IndexFormula, ScheduledFormula, ScheduledFormulas, WhenClause
+from energy_cost.formula.scheduled import maximal_resolution
 from energy_cost.meter import Meter, TimeseriesFrame
 
 
@@ -213,3 +214,25 @@ def test_scheduled_formulas_spread_out_to_resolution_to_culculate_partial_matche
     assert out["value"].tolist() == pytest.approx(
         [5 / 31 * 5.0 * 7.0 + 26 / 31 * 2.0 * 7.0, 4 / 28 * 5.0 * 9.0 + 24 / 28 * 2.0 * 9.0]
     )
+
+
+@pytest.mark.parametrize(
+    ("time", "expected"),
+    [
+        (dt.time(0, 0, 0), dt.timedelta(days=1)),
+        (dt.time(12, 0, 0), dt.timedelta(hours=12)),
+        (dt.time(18, 0, 0), dt.timedelta(hours=6)),
+        (dt.time(1, 0, 0), dt.timedelta(hours=1)),
+        (dt.time(8, 30, 0), dt.timedelta(minutes=30)),
+        (dt.time(2, 45, 0), dt.timedelta(minutes=15)),
+        (dt.time(3, 55, 0), dt.timedelta(minutes=5)),
+        (dt.time(9, 7, 0), dt.timedelta(minutes=1)),
+        (dt.time(15, 0, 17), dt.timedelta(seconds=1)),
+    ],
+)
+def test_maximal_resolution(time: dt.time, expected: dt.timedelta) -> None:
+    assert maximal_resolution(time) == expected
+
+
+def test_scheduled_formulas_maximal_resolution_returns_none_for_empty_schedule() -> None:
+    assert ScheduledFormulas(schedule=[]).maximal_resolution() is None
