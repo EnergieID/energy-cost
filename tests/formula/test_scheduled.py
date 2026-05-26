@@ -235,4 +235,5 @@ def test_maximal_resolution(time: dt.time, expected: dt.timedelta) -> None:
 
 
 def test_scheduled_formulas_maximal_resolution_returns_none_for_empty_schedule() -> None:
+    """ """
     assert ScheduledFormulas(schedule=[]).maximal_resolution() is None
