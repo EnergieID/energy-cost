@@ -8,7 +8,7 @@ from .index import Index
 
 
 class DataFrameIndex(Index):
-    def __init__(self, df: pd.DataFrame, resolution: Resolution | None = None):
+    def __init__(self, df: pd.DataFrame, resolution: Resolution | None = None, forward_fill: bool = False):
         if "timestamp" not in df.columns or "value" not in df.columns:
             raise ValueError("DataFrame must contain 'timestamp' and 'value' columns.")
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
@@ -17,7 +17,7 @@ class DataFrameIndex(Index):
         if resolution is None:
             resolution = detect_resolution(self.df["timestamp"])
 
-        super().__init__(resolution=resolution)
+        super().__init__(resolution=resolution, forward_fill=forward_fill)
 
     def _get_values(self, start: pd.Timestamp, end: pd.Timestamp, timezone: dt.tzinfo) -> pd.DataFrame:
         df = self.df.copy()  # work on a copy to avoid mutating self.df
@@ -26,16 +26,16 @@ class DataFrameIndex(Index):
 
 
 class CSVIndex(DataFrameIndex):
-    def __init__(self, csv_path: str, resolution: Resolution | None = None):
+    def __init__(self, csv_path: str, resolution: Resolution | None = None, forward_fill: bool = False):
         df = pd.read_csv(csv_path, parse_dates=["timestamp"])
-        super().__init__(df, resolution=resolution)
+        super().__init__(df, resolution=resolution, forward_fill=forward_fill)
 
 
 class YAMLIndex(DataFrameIndex):
-    def __init__(self, yaml_path: str, resolution: Resolution | None = None):
+    def __init__(self, yaml_path: str, resolution: Resolution | None = None, forward_fill: bool = False):
         import yaml
 
         with open(yaml_path) as f:
             data = yaml.safe_load(f)
         df = pd.DataFrame(data)
-        super().__init__(df, resolution=resolution)
+        super().__init__(df, resolution=resolution, forward_fill=forward_fill)
