@@ -1,8 +1,11 @@
 from collections.abc import ItemsView
-from typing import ClassVar
+from typing import ClassVar, Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
 
 
-class RegistryMixin[K, V]:
+class RegistryMixin(Generic[K, V]):
     _registry: ClassVar[dict] = {}
 
     def __init_subclass__(cls, **kwargs: object) -> None:

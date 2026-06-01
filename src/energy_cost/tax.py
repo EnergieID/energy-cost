@@ -1,6 +1,6 @@
 import datetime as dt
 from datetime import UTC
-from typing import Literal
+from typing import Literal, TypeAlias, cast
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -18,7 +18,7 @@ from .resolution import (
 
 _WILDCARD: Literal["*"] = "*"
 
-type ColumnPattern = tuple[TariffCategory | Literal["*"], CostGroup | Literal["*"], str]
+ColumnPattern: TypeAlias = tuple[TariffCategory | Literal["*"], CostGroup | Literal["*"], str]
 
 
 def _matches_pattern(pattern: ColumnPattern, column: ColumnPattern) -> bool:
@@ -98,7 +98,8 @@ def _total_pattern(pattern: ColumnPattern) -> ColumnPattern:
             result[i] = "total"
         else:
             break
-    return tuple(result)  # type: ignore[return-value]
+    cat, group, name = result
+    return cast(ColumnPattern, (cat, group, name))  # type: ignore[return-value]
 
 
 class Tax(VersionedCollection[TaxVersion]):
