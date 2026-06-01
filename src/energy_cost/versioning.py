@@ -2,7 +2,7 @@ import bisect
 import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
-from typing import Self
+from typing import Self, TypeVar
 
 import pandas as pd
 import yaml
@@ -10,13 +10,15 @@ from pydantic import BaseModel, RootModel
 
 from energy_cost.resolution import align_datetime_to_tz
 
+V = TypeVar("V", bound="Versioned")
+
 
 class Versioned(BaseModel):
     start: dt.datetime
     end: dt.datetime | None = None
 
 
-class VersionedCollection[V: Versioned](RootModel[list[V]]):
+class VersionedCollection(RootModel[list[V]]):
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:
         """Load from a YAML file containing a list of version entries."""
