@@ -1,0 +1,34 @@
+name: notebooks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate-notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.9.21'
+      - name: Install dependencies
+        run: uv sync
+      - name: Re-execute all notebooks
+        run: |
+          for nb in notebooks/*.ipynb; do
+            echo "Executing $nb..."
+            uv run jupyter nbconvert --to notebook --execute --inplace "$nb"
+          done
+      - name: Check notebooks are unchanged
+        run: |
+          if git diff --exit-code notebooks/; then
+            echo "All notebooks are stable."
+          else
+            echo "::error::Notebooks have changed after re-execution. Please commit the updated notebooks."
+            git diff --stat notebooks/
+            exit 1
+          fi
