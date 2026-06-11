@@ -46,6 +46,9 @@ test = "pytest --cov=energy_cost --cov-report=term-missing"
 [tool.poe.tasks.notebooks]
 cmd = "jupyter lab notebooks"
 envfile = ".env"
+[tool.poe.tasks.rerun-notebooks]
+shell = "jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb"
+interpreter = "bash"
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
