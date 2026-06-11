@@ -17,7 +17,7 @@ from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
 from .types import TzInfo
-from .versioning import Versioned, VersionedCollection
+from .versioning import Versioned, VersionedCollection, sum_frames
 
 
 class Contract(Versioned):
@@ -122,7 +122,7 @@ class Contract(Versioned):
         frames = []
         for category, tariff_or_list in tariffs.items():
             tariff_list = tariff_or_list if isinstance(tariff_or_list, list) else [tariff_or_list]
-            category_frame: pd.DataFrame | None = None
+            category_frames = []
             for tariff in tariff_list:
                 optional_frame = tariff.apply(
                     consumption=consumption,
@@ -134,12 +134,10 @@ class Contract(Versioned):
                     binning_anchor=binning_anchor,
                 )
                 if optional_frame is not None:
-                    optional_frame = optional_frame.set_index("timestamp")
-                    if category_frame is None:
-                        category_frame = optional_frame
-                    else:
-                        category_frame = category_frame.add(optional_frame, fill_value=0)
+                    category_frames.append(optional_frame)
+            category_frame = sum_frames(category_frames) if category_frames else None
             if category_frame is not None:
+                category_frame = category_frame.set_index("timestamp")
                 category_frame.columns = pd.MultiIndex.from_tuples(
                     [(category,) + col for col in category_frame.columns]
                 )
@@ -151,23 +149,24 @@ class Contract(Versioned):
         _total = ("total", "total", "total")
 
         total_cols = [c for c in result.columns if c[-2:] == ("total", "total")]
-        result[_total] = result[total_cols].sum(axis=1)
+        result[_total] = result[total_cols].sum(axis=1, skipna=False)
 
         if self.taxes is not None:
             tax_list = self.taxes if isinstance(self.taxes, list) else [self.taxes]
-            tax_frame: pd.DataFrame | None = None
+            tax_frames = []
             for tax in tax_list:
                 frame = tax.apply(result, start, end, output_resolution, timezone=self.timezone)
                 if frame is not None and not frame.empty:
                     frame = frame.set_index("timestamp")
                     frame.columns = pd.MultiIndex.from_tuples(frame.columns)
-                    tax_frame = frame if tax_frame is None else tax_frame.add(frame, fill_value=0)
-            if tax_frame is not None:
+                    tax_frames.append(frame.reset_index())
+            if tax_frames:
+                tax_frame = sum_frames(tax_frames).set_index("timestamp")
                 result = result.set_index("timestamp").join(tax_frame).reset_index()
 
         # Recompute grand total including taxes
         total_cols = [c for c in result.columns if c[-2:] == ("total", "total") and c != _total]
-        result[_total] = result[total_cols].sum(axis=1)
+        result[_total] = result[total_cols].sum(axis=1, skipna=False)
 
         return result
 

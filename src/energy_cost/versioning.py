@@ -78,13 +78,26 @@ class VersionedCollection(RootModel[list[V]]):
         ]
         if not frames:
             return None
-        combined = pd.concat(frames, ignore_index=True)
-        if isinstance(combined.columns, pd.MultiIndex):
-            combined = combined.sort_index(axis=1)
-        return (
-            combined.groupby("timestamp")
-            .sum(numeric_only=True)
-            .reset_index()
-            .sort_values("timestamp")
-            .reset_index(drop=True)
-        )
+
+        return sum_frames(frames).sort_values("timestamp").reset_index(drop=True)
+
+
+def sum_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    indexed = [f.set_index("timestamp") if "timestamp" in f.columns else f for f in frames]
+
+    # Determine the superset of all columns
+    all_columns = set()
+    for f in indexed:
+        all_columns.update(f.columns)
+
+    # Fill structurally-absent columns with 0
+    for f in indexed:
+        missing_cols = all_columns - set(f.columns)
+        for col in missing_cols:
+            f[col] = 0.0
+
+    # Concatenate and sum over timestamp, keeping NaN values if any frame has NaN for a given timestamp
+    combined = pd.concat(indexed, axis=0)
+    return (combined.groupby("timestamp").sum(skipna=False).reset_index().sort_values("timestamp")).reset_index(
+        drop=True
+    )

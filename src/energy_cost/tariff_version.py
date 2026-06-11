@@ -66,7 +66,7 @@ class TariffVersion(Versioned):
 
         cost_columns = [col for col in result.columns if col not in ("timestamp", "total")]
         if cost_columns:
-            result["total"] = result[cost_columns].sum(axis=1)
+            result["total"] = result[cost_columns].sum(axis=1, skipna=False)
         return result
 
     def get_values(
@@ -122,6 +122,8 @@ class TariffVersion(Versioned):
             return None
 
         result = pd.concat(results, axis=1, sort=True)
-        result[("total", "total")] = result[[col for col in result.columns if col[-1] == "total"]].sum(axis=1)
+        result[("total", "total")] = result[[col for col in result.columns if col[-1] == "total"]].sum(
+            axis=1, skipna=False
+        )
 
         return result.reset_index()

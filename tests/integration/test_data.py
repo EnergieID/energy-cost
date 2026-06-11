@@ -94,11 +94,9 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
     start = dt.datetime(2025, 1, 1, tzinfo=CET)
     end = dt.datetime(2025, 2, 1, tzinfo=CET)
 
-    timestamps = [
-        pd.Timestamp("2025-01-01T00:00:00+01:00"),
-        pd.Timestamp("2025-01-01T00:15:00+01:00"),
-    ]
-    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]})))
+    # Generate quarter-hourly data covering the full month
+    timestamps = pd.date_range(start=start, end=end, freq="15min", inclusive="left")
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": 1.0})))
 
     contract = Contract(
         region="be_flanders",
