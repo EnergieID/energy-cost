@@ -24,6 +24,7 @@ dev = [
     "pytest>=9.0.2",
     "ipykernel>=6.29.5",
     "jupyterlab>=4.4.0",
+    "nbstripout>=0.8.0",
     "openpyxl>=3.1.0",
 ]
 [project.urls]
@@ -46,6 +47,9 @@ test = "pytest --cov=energy_cost --cov-report=term-missing"
 [tool.poe.tasks.notebooks]
 cmd = "jupyter lab notebooks"
 envfile = ".env"
+[tool.poe.tasks.rerun-notebooks]
+shell = "jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb && nbstripout --keep-output --keep-count --extra-keys 'cell.metadata.execution metadata.language_info.version' notebooks/*.ipynb"
+interpreter = "bash"
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
