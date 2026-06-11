@@ -164,30 +164,28 @@ def build_entry(year: int, tariffs: dict) -> dict:
     return {
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "capacity": {
-            "formula": {
-                "period": "P1M",
-                "maximum": [
-                    {
-                        "period": "P1M",
-                        "constant_cost": tariffs["min_band_cost"],
-                    },
-                    {
-                        "period": "P1M",
-                        "minimum": [
-                            {
-                                "capacity_based": True,
-                                "constant_cost": tariffs["capacity_per_month"],
+            "period": "P1M",
+            "maximum": [
+                {
+                    "period": "P1M",
+                    "constant_cost": tariffs["min_band_cost"],
+                },
+                {
+                    "period": "P1M",
+                    "minimum": [
+                        {
+                            "capacity_based": True,
+                            "constant_cost": tariffs["capacity_per_month"],
+                        },
+                        {
+                            "by_meter_type": {
+                                "default": {"constant_cost": tariffs["max_capacity_normaal"]},
+                                "night_only": {"constant_cost": tariffs["max_capacity_nacht"]},
                             },
-                            {
-                                "by_meter_type": {
-                                    "default": {"constant_cost": tariffs["max_capacity_normaal"]},
-                                    "night_only": {"constant_cost": tariffs["max_capacity_nacht"]},
-                                },
-                            },
-                        ],
-                    },
-                ],
-            },
+                        },
+                    ],
+                },
+            ],
         },
         "consumption": {
             "transmission": {"constant_cost": tariffs["transmission"]},
