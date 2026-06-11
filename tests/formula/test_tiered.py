@@ -54,8 +54,10 @@ def test_tiered_formula_apply_uses_first_matching_band() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [36.0, 90.0]
 
@@ -75,8 +77,10 @@ def test_tiered_formula_apply_supports_fixed_periodic_band() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [100.0, 180.0]
 
@@ -110,8 +114,10 @@ def test_tiered_formula_apply_skips_band_that_matches_no_rows() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     # Both rows fall through to the catch-all band (constant_cost=10).
     assert out["value"].tolist() == [80.0, 120.0]
@@ -135,8 +141,10 @@ def test_tiered_formula_band_resolution_selects_band_by_annual_sum() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [2.0] * 12
 
@@ -161,8 +169,10 @@ def test_tiered_formula_band_resolution_extrapolates_incomplete_period() -> None
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [25.0, 25.0]
 
@@ -187,8 +197,10 @@ def test_tiered_formula_band_resolution_handles_multiple_periods() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [2.0] * 12 + [10.0] * 12
 
@@ -208,7 +220,7 @@ def test_tiered_formula_progressive_is_default() -> None:
             "value": [10.0, 10.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
     out = formula.apply(meter, start, end, output_resolution=isodate.parse_duration("P1M"))
@@ -238,7 +250,7 @@ def test_tiered_formula_progressive_rowwise_splits_across_bands() -> None:
             "value": [20.0, 20.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
     start = dt.datetime(2025, 1, 1, tzinfo=dt.UTC)
     end = dt.datetime(2025, 2, 1, tzinfo=dt.UTC)
     out = formula.apply(meter, start, end, output_resolution=isodate.parse_duration("P1M"))
@@ -270,8 +282,10 @@ def test_tiered_formula_progressive_with_band_period_splits_across_bands() -> No
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     expected = pytest.approx([3.5] * 12)
     assert out["value"].tolist() == expected
@@ -302,8 +316,10 @@ def test_tiered_formula_progressive_with_band_period_notebook_scenario() -> None
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     # blended rate = (3*5 + 2*7 + 7*10) / 12 = (15 + 14 + 70) / 12 = 99/12 = 8.25
     assert out["value"].tolist() == pytest.approx([99 / 12] * 12)
@@ -330,8 +346,10 @@ def test_banded_tiers_raises_when_no_band_matches_estimated_total() -> None:
     )
 
     with pytest.raises(ValueError, match="No tier band matches"):
-        meter = Meter(power=TimeseriesFrame(data))
-        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+        meter = Meter(measurements=TimeseriesFrame(data))
+        formula.apply(
+            meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+        )
 
 
 def test_tiered_formula_capacity_based_uses_capacity_data() -> None:
@@ -351,21 +369,23 @@ def test_tiered_formula_capacity_based_uses_capacity_data() -> None:
             "value": [2.0, 5.0],
         }
     )
-    power_df = pd.DataFrame(
+    measurements_df = pd.DataFrame(
         {
             "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [1.0, 1.0],
         }
     )
     meter = Meter(
-        power=TimeseriesFrame(power_df),
+        measurements=TimeseriesFrame(measurements_df),
         capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("P1M")),
     )
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
-    # Jan capacity 2.0 <= 3.0 → band 1 (rate 10) applied to power (1.0): 10.0 * 1.0 = 10
-    # Feb capacity 5.0 > 3.0  → band 2 (rate 20) applied to power (1.0): 20.0 * 1.0 = 20
+    # Jan capacity 2.0 <= 3.0 → band 1 (rate 10) applied to measurements (1.0): 10.0 * 1.0 = 10
+    # Feb capacity 5.0 > 3.0  → band 2 (rate 20) applied to measurements (1.0): 20.0 * 1.0 = 20
     assert out["value"].tolist() == pytest.approx([10.0, 20.0])
 
 
@@ -381,10 +401,12 @@ def test_tiered_formula_capacity_based_raises_when_no_capacity() -> None:
             "value": [1.0, 1.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))  # no capacity
+    meter = Meter(measurements=TimeseriesFrame(data))  # no capacity
 
     with pytest.raises(ValueError, match="Capacity is required"):
-        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+        formula.apply(
+            meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+        )
 
 
 def test_tiered_formula_capacity_based_with_band_period_raises_not_implemented() -> None:
@@ -400,16 +422,18 @@ def test_tiered_formula_capacity_based_with_band_period_raises_not_implemented()
             "value": [2.0, 5.0],
         }
     )
-    power_df = pd.DataFrame(
+    measurements_df = pd.DataFrame(
         {
             "timestamp": pd.to_datetime(["2025-01-01", "2025-02-01"], utc=True),
             "value": [1.0, 1.0],
         }
     )
     meter = Meter(
-        power=TimeseriesFrame(power_df),
+        measurements=TimeseriesFrame(measurements_df),
         capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("P1M")),
     )
 
     with pytest.raises(NotImplementedError, match="Band periods are not yet supported"):
-        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+        formula.apply(
+            meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+        )

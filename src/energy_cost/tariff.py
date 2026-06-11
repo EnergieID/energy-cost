@@ -49,9 +49,9 @@ class Tariff(VersionedCollection[TariffVersion]):
         if output_resolution is None:
             output_resolution = isodate.Duration(months=1)
         if start is None:
-            start = consumption.power.start
+            start = consumption.measurements.start
         if end is None:
-            end = consumption.power.end
+            end = consumption.measurements.end
 
         consumption = consumption.align_to_timezone(timezone)
         if injection is not None:

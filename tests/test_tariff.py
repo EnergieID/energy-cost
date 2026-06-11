@@ -15,7 +15,7 @@ from energy_cost.tariff_version import TariffVersion
 
 
 def _meter(timestamps: pd.DatetimeIndex, value: float = 1.0) -> Meter:
-    return Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": value})))
+    return Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": value})))
 
 
 def test_tariff_from_yaml_versioned_segments(tmp_path: Path) -> None:
@@ -233,7 +233,7 @@ def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_
     )
 
     ts = pd.date_range("2025-01-01T00:00:00+01:00", "2026-01-01T00:00:00+01:00", freq="15min")
-    raw_meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts[:-1], "value": 5.0})))
+    raw_meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts[:-1], "value": 5.0})))
     consumption = cap_rule.apply(raw_meter)
 
     z = ZoneInfo("Europe/Brussels")
@@ -319,7 +319,7 @@ def test_capacity_cost_redistributed_evenly_to_finer_resolution(tmp_path: Path) 
 
     # Use Jan+Feb to have 2 capacity rows (allows resolution detection)
     jan_feb_ts = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
-    raw_meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})))
+    raw_meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})))
     consumption = cap_rule.apply(raw_meter)
 
     result = tariff.apply(
@@ -357,7 +357,7 @@ def test_capacity_cost_aggregated_to_yearly_output(tmp_path: Path) -> None:
     )
 
     jan_feb_ts = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
-    raw_meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})))
+    raw_meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})))
     consumption = cap_rule.apply(raw_meter)
 
     result = tariff.apply(

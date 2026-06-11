@@ -73,13 +73,13 @@ class Meter(BaseModel):
 
     direction: PowerDirection = PowerDirection.CONSUMPTION
     type: MeterType = MeterType.SINGLE_RATE
-    power: TimeseriesFrame
+    measurements: TimeseriesFrame
     capacity: TimeseriesFrame | None = None
 
     def align_to_timezone(self, timezone: dt.tzinfo) -> "Meter":
         return Meter(
             direction=self.direction,
             type=self.type,
-            power=self.power.align_to_timezone(timezone),
+            measurements=self.measurements.align_to_timezone(timezone),
             capacity=self.capacity.align_to_timezone(timezone) if self.capacity is not None else None,
         )

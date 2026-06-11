@@ -55,7 +55,7 @@ def fake_supplier() -> None:
 def consumption_meter() -> Meter:
     """Constant-consumption meter at 4 kW (1 kWh / 15 min)."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
-    return Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": 0.001})))
+    return Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": 0.001})))
 
 
 # ---------------------------------------------------------------------------

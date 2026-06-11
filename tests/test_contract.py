@@ -66,7 +66,7 @@ def test_apply_consumption_multiplies_rate_and_sums_to_month() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
 
-    result = tariff.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert len(result) == 1
@@ -87,7 +87,7 @@ def test_apply_two_months_produces_two_rows() -> None:
         }
     )
 
-    result = tariff.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert len(result) == 2
@@ -105,7 +105,7 @@ def test_apply_explicit_start_end_restricts_billing_period() -> None:
 
     # Only include the first two intervals
     result = tariff.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=dt.datetime(2025, 1, 1, 0, 0),
         end=dt.datetime(2025, 1, 1, 0, 30),
         output_resolution=dt.timedelta(minutes=30),
@@ -144,7 +144,7 @@ def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) ->
     feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
     all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
     raw_df = pd.DataFrame({"timestamp": all_ts, "value": 5.0})
-    raw_meter = Meter(power=TimeseriesFrame(raw_df))
+    raw_meter = Meter(measurements=TimeseriesFrame(raw_df))
     consumption = cap_rule.apply(raw_meter)
     result = tariff.apply(
         consumption,
@@ -168,7 +168,7 @@ def test_apply_custom_output_resolution() -> None:
     timestamps = pd.date_range("2025-01-01", periods=8, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
-    result = tariff.apply(Meter(power=TimeseriesFrame(consumption)), output_resolution=dt.timedelta(days=1))
+    result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)), output_resolution=dt.timedelta(days=1))
 
     assert result is not None
     assert len(result) == 1
@@ -196,7 +196,7 @@ def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(t
     tariff = Tariff.from_yaml(cap_yaml)
     # Use 2 months so capacity has 2 rows (required for resolution detection)
     timestamps = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
-    raw_meter = Meter(power=TimeseriesFrame(_consumption(timestamps, value=5.0)))
+    raw_meter = Meter(measurements=TimeseriesFrame(_consumption(timestamps, value=5.0)))
     result = tariff.apply(
         cap_rule.apply(raw_meter),
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
@@ -214,7 +214,7 @@ def test_apply_column_structure_is_two_level_multiindex() -> None:
     """The output columns form a two-level MultiIndex by default (excluding the timestamp column)."""
     tariff = _tariff(energy_rate=10.0)
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
-    result = tariff.apply(Meter(power=TimeseriesFrame(_consumption(timestamps))))
+    result = tariff.apply(Meter(measurements=TimeseriesFrame(_consumption(timestamps))))
 
     assert result is not None
     data_cols = [c for c in result.columns if c != "timestamp"]
@@ -236,8 +236,8 @@ def test_apply_with_injection_adds_injection_columns() -> None:
     injection = _consumption(timestamps, value=1.0)
 
     result = tariff.apply(
-        Meter(power=TimeseriesFrame(consumption)),
-        injection=Meter(power=TimeseriesFrame(injection)),
+        Meter(measurements=TimeseriesFrame(consumption)),
+        injection=Meter(measurements=TimeseriesFrame(injection)),
     )
 
     assert result is not None
@@ -262,7 +262,7 @@ def test_apply_includes_fixed_costs_prorated_per_output_period() -> None:
     timestamps = pd.date_range("2025-01-01", periods=8, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps)
 
-    result = tariff.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     # Billing period is snapped to full January (31 days) → 24 * 31 = 744 €
@@ -284,7 +284,7 @@ def test_contract_combines_supplier_and_distributor() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert (TariffCategory.SUPPLIER, CostGroup.CONSUMPTION, "energy") in result.columns
     assert (TariffCategory.DISTRIBUTOR, CostGroup.CONSUMPTION, "energy") in result.columns
@@ -302,7 +302,7 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
     # 2 intervals × 1 MWh each
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     supplier_total = result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0]
     distributor_total = result[(TariffCategory.DISTRIBUTOR, "total", "total")].iloc[0]
@@ -331,7 +331,7 @@ def test_contract_list_of_taxes() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     # supplier: 2 × 100 = 200; taxes = 200*(0.10 + 0.05) = 30
     taxes = result[(TariffCategory.TAXES, "total", "total")].iloc[0]
@@ -345,7 +345,7 @@ def test_contract_no_fees_omits_fees_columns() -> None:
         distributor=_tariff(energy_rate=50.0),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
-    result = contract.apply(Meter(power=TimeseriesFrame(_consumption(timestamps))))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(_consumption(timestamps))))
 
     assert not any(isinstance(c, tuple) and c[0] == TariffCategory.FEES for c in result.columns)
 
@@ -358,7 +358,7 @@ def test_contract_column_structure_is_three_level_multiindex() -> None:
         taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
-    result = contract.apply(Meter(power=TimeseriesFrame(_consumption(timestamps))))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(_consumption(timestamps))))
 
     data_cols = [c for c in result.columns if c != "timestamp"]
     assert all(isinstance(c, tuple) and len(c) == 3 for c in data_cols)
@@ -374,7 +374,7 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     p = result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0]
     d = result[(TariffCategory.DISTRIBUTOR, "total", "total")].iloc[0]
@@ -419,7 +419,7 @@ def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
     timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=4, freq="15min")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result["timestamp"].dt.tz is not None
     # Midnight CET must appear as 2025-01-01 00:00 +01:00, not 2024-12-31 23:00 UTC
@@ -436,7 +436,7 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
     end = dt.datetime(2025, 2, 1, 0, 0, tzinfo=z)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)), start=start, end=end)
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)), start=start, end=end)
 
     assert result is not None
     # 8 intervals × 2 MWh × 5 €/MWh = 80 €
@@ -479,7 +479,7 @@ def test_apply_capacity_costs_returns_none_when_filtered_slice_is_empty(tmp_path
     feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
     all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
     raw_df = pd.DataFrame({"timestamp": all_ts, "value": 5.0})
-    consumption = cap_rule.apply(Meter(power=TimeseriesFrame(raw_df)))
+    consumption = cap_rule.apply(Meter(measurements=TimeseriesFrame(raw_df)))
 
     # Billing window is April (after all data) → capacity rows at Jan/Feb are outside
     # [2025-04-01, 2025-05-01) → capacity should not contribute.
@@ -534,7 +534,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     consumption = Meter(
         direction=PowerDirection.CONSUMPTION,
         type=MeterType.SINGLE_RATE,
-        power=TimeseriesFrame(
+        measurements=TimeseriesFrame(
             {
                 "timestamp": pd.date_range("2026-04-09", periods=4, freq="15min", tz="CET"),
                 "value": [0.0025, 0.0025, 0.0025, 0.0025],
@@ -581,7 +581,7 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
     timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     # fees: (2 × 100) + (2 × 50) = 300
     assert result[(TariffCategory.FEES, "total", "total")].iloc[0] == pytest.approx(300.0)
@@ -603,7 +603,7 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
         distributor_key="fluvius_antwerpen",
     )
     meter = Meter(
-        power=TimeseriesFrame(
+        measurements=TimeseriesFrame(
             pd.DataFrame(
                 {
                     "timestamp": [
@@ -657,7 +657,7 @@ def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=start,
         end=end,
         output_resolution=Duration(months=1),
@@ -691,7 +691,7 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=start,
         end=end,
         output_resolution=Duration(months=1),
@@ -741,7 +741,7 @@ def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> Non
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=start,
         end=end,
         output_resolution=Duration(months=1),
@@ -782,7 +782,7 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
     consumption = _consumption(timestamps, value=2.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=start,
         end=end,
         output_resolution=Duration(months=1),
@@ -818,7 +818,7 @@ def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=start,
         end=end,
         output_resolution=Duration(months=1),
@@ -872,7 +872,7 @@ def test_contract_region_keys_produce_valid_result() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz="Europe/Brussels")
     consumption = _consumption(timestamps, value=1.0)
 
-    result = contract.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert not result.empty
@@ -986,7 +986,7 @@ def test_contract_history_single_contract() -> None:
     timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
-    result = history.apply(Meter(power=TimeseriesFrame(consumption)))
+    result = history.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert len(result) == 1
@@ -1015,7 +1015,7 @@ def test_contract_history_two_contracts_sequential() -> None:
     consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
 
     result = history.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
         end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
     )
@@ -1048,7 +1048,7 @@ def test_contract_history_gap_produces_no_rows() -> None:
     consumption = pd.DataFrame({"timestamp": ts, "value": 1.0})
 
     result = history.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
         end=dt.datetime(2025, 5, 1, tzinfo=dt.UTC),
     )
@@ -1082,7 +1082,7 @@ def test_contract_history_different_columns_zero_filled() -> None:
     consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
 
     result = history.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
         end=dt.datetime(2025, 3, 1, tzinfo=dt.UTC),
     )
@@ -1110,7 +1110,7 @@ def test_contract_history_returns_none_when_no_contracts_overlap() -> None:
     consumption = _consumption(ts, value=1.0)
 
     result = history.apply(
-        Meter(power=TimeseriesFrame(consumption)),
+        Meter(measurements=TimeseriesFrame(consumption)),
         start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
         end=dt.datetime(2025, 2, 1, tzinfo=dt.UTC),
     )
@@ -1193,7 +1193,9 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)), start=billing_start, output_resolution=isodate.parse_duration("P7D")
+        Meter(measurements=TimeseriesFrame(consumption)),
+        start=billing_start,
+        output_resolution=isodate.parse_duration("P7D"),
     )
 
     assert result is not None
@@ -1216,8 +1218,8 @@ def test_contract_apply_with_injection_aligns_to_contract_timezone() -> None:
     injection = _consumption(timestamps, value=1.0)
 
     result = contract.apply(
-        Meter(power=TimeseriesFrame(consumption)),
-        injection=Meter(power=TimeseriesFrame(injection)),
+        Meter(measurements=TimeseriesFrame(consumption)),
+        injection=Meter(measurements=TimeseriesFrame(injection)),
     )
 
     assert result is not None

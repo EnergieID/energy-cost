@@ -34,7 +34,7 @@ class FormulaBase(ABC, BaseModel):
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
         """Apply formula values to a dataframe of quantities and return a single value column."""
-        data = meter.power
+        data = meter.measurements
         if self.capacity_based:
             if meter.capacity is None:
                 raise ValueError("Capacity is required for capacity-based formulas.")

@@ -182,9 +182,9 @@ class ContractHistory(VersionedCollection[Contract]):
         output_resolution: Resolution | None = None,
     ) -> pd.DataFrame | None:
         if start is None:
-            start = consumption.power.start
+            start = consumption.measurements.start
         if end is None:
-            end = consumption.power.end
+            end = consumption.measurements.end
         if output_resolution is None:
             output_resolution = Duration(months=1)
 

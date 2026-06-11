@@ -10,9 +10,9 @@ from energy_cost.capacity import CapacityRule
 from energy_cost.meter import Meter, TimeseriesFrame
 
 
-def _power_meter(values: list[float], freq: str = "15min") -> Meter:
+def _measurements_meter(values: list[float], freq: str = "15min") -> Meter:
     timestamps = pd.date_range("2025-01-01", periods=len(values), freq=freq, tz=dt.UTC)
-    return Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": values})))
+    return Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": values})))
 
 
 def test_capacity_rule_uses_existing_capacity_data() -> None:
@@ -28,14 +28,14 @@ def test_capacity_rule_uses_existing_capacity_data() -> None:
             "value": [3.0, 5.0],
         }
     )
-    power_df = pd.DataFrame(
+    measurements_df = pd.DataFrame(
         {
             "timestamp": pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC),
             "value": [1.0] * 4,
         }
     )
     meter = Meter(
-        power=TimeseriesFrame(power_df),
+        measurements=TimeseriesFrame(measurements_df),
         capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("P1M")),
     )
 
@@ -46,13 +46,13 @@ def test_capacity_rule_uses_existing_capacity_data() -> None:
     assert result.capacity["value"].tolist() == pytest.approx([3.0, 5.0])
 
 
-def test_capacity_rule_raises_when_power_resolution_not_divisor_of_measurement_period() -> None:
+def test_capacity_rule_raises_when_measurements_resolution_not_divisor_of_measurement_period() -> None:
     """Power data resolution must evenly divide measurement_period (line 34)."""
     cap_rule = CapacityRule(
         measurement_period=isodate.parse_duration("PT10M"),
         billing_period=isodate.parse_duration("P1M"),
     )
-    meter = _power_meter([1.0, 2.0, 3.0, 4.0], freq="15min")  # 15-min data
+    meter = _measurements_meter([1.0, 2.0, 3.0, 4.0], freq="15min")  # 15-min data
 
     with pytest.raises(ValueError, match="divisor of measurement period"):
         cap_rule.apply(meter)
@@ -66,7 +66,7 @@ def test_capacity_rule_raises_when_capacity_resolution_not_divisor_of_billing_pe
             "value": [1.0, 2.0, 3.0, 4.0],
         }
     )
-    power_df = pd.DataFrame(
+    measurements_df = pd.DataFrame(
         {
             "timestamp": pd.date_range("2025-01-01", periods=4, freq="30min", tz=dt.UTC),
             "value": [1.0] * 4,
@@ -77,7 +77,7 @@ def test_capacity_rule_raises_when_capacity_resolution_not_divisor_of_billing_pe
         billing_period=isodate.parse_duration("PT40M"),  # 40 min; 30 min is not a divisor
     )
     meter = Meter(
-        power=TimeseriesFrame(power_df),
+        measurements=TimeseriesFrame(measurements_df),
         capacity=TimeseriesFrame(cap_df, resolution=isodate.parse_duration("PT30M")),
     )
 

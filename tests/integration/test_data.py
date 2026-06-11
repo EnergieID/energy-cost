@@ -41,7 +41,7 @@ def consumption_meter_15min() -> Meter:
     """Constant-consumption meter at 4 kW (1 kWh / 15 min) for 1.5 years."""
     timestamps = pd.date_range(_START, _END, freq="15min", inclusive="left")
     data = pd.DataFrame({"timestamp": timestamps, "value": 0.001})
-    return Meter(power=TimeseriesFrame(data))
+    return Meter(measurements=TimeseriesFrame(data))
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
         pd.Timestamp("2025-01-01T00:00:00+01:00"),
         pd.Timestamp("2025-01-01T00:15:00+01:00"),
     ]
-    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]})))
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": [150.5, 75.3]})))
 
     contract = Contract(
         region="be_flanders",
@@ -125,7 +125,7 @@ def test_regression_gas_gives_correct_fees_in_october() -> None:
     )
 
     meter = Meter(
-        power=TimeseriesFrame(
+        measurements=TimeseriesFrame(
             {
                 "timestamp": pd.to_datetime(
                     [

@@ -91,9 +91,11 @@ def test_index_formula_apply_multiplies_input_dataframe() -> None:
             "value": [1.0, 2.0, 3.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+    )
 
     assert out["value"].tolist() == [2.0, 4.0, 6.0]
 
@@ -141,7 +143,9 @@ def test_capacity_based_formula_raises_when_meter_has_no_capacity() -> None:
             "value": [1.0, 1.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))  # no capacity
+    meter = Meter(measurements=TimeseriesFrame(data))  # no capacity
 
     with pytest.raises(ValueError, match="Capacity is required"):
-        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+        formula.apply(
+            meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+        )

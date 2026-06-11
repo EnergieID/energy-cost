@@ -40,8 +40,10 @@ def test_minimum_formula_apply_picks_cheaper_formula() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     # IndexFormula(constant_cost=2.0) → 2*10=20 per month; the other → 5*10=50
     assert out["value"].tolist() == pytest.approx([20.0, 20.0])
@@ -65,8 +67,10 @@ def test_minimum_formula_apply_different_winner_per_period() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == pytest.approx([30.0, 50.0])
 
@@ -89,8 +93,10 @@ def test_minimum_formula_apply_all_formulas_tie() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == pytest.approx([20.0, 20.0])
 
@@ -113,8 +119,10 @@ def test_minimum_formula_apply_works_for_resolutions_smaller_than_period() -> No
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     assert out["value"].tolist() == pytest.approx([10.0, 10.0, 15.0])
 
@@ -136,8 +144,10 @@ def test_minimum_formula_apply_works_for_resolutions_larger_than_period() -> Non
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT1H"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT1H")
+    )
 
     assert out["value"].tolist()[0] == pytest.approx(50.0)  # 20 from index + 30 from periodic
 
@@ -158,8 +168,10 @@ def test_minimum_formula_apply_takes_first_formula_on_ties() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     # we get the 5, 15 from the index instead of the 10, 10 from the periodic formula
     assert out["value"].tolist() == pytest.approx([5.0, 15.0])
@@ -172,7 +184,7 @@ def test_minimum_formula_apply_takes_first_formula_on_ties() -> None:
         ],
     )
     reversed_out = reversed_formula.apply(
-        meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M")
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
     )
 
     assert reversed_out["value"].tolist() == pytest.approx([10.0, 10.0])
@@ -190,8 +202,10 @@ def test_minimum_formula_apply_single_formula() -> None:
             "value": [4.0, 4.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert pytest.approx(out["value"].iloc[0]) == 12.0
 
@@ -248,8 +262,10 @@ def test_maximum_formula_apply_picks_more_expensive_formula() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     # IndexFormula(constant_cost=5.0) → 5*10=50 per month; the other → 2*10=20
     assert out["value"].tolist() == pytest.approx([50.0, 50.0])
@@ -273,8 +289,10 @@ def test_maximum_formula_apply_different_winner_per_period() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == pytest.approx([50.0, 80.0])
 
@@ -295,8 +313,10 @@ def test_maximum_formula_apply_all_formulas_tie() -> None:
             "value": [2.0, 2.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert pytest.approx(out["value"].iloc[0]) == 20.0
 
@@ -319,8 +339,10 @@ def test_maximum_formula_apply_works_for_resolutions_smaller_than_period() -> No
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     assert out["value"].tolist() == pytest.approx([15.0, 15.0, 50.0])
 
@@ -341,8 +363,10 @@ def test_maximum_formula_apply_takes_first_formula_on_ties() -> None:
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
+    )
 
     # index total = 0.5*10 + 1.5*10 = 20, periodic total = 20 → tie → first formula (index) wins
     # index gives 5.0 and 15.0 per slot; periodic gives 10.0 per slot
@@ -356,7 +380,7 @@ def test_maximum_formula_apply_takes_first_formula_on_ties() -> None:
         ],
     )
     reversed_out = reversed_formula.apply(
-        meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("PT30M")
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("PT30M")
     )
 
     assert reversed_out["value"].tolist() == pytest.approx([10.0, 10.0])
@@ -374,8 +398,10 @@ def test_maximum_formula_apply_single_formula() -> None:
             "value": [4.0, 4.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert pytest.approx(out["value"].iloc[0]) == 12.0
 
