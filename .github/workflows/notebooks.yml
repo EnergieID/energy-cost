@@ -17,14 +17,10 @@ jobs:
           version: '0.9.21'
       - name: Install dependencies
         run: uv sync
+      - name: Install poethepoet
+        run: uv tool install poethepoet
       - name: Re-execute all notebooks
-        run: |
-          for nb in notebooks/*.ipynb; do
-            echo "Executing $nb..."
-            uv run jupyter nbconvert --to notebook --execute --inplace "$nb"
-          done
-      - name: Strip execution metadata
-        run: uv run nbstripout --keep-output --keep-count --extra-keys 'cell.metadata.execution' notebooks/*.ipynb
+        run: poe rerun-notebooks
       - name: Check notebooks are unchanged
         run: |
           if git diff --exit-code notebooks/; then

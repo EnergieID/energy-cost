@@ -48,7 +48,7 @@ test = "pytest --cov=energy_cost --cov-report=term-missing"
 cmd = "jupyter lab notebooks"
 envfile = ".env"
 [tool.poe.tasks.rerun-notebooks]
-shell = "jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb && nbstripout --keep-output --keep-count --extra-keys 'cell.metadata.execution' notebooks/*.ipynb"
+shell = "jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb && nbstripout --keep-output --keep-count --extra-keys 'cell.metadata.execution metadata.language_info.version' notebooks/*.ipynb"
 interpreter = "bash"
 [tool.ruff]
 line-length = 120
