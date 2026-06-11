@@ -1,19 +1,18 @@
 - start: '2024-01-01T00:00:00+01:00'
   capacity:
-    formula:
-      period: P1M
-      maximum:
-      - period: P1M
-        constant_cost: 8.118840916666667
-      - period: P1M
-        minimum:
-        - capacity_based: true
-          constant_cost: 3247.5363666666667
-        - by_meter_type:
-            default:
-              constant_cost: 145.42780000000002
-            night_only:
-              constant_cost: 158.26430000000002
+    period: P1M
+    maximum:
+    - period: P1M
+      constant_cost: 8.118840916666667
+    - period: P1M
+      minimum:
+      - capacity_based: true
+        constant_cost: 3247.5363666666667
+      - by_meter_type:
+          default:
+            constant_cost: 145.42780000000002
+          night_only:
+            constant_cost: 158.26430000000002
   consumption:
     transmission:
       constant_cost: 10.198
@@ -31,20 +30,19 @@
       constant_cost: 14.28
 - start: '2025-01-01T00:00:00+01:00'
   capacity:
-    formula:
-      period: P1M
-      maximum:
-      - period: P1M
-        constant_cost: 10.181942333333334
-      - period: P1M
-        minimum:
-        - capacity_based: true
-          constant_cost: 4072.776933333333
-        - by_meter_type:
-            default:
-              constant_cost: 263.49049999999994
-            night_only:
-              constant_cost: 274.4697
+    period: P1M
+    maximum:
+    - period: P1M
+      constant_cost: 10.181942333333334
+    - period: P1M
+      minimum:
+      - capacity_based: true
+        constant_cost: 4072.776933333333
+      - by_meter_type:
+          default:
+            constant_cost: 263.49049999999994
+          night_only:
+            constant_cost: 274.4697
   consumption:
     transmission:
       constant_cost: 22.761400000000002
@@ -62,20 +60,19 @@
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
   capacity:
-    formula:
-      period: P1M
-      maximum:
-      - period: P1M
-        constant_cost: 10.218112166666666
-      - period: P1M
-        minimum:
-        - capacity_based: true
-          constant_cost: 4087.2448666666664
-        - by_meter_type:
-            default:
-              constant_cost: 273.34729999999996
-            night_only:
-              constant_cost: 278.68149999999997
+    period: P1M
+    maximum:
+    - period: P1M
+      constant_cost: 10.218112166666666
+    - period: P1M
+      minimum:
+      - capacity_based: true
+        constant_cost: 4087.2448666666664
+      - by_meter_type:
+          default:
+            constant_cost: 273.34729999999996
+          night_only:
+            constant_cost: 278.68149999999997
   consumption:
     transmission:
       constant_cost: 23.208199999999998
