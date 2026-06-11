@@ -17,7 +17,7 @@ def _meter(value: float = 1.0, meter_type: MeterType = MeterType.SINGLE_RATE) ->
             "value": [value, value],
         }
     )
-    return Meter(power=TimeseriesFrame(data), type=meter_type)
+    return Meter(measurements=TimeseriesFrame(data), type=meter_type)
 
 
 def test_meter_type_formula_routes_to_matching_formula() -> None:
@@ -29,7 +29,9 @@ def test_meter_type_formula_routes_to_matching_formula() -> None:
     )
     meter = _meter(value=2.0, meter_type=MeterType.SINGLE_RATE)
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+    )
 
     assert out["value"].tolist() == pytest.approx([20.0, 20.0])
 
@@ -43,7 +45,9 @@ def test_meter_type_formula_falls_back_to_default_when_no_match() -> None:
     )
     meter = _meter(value=2.0, meter_type=MeterType.NIGHT_ONLY)
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+    )
 
     assert out["value"].tolist() == pytest.approx([6.0, 6.0])
 
@@ -58,4 +62,6 @@ def test_meter_type_formula_raises_when_no_match_and_no_default() -> None:
     meter = _meter(value=1.0, meter_type=MeterType.NIGHT_ONLY)
 
     with pytest.raises(ValueError, match="No formula configured for meter type"):
-        formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+        formula.apply(
+            meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+        )

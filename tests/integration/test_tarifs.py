@@ -230,7 +230,7 @@ def test_fixed_costs_are_prorated_correctly(tmp_path: Path) -> None:
     tariff = Tariff.from_yaml(path)
 
     consumption = Meter(
-        power=TimeseriesFrame(
+        measurements=TimeseriesFrame(
             pd.DataFrame(
                 {"timestamp": pd.date_range("2026-03-08 00:00:00+01:00", periods=4, freq="15min"), "value": [0.0] * 4}
             )

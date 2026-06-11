@@ -68,7 +68,7 @@ def test_fixed_costs_returns_prorated_cost_for_each_entry() -> None:
         },
     )
     ts = pd.date_range("2025-01-01", "2025-01-02", freq="h", tz=dt.UTC, inclusive="left")
-    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
     start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=dt.UTC)
     end = dt.datetime(2025, 1, 2, 0, 0, tzinfo=dt.UTC)
 
@@ -193,7 +193,7 @@ def test_apply_returns_none_when_data_is_outside_start_end() -> None:
     )
 
     ts = pd.date_range("2025-03-01", periods=4, freq="15min", tz=dt.UTC)
-    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [1.0] * 4})))
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [1.0] * 4})))
 
     result = segment.apply(
         consumption=meter,
@@ -214,7 +214,7 @@ def test_apply_returns_none_when_no_formulas_match_cost_group() -> None:
     )
 
     ts = pd.date_range("2025-01-01", periods=1, freq="h", tz=dt.UTC)
-    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [10.0]})))
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": [10.0]})))
 
     result = segment.apply(
         consumption=meter,
@@ -234,7 +234,7 @@ def test_fixed_costs_returns_none_when_output_range_is_empty() -> None:
         fixed={"admin": PeriodicFormula(period=isodate.parse_duration("P1D"), constant_cost=24.0)},
     )
     ts = pd.date_range("2025-01-01", periods=2, freq="h", tz=dt.UTC)
-    meter = Meter(power=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
+    meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts, "value": 1.0})))
 
     result = segment.apply(
         consumption=meter,

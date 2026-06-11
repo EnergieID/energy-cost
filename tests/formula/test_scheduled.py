@@ -140,9 +140,9 @@ def test_scheduled_formulas_apply_multiplies_matching_formula_values() -> None:
             "value": [3.0, 4.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=1))
+    out = formula.apply(meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(days=1))
 
     assert out["value"].tolist() == [15.0, 8.0]
 
@@ -163,9 +163,9 @@ def test_scheduled_formulas_apply_schedule_before_aggregating_to_output_resoluti
             "value": 1.0,
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=2))
+    out = formula.apply(meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(days=2))
 
     assert out["value"].tolist() == [24 * 5.0 + 24 * 2.0]
     formula = ScheduledFormulas(
@@ -183,9 +183,9 @@ def test_scheduled_formulas_apply_schedule_before_aggregating_to_output_resoluti
             "value": 0.25,
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(days=2))
+    out = formula.apply(meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(days=2))
 
     assert out["value"].tolist() == [12 * 5.0 + 36 * 2.0]
 
@@ -207,8 +207,10 @@ def test_scheduled_formulas_spread_out_to_resolution_to_culculate_partial_matche
         }
     )
 
-    meter = Meter(power=TimeseriesFrame(data))
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     # January has 5 thursdays, February has 4
     assert out["value"].tolist() == pytest.approx(

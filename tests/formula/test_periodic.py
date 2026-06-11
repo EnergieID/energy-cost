@@ -29,9 +29,11 @@ def test_periodic_formula_apply_uses_input_resolution() -> None:
             "value": [1.0, 1.0],
         }
     )
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=isodate.parse_duration("P1M"))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=isodate.parse_duration("P1M")
+    )
 
     assert out["value"].tolist() == [100.0, 100.0]
 
@@ -41,9 +43,11 @@ def test_periodic_formula_apply_distributes_cost_over_fine_slots() -> None:
     formula = PeriodicFormula(period=dt.timedelta(days=1), constant_cost=24.0)
     timestamps = pd.date_range("2025-01-01", periods=24, freq="h", tz=dt.UTC)
     data = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
-    meter = Meter(power=TimeseriesFrame(data))
+    meter = Meter(measurements=TimeseriesFrame(data))
 
-    out = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(hours=1))
+    out = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(hours=1)
+    )
 
     assert out["value"].sum() == pytest.approx(24.0)
     assert out["value"].iloc[0] == pytest.approx(1.0)

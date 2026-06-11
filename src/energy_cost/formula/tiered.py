@@ -49,7 +49,7 @@ class TieredFormula(FormulaBase):
         timezone: dt.tzinfo = UTC,
         binning_anchor: dt.datetime | None = None,
     ) -> pd.DataFrame:
-        data = meter.power
+        data = meter.measurements
         if self.capacity_based:
             if meter.capacity is None:
                 raise ValueError("Capacity is required for capacity-based formulas.")

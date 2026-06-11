@@ -126,8 +126,10 @@ def test_apply_produces_correct_values_when_data_has_non_default_integer_index()
 
     assert data.index[0] == 8, "Pre-condition: index must NOT start at 0"
 
-    meter = Meter(power=TimeseriesFrame(data))
-    result = formula.apply(meter, meter.power.start, meter.power.end, output_resolution=dt.timedelta(minutes=15))
+    meter = Meter(measurements=TimeseriesFrame(data))
+    result = formula.apply(
+        meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+    )
 
     assert result["value"].notna().all(), "Formula.apply must not produce NaN values for non-zero-based indexes"
     expected = 0.0002 * 90.0

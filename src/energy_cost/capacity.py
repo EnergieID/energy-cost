@@ -23,8 +23,8 @@ class CapacityRule(BaseModel):
         if data is not None:
             resolution = data.resolution
         else:
-            # calculate capacity from power data if capacity data is not provided
-            data = meter.power
+            # calculate capacity from measurements data if capacity data is not provided
+            data = meter.measurements
             resolution = data.resolution
             # 1. if resolution of capacity data is divisor of measurement_period, resample to measurement_period using sum
             if is_divisor(self.measurement_period, resolution):
@@ -49,7 +49,7 @@ class CapacityRule(BaseModel):
             data["value"] = data["value"].rolling(window=self.window_periods, min_periods=1).mean()
 
         return Meter(
-            power=meter.power,
+            measurements=meter.measurements,
             capacity=TimeseriesFrame(data, resolution=self.billing_period),
             direction=meter.direction,
             type=meter.type,
