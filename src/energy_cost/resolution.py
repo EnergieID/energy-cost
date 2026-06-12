@@ -252,8 +252,9 @@ def redistribute_to_resolution(
     """Convert *df* from *source_resolution* to *output_resolution*."""
 
     if source_resolution == output_resolution:
-        # Filter to [start, end) — data outside this range is out-of-scope
-        return df[(df["timestamp"] >= start) & (df["timestamp"] < end)].reset_index(drop=True)
+        # Same resolution — just filter to [start, end)
+        filtered = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
+        return filtered.reset_index(drop=True)
 
     gcd = find_common_divisor(source_resolution, output_resolution)
     result = df
@@ -282,12 +283,10 @@ def _aggregate_to_resolution(
     df = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
     merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
     value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]
-    return (
-        merged.groupby("__bin")[value_cols]
-        .agg(lambda x: x.sum(skipna=False))
-        .reset_index()
-        .rename(columns={"__bin": "timestamp"})
-    )
+    agg = merged.groupby("__bin")[value_cols].agg(lambda x: x.sum(skipna=False))
+    # Reindex to all expected bins — bins without any data become NaN
+    agg = agg.reindex(bin_df["__bin"])
+    return agg.reset_index().rename(columns={"__bin": "timestamp"})
 
 
 def detect_resolution_and_range(

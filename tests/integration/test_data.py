@@ -111,9 +111,14 @@ def test_p7d_resolution_produces_no_nan_values() -> None:
     assert not result.empty
     # Five weekly buckets expected in January 2025
     assert len(result) == 5, f"Expected 5 weekly rows, got {len(result)}"
-    # No row may contain any NaN — all weekly bins must carry distributed costs
+    # First four weeks: no nan, correctly distributed
+    # last week: Nan values are expected for the last week, which only has 3 days of data (Jan 29-31)
+    # so it is incomplete
     nan_rows = result[result.isna().any(axis=1)]
-    assert nan_rows.empty, f"Unexpected NaN values in rows:\n{nan_rows}"
+    assert len(nan_rows) == 1, f"Expected exactly 1 row with NaN values, got {len(nan_rows)}"
+    assert nan_rows["timestamp"].iloc[0] == pd.Timestamp("2025-01-29T00:00:00+01:00"), (
+        f"Expected NaN row to start on 2025-01-29, got {nan_rows['timestamp'].iloc[0]}"
+    )
 
 
 def test_regression_gas_gives_correct_fees_in_october() -> None:

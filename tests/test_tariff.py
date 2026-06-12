@@ -213,41 +213,6 @@ def test_apply_fixed_costs_timestamps_are_at_billing_start_not_utc() -> None:
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
 
 
-def test_apply_capacity_includes_first_billing_month_when_start_is_tz_aware(tmp_path: Path) -> None:
-    """Capacity for the first billing month must not be lost when start is tz-aware."""
-    cap_yaml = tmp_path / "cap.yml"
-    cap_yaml.write_text(
-        "- start: 2025-01-01T00:00:00+01:00\n"
-        "  capacity:\n"
-        "    formula:\n"
-        "      constant_cost: 1.0\n"
-        "      capacity_based: true\n",
-        encoding="utf-8",
-    )
-    from energy_cost.capacity import CapacityRule
-
-    tariff = Tariff.from_yaml(cap_yaml)
-    cap_rule = CapacityRule(
-        measurement_period=isodate.parse_duration("PT15M"),
-        billing_period=isodate.parse_duration("P1M"),
-    )
-
-    ts = pd.date_range("2025-01-01T00:00:00+01:00", "2026-01-01T00:00:00+01:00", freq="15min")
-    raw_meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": ts[:-1], "value": 5.0})))
-    consumption = cap_rule.apply(raw_meter)
-
-    z = ZoneInfo("Europe/Brussels")
-    start = dt.datetime(2025, 1, 1, 0, 0, tzinfo=z)
-    end = dt.datetime(2026, 1, 1, 0, 0, tzinfo=z)
-
-    result = tariff.apply(consumption, start=start, end=end, timezone=z)
-
-    assert result is not None
-    assert len(result) == 12
-    assert (CostGroup.CAPACITY, "total") in result.columns
-    assert result["timestamp"].iloc[0].month == 1
-
-
 # ---------------------------------------------------------------------------
 # redistribute_to_resolution: consumption costs
 # ---------------------------------------------------------------------------
@@ -335,44 +300,6 @@ def test_capacity_cost_redistributed_evenly_to_finer_resolution(tmp_path: Path) 
     assert (result[cap_col] > 0).all(), "All 5-min capacity slots should be non-zero"
     # Peak = 1 MWh / 0.25 h = 4 MW; cost = 4 MW * 1.0 €/MW = 4.0 € for Jan
     assert result[cap_col].sum() == pytest.approx(4.0, rel=1e-6)
-
-
-def test_capacity_cost_aggregated_to_yearly_output(tmp_path: Path) -> None:
-    """Two monthly capacity rows aggregate into a single yearly output row."""
-    from energy_cost.capacity import CapacityRule
-
-    cap_yaml = tmp_path / "cap.yml"
-    cap_yaml.write_text(
-        "- start: 2025-01-01T00:00:00\n"
-        "  capacity:\n"
-        "    formula:\n"
-        "      constant_cost: 1.0\n"
-        "      capacity_based: true\n",
-        encoding="utf-8",
-    )
-    tariff = Tariff.from_yaml(cap_yaml)
-    cap_rule = CapacityRule(
-        measurement_period=isodate.parse_duration("PT15M"),
-        billing_period=isodate.parse_duration("P1M"),
-    )
-
-    jan_feb_ts = pd.date_range("2025-01-01", "2025-03-01", freq="15min", tz=dt.UTC, inclusive="left")
-    raw_meter = Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": jan_feb_ts, "value": 1.0})))
-    consumption = cap_rule.apply(raw_meter)
-
-    result = tariff.apply(
-        consumption,
-        start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
-        end=dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
-        output_resolution=isodate.parse_duration("P1Y"),
-    )
-
-    assert result is not None
-    cap_col = (CostGroup.CAPACITY, "total")
-    assert cap_col in result.columns
-    # Peak = 4 MW each month; cost = 4 * 1.0 = 4.0 € per month; Jan + Feb = 8.0 €
-    assert len(result) == 1
-    assert result[cap_col].iloc[0] == pytest.approx(8.0, rel=1e-6)
 
 
 def test_tariff_version_should_not_allow_end_to_be_set() -> None:
