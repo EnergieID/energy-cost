@@ -16,7 +16,18 @@ import pandas as pd
 import pytest
 
 from energy_cost.contract import Contract
-from energy_cost.formula import IndexFormula
+from energy_cost.formula import (
+    DayOfWeek,
+    IndexFormula,
+    MaximumFormula,
+    MinimumFormula,
+    PeriodicFormula,
+    ScheduledFormula,
+    ScheduledFormulas,
+    TierBand,
+    TieredFormula,
+    WhenClause,
+)
 from energy_cost.formula.index import IndexAdder
 from energy_cost.index import DataFrameIndex, Index
 from energy_cost.meter import CostGroup, Meter, TimeseriesFrame
@@ -643,3 +654,209 @@ class TestSumFrames:
         expected = {1: 1.0, 2: 22.0, 3: 33.0, 4: 40.0}
         for _, row in result.iterrows():
             assert row["a"] == expected[row["timestamp"]]
+
+
+# ---------------------------------------------------------------------------
+# Formula-level NaN propagation
+# ---------------------------------------------------------------------------
+
+
+def _meter_with_nan(
+    start: str = "2025-01-01",
+    periods: int = 24,
+    freq: str = "h",
+    nan_positions: list[int] | None = None,
+) -> Meter:
+    """Create a meter with NaN values at specified positions."""
+    timestamps = pd.date_range(start, periods=periods, freq=freq, tz=dt.UTC)
+    values = pd.Series(1.0, index=range(periods))
+    if nan_positions:
+        values.iloc[nan_positions] = float("nan")
+    return Meter(measurements=TimeseriesFrame(pd.DataFrame({"timestamp": timestamps, "value": values})))
+
+
+class TestIndexFormulaNaNPropagation:
+    """IndexFormula: NaN in meter data propagates through multiplication."""
+
+    def test_nan_meter_value_produces_nan_output(self) -> None:
+        """A NaN in meter data × constant = NaN."""
+        formula = IndexFormula(constant_cost=10.0)
+        meter = _meter_with_nan(periods=4, freq="h", nan_positions=[1, 2])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 1, 4, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(hours=1),
+        )
+
+        assert result["value"].iloc[0] == pytest.approx(10.0)
+        assert pd.isna(result["value"].iloc[1])
+        assert pd.isna(result["value"].iloc[2])
+        assert result["value"].iloc[3] == pytest.approx(10.0)
+
+    def test_nan_meter_propagates_through_aggregation(self) -> None:
+        """NaN in any sub-period makes the aggregated bin NaN."""
+        formula = IndexFormula(constant_cost=10.0)
+        meter = _meter_with_nan(periods=24, freq="h", nan_positions=[12])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 2, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(days=1),
+        )
+
+        assert pd.isna(result["value"].iloc[0])
+
+
+class TestScheduledFormulaNaNPropagation:
+    """ScheduledFormula: NaN in meter data propagates through the selected sub-formula."""
+
+    def test_nan_propagates_through_scheduled_formula(self) -> None:
+        """A NaN in meter data passes through whichever schedule clause matches."""
+        scheduled = ScheduledFormulas(
+            schedule=[
+                ScheduledFormula(
+                    when=[WhenClause(days=[DayOfWeek.WEDNESDAY], start=dt.time(0, 0))],
+                    formula=IndexFormula(constant_cost=5.0),
+                ),
+                ScheduledFormula(
+                    when=[WhenClause()],
+                    formula=IndexFormula(constant_cost=10.0),
+                ),
+            ]
+        )
+        # 2025-01-01 is a Wednesday
+        meter = _meter_with_nan(start="2025-01-01", periods=4, freq="h", nan_positions=[1])
+
+        result = scheduled.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 1, 4, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(hours=1),
+        )
+
+        assert result["value"].iloc[0] == pytest.approx(5.0)
+        assert pd.isna(result["value"].iloc[1])
+        assert result["value"].iloc[2] == pytest.approx(5.0)
+
+
+class TestMinimumFormulaNaNPropagation:
+    """MinimumFormula: NaN in meter data makes the min comparison result NaN."""
+
+    def test_nan_propagates_through_minimum(self) -> None:
+        """If meter has NaN, the minimum across formulas should produce NaN."""
+        formula = MinimumFormula(
+            period=dt.timedelta(days=1),
+            minimum=[
+                IndexFormula(constant_cost=10.0),
+                IndexFormula(constant_cost=20.0),
+            ],
+        )
+        meter = _meter_with_nan(periods=24, freq="h", nan_positions=[5])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 2, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(days=1),
+        )
+
+        # The daily bin has a NaN sub-period → result should be NaN
+        assert pd.isna(result["value"].iloc[0])
+
+
+class TestMaximumFormulaNaNPropagation:
+    """MaximumFormula: NaN in meter data makes the max comparison result NaN."""
+
+    def test_nan_propagates_through_maximum(self) -> None:
+        """If meter has NaN, the maximum across formulas should produce NaN."""
+        formula = MaximumFormula(
+            period=dt.timedelta(days=1),
+            maximum=[
+                IndexFormula(constant_cost=10.0),
+                IndexFormula(constant_cost=20.0),
+            ],
+        )
+        meter = _meter_with_nan(periods=24, freq="h", nan_positions=[5])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 2, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(days=1),
+        )
+
+        # The daily bin has a NaN sub-period → result should be NaN
+        assert pd.isna(result["value"].iloc[0])
+
+
+class TestTieredFormulaNaNPropagation:
+    """TieredFormula: NaN in meter data propagates through band application."""
+
+    def test_nan_propagates_through_progressive_tiered(self) -> None:
+        """NaN meter value in a progressive tiered formula produces NaN."""
+        formula = TieredFormula(
+            mode=TieredFormula.model_fields["mode"].default,
+            bands=[
+                TierBand(up_to=5.0, formula=IndexFormula(constant_cost=4.0)),
+                TierBand(formula=IndexFormula(constant_cost=6.0)),
+            ],
+        )
+        meter = _meter_with_nan(periods=4, freq="h", nan_positions=[1])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 1, 4, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(hours=1),
+        )
+
+        assert result["value"].iloc[0] == pytest.approx(4.0)
+        assert pd.isna(result["value"].iloc[1])
+        assert result["value"].iloc[2] == pytest.approx(4.0)
+
+    def test_nan_propagates_through_banded_tiered(self) -> None:
+        """NaN meter value in a banded tiered formula produces NaN."""
+        from energy_cost.formula import TieringMode
+
+        formula = TieredFormula(
+            mode=TieringMode.BANDED,
+            bands=[
+                TierBand(up_to=5.0, formula=IndexFormula(constant_cost=4.0)),
+                TierBand(formula=IndexFormula(constant_cost=6.0)),
+            ],
+        )
+        meter = _meter_with_nan(periods=4, freq="h", nan_positions=[2])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 1, 4, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(hours=1),
+        )
+
+        assert result["value"].iloc[0] == pytest.approx(4.0)
+        assert pd.isna(result["value"].iloc[2])
+        assert result["value"].iloc[3] == pytest.approx(4.0)
+
+
+class TestPeriodicFormulaNaNPropagation:
+    """PeriodicFormula: does not depend on meter values, so NaN in meter
+    should NOT affect the output (periodic costs are independent of consumption)."""
+
+    def test_periodic_ignores_nan_in_meter(self) -> None:
+        """Periodic formula produces values regardless of meter NaN."""
+        formula = PeriodicFormula(period=dt.timedelta(days=1), constant_cost=24.0)
+        meter = _meter_with_nan(periods=24, freq="h", nan_positions=[5, 10, 15])
+
+        result = formula.apply(
+            meter,
+            start=dt.datetime(2025, 1, 1, tzinfo=dt.UTC),
+            end=dt.datetime(2025, 1, 2, tzinfo=dt.UTC),
+            output_resolution=dt.timedelta(days=1),
+        )
+
+        # Periodic cost is independent of meter — should be 24.0 regardless
+        assert result["value"].iloc[0] == pytest.approx(24.0)
