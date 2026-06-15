@@ -145,8 +145,8 @@ class TieredFormula(FormulaBase):
                 else:
                     break
 
-        result_ts = pd.date_range(start=start, end=end, freq=to_pandas_freq(data.resolution), inclusive="left")
-        result = pd.DataFrame({"timestamp": result_ts})
-        result["value"] = result["timestamp"].map(result_values).astype(float)
+        full_grid = pd.date_range(start, end, freq=to_pandas_freq(data.resolution), inclusive="left")
+        result = result_values.reindex(full_grid).reset_index()
+        result.columns = ["timestamp", "value"]
 
         return redistribute_to_resolution(result, data.resolution, output_resolution, start, end, binning_anchor)

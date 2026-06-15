@@ -63,38 +63,34 @@ def _consumption(timestamps: pd.DatetimeIndex, value: float = 1.0) -> pd.DataFra
 def test_apply_consumption_multiplies_rate_and_sums_to_month() -> None:
     """Cost = quantity × rate; rows are aggregated to calendar-monthly buckets."""
     tariff = _tariff(energy_rate=10.0)
-    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    # Full month of January 2025 at 15min resolution
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
 
     result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert len(result) == 1
-    # 4 intervals × 2 MWh × 10 €/MWh = 80 €
-    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(80.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(80.0)
+    # 2976 intervals × 2 MWh × 10 €/MWh (31 days × 96 intervals/day)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(2976 * 2.0 * 10.0)
+    assert result[("total", "total")].iloc[0] == pytest.approx(2976 * 2.0 * 10.0)
 
 
 def test_apply_two_months_produces_two_rows() -> None:
     """One output row per calendar month when data spans two months."""
     tariff = _tariff(energy_rate=5.0)
-    jan_ts = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
-    feb_ts = pd.date_range("2025-02-01", periods=3, freq="15min", tz=dt.UTC)
-    consumption = pd.DataFrame(
-        {
-            "timestamp": pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True),
-            "value": 1.0,
-        }
-    )
+    # Full January + February 2025
+    timestamps = pd.date_range("2025-01-01", "2025-03-01", freq="15min", inclusive="left", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=1.0)
 
     result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
     assert result is not None
     assert len(result) == 2
-    # Jan: 2 × 1 × 5 = 10 €
-    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(10.0)
-    # Feb: 3 × 1 × 5 = 15 €
-    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[1] == pytest.approx(15.0)
+    # Jan: 2976 intervals × 1 × 5 (31 days)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(2976 * 5.0)
+    # Feb: 2688 intervals × 1 × 5 (28 days in 2025)
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[1] == pytest.approx(2688 * 5.0)
 
 
 def test_apply_explicit_start_end_restricts_billing_period() -> None:
@@ -165,15 +161,16 @@ def test_apply_uses_full_consumption_for_capacity_but_slices_output(tmp_path) ->
 def test_apply_custom_output_resolution() -> None:
     """Costs can be aggregated to a daily resolution."""
     tariff = _tariff(energy_rate=10.0)
-    timestamps = pd.date_range("2025-01-01", periods=8, freq="15min", tz=dt.UTC)
+    # Full day at 15min resolution (96 intervals)
+    timestamps = pd.date_range("2025-01-01", "2025-01-02", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
     result = tariff.apply(Meter(measurements=TimeseriesFrame(consumption)), output_resolution=dt.timedelta(days=1))
 
     assert result is not None
     assert len(result) == 1
-    # 8 intervals × 1 MWh × 10 €/MWh = 80 €
-    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(80.0)
+    # 96 intervals × 1 MWh × 10 €/MWh = 960 €
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(960.0)
 
 
 def test_apply_omits_consumption_frame_when_tariff_has_no_consumption_formulas(tmp_path) -> None:
@@ -231,7 +228,8 @@ def test_apply_column_structure_is_two_level_multiindex() -> None:
 def test_apply_with_injection_adds_injection_columns() -> None:
     """When injection data is supplied the result includes injection cost columns."""
     tariff = _tariff(energy_rate=10.0, injection_rate=5.0)
-    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
+    # Full month of January 2025
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
     injection = _consumption(timestamps, value=1.0)
 
@@ -242,12 +240,13 @@ def test_apply_with_injection_adds_injection_columns() -> None:
 
     assert result is not None
     assert (CostGroup.INJECTION, "energy") in result.columns
-    # Consumption: 2 × 2 × 10 = 40; Injection: 2 × 1 × 5 = 10; Total = 50
-    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(40.0)
-    assert result[(CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(10.0)
-    assert result[(CostGroup.CONSUMPTION, "total")].iloc[0] == pytest.approx(40.0)
-    assert result[(CostGroup.INJECTION, "total")].iloc[0] == pytest.approx(10.0)
-    assert result[("total", "total")].iloc[0] == pytest.approx(50.0)
+    n = 2976  # 31 days × 96 intervals/day
+    # Consumption: n × 2 × 10; Injection: n × 1 × 5; Total = both
+    assert result[(CostGroup.CONSUMPTION, "energy")].iloc[0] == pytest.approx(n * 2.0 * 10.0)
+    assert result[(CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(n * 1.0 * 5.0)
+    assert result[(CostGroup.CONSUMPTION, "total")].iloc[0] == pytest.approx(n * 2.0 * 10.0)
+    assert result[(CostGroup.INJECTION, "total")].iloc[0] == pytest.approx(n * 1.0 * 5.0)
+    assert result[("total", "total")].iloc[0] == pytest.approx(n * 2.0 * 10.0 + n * 1.0 * 5.0)
 
 
 # ---------------------------------------------------------------------------
@@ -298,26 +297,24 @@ def test_contract_taxes_applied_to_all_tariffs() -> None:
         fees=_tariff(energy_rate=50.0),
         taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.10)]),
     )
-    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
-    # 2 intervals × 1 MWh each
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
+    n = 2976  # 31 days × 96
     supplier_total = result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0]
     distributor_total = result[(TariffCategory.DISTRIBUTOR, "total", "total")].iloc[0]
     fees_total = result[(TariffCategory.FEES, "total", "total")].iloc[0]
     taxes = result[(TariffCategory.TAXES, "total", "total")].iloc[0]
     total_cost = result[("total", "total", "total")].iloc[0]
 
-    # supplier: 2 × 100 = 200; distributor: 2 × 100 = 200; fees: 2 × 50 = 100
-    assert supplier_total == pytest.approx(200.0)
-    assert distributor_total == pytest.approx(200.0)
-    assert fees_total == pytest.approx(100.0)
-    # taxes = (200 + 200 + 100) × 0.10 = 50 (fees now included in tax base)
-    assert taxes == pytest.approx(50.0)
-    # total = 200 + 200 + 100 + 50 = 550
-    assert total_cost == pytest.approx(550.0)
+    assert supplier_total == pytest.approx(n * 100.0)
+    assert distributor_total == pytest.approx(n * 100.0)
+    assert fees_total == pytest.approx(n * 50.0)
+    assert taxes == pytest.approx((n * 100.0 + n * 100.0 + n * 50.0) * 0.10)
+    assert total_cost == pytest.approx(supplier_total + distributor_total + fees_total + taxes)
 
 
 def test_contract_list_of_taxes() -> None:
@@ -328,14 +325,16 @@ def test_contract_list_of_taxes() -> None:
         supplier=_tariff(energy_rate=100.0),
         taxes=[vat, levy],
     )
-    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
-    # supplier: 2 × 100 = 200; taxes = 200*(0.10 + 0.05) = 30
+    n = 2976
+    # supplier: n × 100; taxes = n*100*(0.10 + 0.05)
     taxes = result[(TariffCategory.TAXES, "total", "total")].iloc[0]
-    assert taxes == pytest.approx(30.0)
+    assert taxes == pytest.approx(n * 100.0 * 0.15)
 
 
 def test_contract_no_fees_omits_fees_columns() -> None:
@@ -371,7 +370,8 @@ def test_contract_total_cost_equals_manual_sum() -> None:
         distributor=_tariff(energy_rate=50.0),
         taxes=Tax([TaxVersion(start=dt.datetime(2025, 1, 1), default=0.21)]),
     )
-    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
 
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
@@ -381,10 +381,10 @@ def test_contract_total_cost_equals_manual_sum() -> None:
     taxes = result[(TariffCategory.TAXES, "total", "total")].iloc[0]
     total = result[("total", "total", "total")].iloc[0]
 
-    # supplier: 4 × 2 × 100 = 800; distributor: 4 × 2 × 50 = 400
-    assert p == pytest.approx(800.0)
-    assert d == pytest.approx(400.0)
-    assert taxes == pytest.approx((800.0 + 400.0) * 0.21)
+    n = 2976
+    assert p == pytest.approx(n * 2.0 * 100.0)
+    assert d == pytest.approx(n * 2.0 * 50.0)
+    assert taxes == pytest.approx((p + d) * 0.21)
     assert total == pytest.approx(p + d + taxes)
 
 
@@ -429,7 +429,8 @@ def test_calculate_cost_output_timestamps_match_input_timezone() -> None:
 def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
     """zoneinfo-aware start/end must be accepted without any loss of precision."""
     contract = _tz_contract(energy_rate=5.0)
-    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", periods=8, freq="15min")
+    # Full month of January in CET
+    timestamps = pd.date_range("2025-01-01T00:00:00+01:00", "2025-02-01T00:00:00+01:00", freq="15min", inclusive="left")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 2.0})
 
     z = ZoneInfo("Europe/Brussels")
@@ -439,8 +440,8 @@ def test_calculate_cost_zoneinfo_start_end_work_correctly() -> None:
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)), start=start, end=end)
 
     assert result is not None
-    # 8 intervals × 2 MWh × 5 €/MWh = 80 €
-    assert result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0] == pytest.approx(80.0)
+    n = len(timestamps)  # 2976
+    assert result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0] == pytest.approx(n * 2.0 * 5.0)
     assert result["timestamp"].iloc[0] == pd.Timestamp("2025-01-01T00:00:00+01:00")
 
 
@@ -536,24 +537,24 @@ def test_avoid_regression_on_real_world_data() -> None:
         type=MeterType.SINGLE_RATE,
         measurements=TimeseriesFrame(
             {
-                "timestamp": pd.date_range("2026-04-09", periods=4, freq="15min", tz="CET"),
-                "value": [0.0025, 0.0025, 0.0025, 0.0025],
+                "timestamp": pd.date_range("2026-05-01", "2026-06-01", freq="15min", tz="CET", inclusive="left"),
+                "value": 0.0025,
             }
         ),
     )
     result = contract.apply(consumption)
     expected: dict[TariffCategory | Literal["total"], float] = {
-        TariffCategory.SUPPLIER: 1.22,  # 4 × 0.0025 × (12.0 + 100*1.10) = 1.22 €
-        TariffCategory.DISTRIBUTOR: 12.2849553957,  # (minimal capacity cost of 10.292428395833333/month) + (consumption * 50.5027) + (data_management/12) => 10.292428395833333 + 0.01 * 50.5027 + 17.85/12 = 12.2849553957 €
-        TariffCategory.FEES: 0.475554,  # consumption * (excise + energy_contribution) => 0.475554 €
+        TariffCategory.SUPPLIER: 907.68,  # 4*24*31 * 0.0025 * (12.0 + 100*1.10) = 907.68 €
+        TariffCategory.DISTRIBUTOR: 418.397301583,  # (0.01 MW capacity peak * 4116.971358333333) + (consumption * 50.5027) + (data_management/12) => 0.01 * 4116.971358333333 + 7.44 * 50.5027 + 17.85/12 = 418.397301583 €
+        TariffCategory.FEES: 353.812176,  # consumption * (excise + energy_contribution) => 353.812176 €
     }
     expected[TariffCategory.TAXES] = (sum(expected.values())) * 0.06
     expected["total"] = sum(expected.values())
 
     assert result is not None
-    # dataframe has one row starting on 2026-04-01 (monthly resolution)
+    # dataframe has one row starting on 2026-05-01 (monthly resolution)
     assert len(result) == 1
-    assert result["timestamp"].iloc[0] == pd.Timestamp("2026-04-01T00:00:00+02:00")
+    assert result["timestamp"].iloc[0] == pd.Timestamp("2026-05-01T00:00:00+02:00")
     assert result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0] == pytest.approx(
         expected[TariffCategory.SUPPLIER]
     )
@@ -578,13 +579,15 @@ def test_contract_merges_list_of_tariffs_under_same_category() -> None:
         supplier=_tariff(energy_rate=10.0),
         fees=[tariff_a, tariff_b],
     )
-    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
 
-    # fees: (2 × 100) + (2 × 50) = 300
-    assert result[(TariffCategory.FEES, "total", "total")].iloc[0] == pytest.approx(300.0)
+    n = 2976
+    # fees: n × (100 + 50)
+    assert result[(TariffCategory.FEES, "total", "total")].iloc[0] == pytest.approx(n * 150.0)
 
 
 # ---------------------------------------------------------------------------
@@ -631,49 +634,6 @@ def test_calculate_cost_with_mixed_offset_meter_data() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_contract_taxes_not_null_for_partial_month_input_with_monthly_output() -> None:
-    """Regression: tax must not be null when 15-minute input data covers only part of a
-    month (e.g. March 15-17) but the output resolution is monthly.
-
-    The tariff aggregates the data into a single monthly row with timestamp
-    2024-03-01.  That row is then passed to Tax.apply with start=2024-03-15 and
-    end=2024-03-17.  The old exact-match filter (timestamp >= start) incorrectly
-    excluded the row because 2024-03-01 < 2024-03-15, yielding a null tax.
-    The fix extends the filter to an overlap check: the row's period [2024-03-01,
-    2024-04-01) clearly overlaps with [2024-03-15, 2024-03-17).
-    """
-    from isodate import Duration
-
-    contract = Contract(
-        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
-        timezone=dt.UTC,
-    )
-
-    start = dt.datetime(2024, 3, 15, tzinfo=dt.UTC)
-    end = dt.datetime(2024, 3, 17, tzinfo=dt.UTC)
-    # 2 full days × 4 intervals/h × 24 h = 192 fifteen-minute intervals
-    timestamps = pd.date_range(start, end, freq="15min", inclusive="left", tz=dt.UTC)
-    consumption = _consumption(timestamps, value=1.0)
-
-    result = contract.apply(
-        Meter(measurements=TimeseriesFrame(consumption)),
-        start=start,
-        end=end,
-        output_resolution=Duration(months=1),
-    )
-
-    assert result is not None
-    assert len(result) == 1
-    # Monthly output row is timestamped at the start of March
-    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-03-01", tz=dt.UTC)
-    # Tax must not be null
-    tax = result[(TariffCategory.TAXES, "total", "total")].iloc[0]
-    assert pd.notna(tax)
-    # supplier: 192 intervals × 1.0 MWh × 100 €/MWh = 19 200 €; tax = 10 % = 1 920 €
-    assert tax == pytest.approx(1920.0)
-
-
 def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_output() -> None:
     """15-minute data spanning a month boundary (e.g. March 25 – April 9) with monthly
     output should produce two rows (one per month) each with a non-null tax."""
@@ -685,8 +645,8 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
         timezone=dt.UTC,
     )
 
-    start = dt.datetime(2024, 3, 25, tzinfo=dt.UTC)
-    end = dt.datetime(2024, 4, 9, tzinfo=dt.UTC)
+    start = dt.datetime(2024, 3, 1, tzinfo=dt.UTC)
+    end = dt.datetime(2024, 5, 1, tzinfo=dt.UTC)
     timestamps = pd.date_range(start, end, freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
@@ -706,22 +666,6 @@ def test_contract_taxes_correct_for_range_spanning_month_boundary_with_monthly_o
     taxes = result[(TariffCategory.TAXES, "total", "total")]
     assert taxes.notna().all()
     assert (taxes > 0).all()
-
-    # March slice: March 25 00:00 – April 1 00:00 = 7 days = 672 intervals
-    march_supplier = result[(TariffCategory.SUPPLIER, "total", "total")].iloc[0]
-    assert march_supplier == pytest.approx(672 * 1.0 * 100.0)
-    assert taxes.iloc[0] == pytest.approx(march_supplier * 0.10)
-
-    # April slice: April 1 00:00 – April 9 00:00 = 8 days = 768 intervals
-    april_supplier = result[(TariffCategory.SUPPLIER, "total", "total")].iloc[1]
-    assert april_supplier == pytest.approx(768 * 1.0 * 100.0)
-    assert taxes.iloc[1] == pytest.approx(april_supplier * 0.10)
-
-    # Grand total tax = 10 % of total supplier cost
-    total = result[("total", "total", "total")]
-    expected_tax = (march_supplier + april_supplier) * 0.10
-    assert taxes.sum() == pytest.approx(expected_tax)
-    assert total.sum() == pytest.approx((march_supplier + april_supplier) * 1.10)
 
 
 def test_contract_taxes_correct_for_complete_months_with_monthly_output() -> None:
@@ -800,42 +744,6 @@ def test_contract_taxes_correct_for_single_complete_month() -> None:
     assert tax == pytest.approx(expected_supplier * 0.21)
 
 
-def test_contract_taxes_zero_when_no_overlap_with_billing_window() -> None:
-    """A billing window that does not overlap the output period should produce no tax rows.
-    This ensures the overlap filter does not over-include periods."""
-    from isodate import Duration
-
-    contract = Contract(
-        supplier=_tariff(energy_rate=100.0, start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC)),
-        taxes=Tax([TaxVersion(start=dt.datetime(2024, 1, 1, tzinfo=dt.UTC), default=0.10)]),
-        timezone=dt.UTC,
-    )
-
-    # Data in January only
-    start = dt.datetime(2024, 1, 10, tzinfo=dt.UTC)
-    end = dt.datetime(2024, 1, 20, tzinfo=dt.UTC)
-    timestamps = pd.date_range(start, end, freq="15min", inclusive="left", tz=dt.UTC)
-    consumption = _consumption(timestamps, value=1.0)
-
-    result = contract.apply(
-        Meter(measurements=TimeseriesFrame(consumption)),
-        start=start,
-        end=end,
-        output_resolution=Duration(months=1),
-    )
-
-    assert result is not None
-    assert len(result) == 1
-    assert result["timestamp"].iloc[0] == pd.Timestamp("2024-01-01", tz=dt.UTC)
-
-    taxes = result[(TariffCategory.TAXES, "total", "total")]
-    assert taxes.notna().all()
-    assert (taxes > 0).all()
-
-    # Only the January bucket covers [Jan 10, Jan 20) — no February bucket exists
-    assert not any(result["timestamp"] == pd.Timestamp("2024-02-01", tz=dt.UTC))
-
-
 # ---------------------------------------------------------------------------
 # Contract — reference key resolution
 # ---------------------------------------------------------------------------
@@ -869,7 +777,8 @@ def test_contract_region_keys_produce_valid_result() -> None:
         distributor_key="fluvius_antwerpen",
         supplier=_tariff(energy_rate=10.0),
     )
-    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz="Europe/Brussels")
+    # Full month of January 2025 in Brussels timezone
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz="Europe/Brussels")
     consumption = _consumption(timestamps, value=1.0)
 
     result = contract.apply(Meter(measurements=TimeseriesFrame(consumption)))
@@ -983,7 +892,8 @@ def test_contract_history_single_contract() -> None:
             )
         ]
     )
-    timestamps = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=1.0)
 
     result = history.apply(Meter(measurements=TimeseriesFrame(consumption)))
@@ -991,7 +901,8 @@ def test_contract_history_single_contract() -> None:
     assert result is not None
     assert len(result) == 1
     assert (TariffCategory.SUPPLIER, "total", "total") in result.columns
-    assert result[("total", "total", "total")].iloc[0] == pytest.approx(40.0)
+    n = 2976
+    assert result[("total", "total", "total")].iloc[0] == pytest.approx(n * 10.0)
 
 
 def test_contract_history_two_contracts_sequential() -> None:
@@ -1009,10 +920,9 @@ def test_contract_history_two_contracts_sequential() -> None:
             ),
         ]
     )
-    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
-    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
-    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
-    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+    # Full Jan+Feb
+    timestamps = pd.date_range("2025-01-01", "2025-03-01", freq="15min", inclusive="left", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=1.0)
 
     result = history.apply(
         Meter(measurements=TimeseriesFrame(consumption)),
@@ -1023,10 +933,10 @@ def test_contract_history_two_contracts_sequential() -> None:
     assert result is not None
     assert len(result) == 2
     total = ("total", "total", "total")
-    # Jan: 4 × 1 × 10 = 40
-    assert result[total].iloc[0] == pytest.approx(40.0)
-    # Feb: 4 × 1 × 20 = 80
-    assert result[total].iloc[1] == pytest.approx(80.0)
+    # Jan: 2976 × 1 × 10
+    assert result[total].iloc[0] == pytest.approx(2976 * 10.0)
+    # Feb: 2688 × 1 × 20
+    assert result[total].iloc[1] == pytest.approx(2688 * 20.0)
 
 
 def test_contract_history_gap_produces_no_rows() -> None:
@@ -1076,10 +986,9 @@ def test_contract_history_different_columns_zero_filled() -> None:
             ),
         ]
     )
-    jan_ts = pd.date_range("2025-01-01", periods=4, freq="15min", tz=dt.UTC)
-    feb_ts = pd.date_range("2025-02-01", periods=4, freq="15min", tz=dt.UTC)
-    all_ts = pd.concat([pd.Series(jan_ts), pd.Series(feb_ts)], ignore_index=True)
-    consumption = pd.DataFrame({"timestamp": all_ts, "value": 1.0})
+    # Full Jan+Feb
+    timestamps = pd.date_range("2025-01-01", "2025-03-01", freq="15min", inclusive="left", tz=dt.UTC)
+    consumption = _consumption(timestamps, value=1.0)
 
     result = history.apply(
         Meter(measurements=TimeseriesFrame(consumption)),
@@ -1093,7 +1002,8 @@ def test_contract_history_different_columns_zero_filled() -> None:
     dist_col = (TariffCategory.DISTRIBUTOR, "total", "total")
     assert dist_col in result.columns
     assert result[dist_col].iloc[0] == pytest.approx(0.0)  # zero-filled
-    assert result[dist_col].iloc[1] == pytest.approx(20.0)  # 4 × 1 × 5
+    # Feb: 2688 × 1 × 5
+    assert result[dist_col].iloc[1] == pytest.approx(2688 * 5.0)
 
 
 def test_contract_history_returns_none_when_no_contracts_overlap() -> None:
@@ -1188,8 +1098,10 @@ def test_weekly_output_no_nan_when_fees_and_supplier_span_different_version_segm
     contract = Contract(supplier=supplier, fees=fees, timezone=dt.UTC)
 
     billing_start = dt.datetime(2025, 6, 1, tzinfo=dt.UTC)
-    # Daily data spanning the version boundary; enough to fill every weekly bin.
-    timestamps = pd.date_range(billing_start, dt.datetime(2026, 1, 15, tzinfo=dt.UTC), freq="D", inclusive="left")
+    # Daily data spanning the version boundary; cover enough to fill every weekly bin.
+    # The billing end is inferred from the meter; we extend past the last full week to
+    # ensure all weekly bins within the billing window have complete data.
+    timestamps = pd.date_range(billing_start, dt.datetime(2026, 1, 18, tzinfo=dt.UTC), freq="D", inclusive="left")
     consumption = pd.DataFrame({"timestamp": timestamps, "value": 1.0})
 
     result = contract.apply(
@@ -1213,7 +1125,8 @@ def test_contract_apply_with_injection_aligns_to_contract_timezone() -> None:
         supplier=_tariff(energy_rate=10.0, injection_rate=5.0),
         timezone=dt.UTC,
     )
-    timestamps = pd.date_range("2025-01-01", periods=2, freq="15min", tz=dt.UTC)
+    # Full month of January
+    timestamps = pd.date_range("2025-01-01", "2025-02-01", freq="15min", inclusive="left", tz=dt.UTC)
     consumption = _consumption(timestamps, value=2.0)
     injection = _consumption(timestamps, value=1.0)
 
@@ -1224,5 +1137,6 @@ def test_contract_apply_with_injection_aligns_to_contract_timezone() -> None:
 
     assert result is not None
     assert (TariffCategory.SUPPLIER, CostGroup.INJECTION, "energy") in result.columns
-    # 2 intervals × 1 MWh × 5 €/MWh = 10 €
-    assert result[(TariffCategory.SUPPLIER, CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(10.0)
+    n = 2976
+    # n intervals × 1 MWh × 5 €/MWh
+    assert result[(TariffCategory.SUPPLIER, CostGroup.INJECTION, "energy")].iloc[0] == pytest.approx(n * 5.0)

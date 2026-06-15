@@ -53,9 +53,15 @@ class FormulaBase(ABC, BaseModel):
         """Apply formula values to a dataframe of quantities and return a single value column."""
         formula_values = self.get_values(start, end, data.resolution, timezone)
 
-        result = data.reset_index(drop=True)
-        formula_series = formula_values.set_index("timestamp")["value"].reindex(result["timestamp"])
-        result["value"] = formula_series.values * result["value"].values
+        formula_series = formula_values.set_index("timestamp")["value"]
+        meter_series = data.set_index("timestamp")["value"]
+        combined = pd.DataFrame({"meter": meter_series, "formula": formula_series}).sort_index()
+        result = pd.DataFrame(
+            {
+                "timestamp": combined.index,
+                "value": (combined["meter"] * combined["formula"]).values,
+            }
+        )
         return redistribute_to_resolution(
             result, data.resolution, output_resolution, start, end, binning_anchor=binning_anchor
         )

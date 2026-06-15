@@ -252,7 +252,9 @@ def redistribute_to_resolution(
     """Convert *df* from *source_resolution* to *output_resolution*."""
 
     if source_resolution == output_resolution:
-        return df
+        # Same resolution — just filter to [start, end)
+        filtered = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
+        return filtered.reset_index(drop=True)
 
     gcd = find_common_divisor(source_resolution, output_resolution)
     result = df
@@ -277,11 +279,18 @@ def _aggregate_to_resolution(
     freq = to_pandas_freq(output_resolution)
     snapped_start, snapped_end = snap_billing_period(start, end, freq, anchor=binning_anchor)
     bin_df = pd.DataFrame({"__bin": pd.date_range(start=snapped_start, end=snapped_end, freq=freq, inclusive="left")})
+    # Filter to [start, end) — rows outside are out-of-scope and should not affect bin sums
+    df = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
     merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
     value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]
-    return (
-        merged.groupby("__bin")[value_cols].sum(numeric_only=True).reset_index().rename(columns={"__bin": "timestamp"})
-    )
+    grouped = merged.groupby("__bin")[value_cols]
+    agg = grouped.sum()
+    # Mask bins that contain any NaN back to NaN (skipna=False semantics)
+    has_nan = merged.set_index("__bin")[value_cols].isna().groupby(level=0).any()
+    agg = agg.where(~has_nan)
+    # Reindex to all expected bins — bins without any data become NaN
+    agg = agg.reindex(bin_df["__bin"])
+    return agg.reset_index().rename(columns={"__bin": "timestamp"})
 
 
 def detect_resolution_and_range(
