@@ -83,7 +83,7 @@ class VersionedCollection(RootModel[list[V]]):
 
 
 def sum_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
-    indexed = [f.set_index("timestamp") if "timestamp" in f.columns else f for f in frames]
+    indexed = [f.set_index("timestamp") if "timestamp" in f.columns else f.copy() for f in frames]
 
     # Determine the superset of all columns
     all_columns = set()
