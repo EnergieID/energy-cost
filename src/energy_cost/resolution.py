@@ -283,8 +283,7 @@ def _aggregate_to_resolution(
     df = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
     merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
     value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]
-    grouped = merged.groupby("__bin")[value_cols]
-    agg = grouped.sum()
+    agg = merged.groupby("__bin")[value_cols].sum()
     # Mask bins that contain any NaN back to NaN (skipna=False semantics)
     has_nan = merged.set_index("__bin")[value_cols].isna().groupby(level=0).any()
     agg = agg.where(~has_nan)
