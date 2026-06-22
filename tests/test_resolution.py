@@ -299,15 +299,9 @@ def test_find_common_divisor_returns_gcd_for_two_timedeltas() -> None:
 
 
 def test_find_common_divisor_returns_gcd_for_two_calendar_durations() -> None:
-    assert find_common_divisor(isodate.parse_duration("P1Y"), isodate.parse_duration("P1M")) == isodate.Duration(
-        months=1
-    )
-    assert find_common_divisor(isodate.parse_duration("P3M"), isodate.parse_duration("P2M")) == isodate.Duration(
-        months=1
-    )
-    assert find_common_divisor(isodate.parse_duration("P6M"), isodate.parse_duration("P4M")) == isodate.Duration(
-        months=2
-    )
+    assert find_common_divisor(isodate.parse_duration("P1Y"), isodate.parse_duration("P1M")) == dt.timedelta(days=1)
+    assert find_common_divisor(isodate.parse_duration("P3M"), isodate.parse_duration("P2M")) == dt.timedelta(days=1)
+    assert find_common_divisor(isodate.parse_duration("P6M"), isodate.parse_duration("P4M")) == dt.timedelta(days=1)
 
 
 def test_find_common_divisor_returns_timedelta_for_mixed_types_when_timedelta_divides_calendar() -> None:

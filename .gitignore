@@ -210,3 +210,7 @@ __marimo__/
 .cache/
 
 local/
+
+# excel files
+*.xls
+*.xlsx

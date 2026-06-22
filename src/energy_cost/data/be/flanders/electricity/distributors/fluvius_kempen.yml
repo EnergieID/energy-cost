@@ -2,12 +2,14 @@
   capacity:
     period: P1M
     maximum:
-    - period: P1M
-      constant_cost: 11.064991333333333
+    - period: P1Y
+      constant_cost: 132.77989599999998
     - period: P1M
       minimum:
       - capacity_based: true
-        constant_cost: 4425.996533333333
+        constant_cost: 53111.958399999996
+        period: P1Y
+        kind: unit_periodic
       - by_meter_type:
           default:
             constant_cost: 266.87559999999996
@@ -32,12 +34,14 @@
   capacity:
     period: P1M
     maximum:
-    - period: P1M
-      constant_cost: 11.7097886875
+    - period: P1Y
+      constant_cost: 140.51746425
     - period: P1M
       minimum:
       - capacity_based: true
-        constant_cost: 4683.915475
+        constant_cost: 56206.9857
+        period: P1Y
+        kind: unit_periodic
       - by_meter_type:
           default:
             constant_cost: 267.83299999999997

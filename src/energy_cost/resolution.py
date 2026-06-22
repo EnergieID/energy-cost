@@ -194,10 +194,8 @@ def find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
         return dt.timedelta(seconds=g)
 
     if a_is_cal and b_is_cal:
-        a_months = int(a.years * 12 + a.months)
-        b_months = int(b.years * 12 + b.months)
-        g = math.gcd(a_months, b_months)
-        return isodate.Duration(months=g)
+        # all calendar durations have a common divisor of 1 day (P1D)
+        return dt.timedelta(days=1)
 
     # Mixed: one calendar, one timedelta. 1 day is a divisor of every calendar duration
     # So a common divisor between P1D and the timedelta also divides the calendar duration.
