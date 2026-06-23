@@ -1,10 +1,10 @@
 - start: '2024-01-01T00:00:00+01:00'
   capacity:
-    period: P1M
+    period: P1Y
     maximum:
     - period: P1Y
       constant_cost: 104.49329675
-    - period: P1M
+    - period: P1Y
       minimum:
       - capacity_based: true
         constant_cost: 41797.318699999996
@@ -32,11 +32,11 @@
       constant_cost: 14.28
 - start: '2025-01-01T00:00:00+01:00'
   capacity:
-    period: P1M
+    period: P1Y
     maximum:
     - period: P1Y
       constant_cost: 142.33098975000001
-    - period: P1M
+    - period: P1Y
       minimum:
       - capacity_based: true
         constant_cost: 56932.3959
@@ -64,11 +64,11 @@
       constant_cost: 17.51
 - start: '2026-01-01T00:00:00+01:00'
   capacity:
-    period: P1M
+    period: P1Y
     maximum:
     - period: P1Y
       constant_cost: 142.7489315
-    - period: P1M
+    - period: P1Y
       minimum:
       - capacity_based: true
         constant_cost: 57099.5726

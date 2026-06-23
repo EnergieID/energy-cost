@@ -164,14 +164,14 @@ def build_entry(year: int, tariffs: dict) -> dict:
     return {
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "capacity": {
-            "period": "P1M",
+            "period": "P1Y",
             "maximum": [
                 {
                     "period": "P1Y",
                     "constant_cost": tariffs["min_band_cost"],
                 },
                 {
-                    "period": "P1M",
+                    "period": "P1Y",
                     "minimum": [
                         {
                             "capacity_based": True,
