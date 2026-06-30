@@ -181,7 +181,7 @@ def snap_billing_period(
 
 
 def find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
-    """Return a common divisor of *a* and *b*, i.e. the coarsest resolution C such that
+    """Return a common divisor of *a* and *b*, i.e. a resolution C such that
     C divides both *a* and *b* (both are integer multiples of C).
     """
     a_is_cal = isinstance(a, isodate.Duration) and (a.years or a.months)
