@@ -113,7 +113,7 @@ def extract_tariffs(ws) -> dict:
     Afname worksheet and return them as a dict ready for build_entry().
 
     Values read from the LS piekmeting (digital meter) column:
-      - capacity_per_month : EUR/MW/month  (converted from EUR/kW/year)
+      - capacity_per_year : EUR/MW/year  (converted from EUR/kW/year)
       - min_band_cost      : EUR/month for the ≤0.0025 MW band
       - transmission       : EUR/MWh  (kWh-tarief netgebruik)
       - public_service_all : EUR/MWh  (ODV kWh-tarief normaal)
