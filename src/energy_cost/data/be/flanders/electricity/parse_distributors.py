@@ -113,7 +113,7 @@ def extract_tariffs(ws) -> dict:
     Afname worksheet and return them as a dict ready for build_entry().
 
     Values read from the LS piekmeting (digital meter) column:
-      - capacity_per_month : EUR/MW/month  (converted from EUR/kW/year)
+      - capacity_per_year : EUR/MW/year  (converted from EUR/kW/year)
       - min_band_cost      : EUR/month for the ≤0.0025 MW band
       - transmission       : EUR/MWh  (kWh-tarief netgebruik)
       - public_service_all : EUR/MWh  (ODV kWh-tarief normaal)
@@ -135,9 +135,9 @@ def extract_tariffs(ws) -> dict:
     toeslagen = rows[layout["row_toeslagen"]][col]
     max_kwh_price = rows[layout["row_max_kwh_price"]][col]
 
-    # Convert capacity: EUR/kW/year → EUR/MW/month
-    cap_per_month = cap_kw_year * 1000 / 12
-    min_band = MIN_CAPACITY_MW * cap_per_month
+    # Convert capacity: EUR/kW/year → EUR/MW/year
+    cap_per_year = cap_kw_year * 1000
+    min_band = MIN_CAPACITY_MW * cap_per_year
 
     # max capacity kwh price, is the max kwh price minus the sum of the other kwh prices (transmission + odv + toeslagen)
     other_kwh_costs_normaal = kwh_net + odv_normaal + toeslagen
@@ -147,7 +147,7 @@ def extract_tariffs(ws) -> dict:
 
     # Convert EUR/kWh → EUR/MWh
     return {
-        "capacity_per_month": cap_per_month,
+        "capacity_per_year": cap_per_year,
         "min_band_cost": min_band,
         "transmission": kwh_net * 1000,
         "public_service_all": odv_normaal * 1000,
@@ -164,18 +164,20 @@ def build_entry(year: int, tariffs: dict) -> dict:
     return {
         "start": datetime(year, 1, 1, 0, 0, 0, tzinfo=CET),
         "capacity": {
-            "period": "P1M",
+            "period": "P1Y",
             "maximum": [
                 {
-                    "period": "P1M",
+                    "period": "P1Y",
                     "constant_cost": tariffs["min_band_cost"],
                 },
                 {
-                    "period": "P1M",
+                    "period": "P1Y",
                     "minimum": [
                         {
                             "capacity_based": True,
-                            "constant_cost": tariffs["capacity_per_month"],
+                            "constant_cost": tariffs["capacity_per_year"],
+                            "period": "P1Y",
+                            "kind": "unit_periodic",
                         },
                         {
                             "by_meter_type": {

@@ -5,7 +5,7 @@ from pydantic import Discriminator, Tag
 from .index import IndexFormula
 from .metertype import MeterTypeFormula
 from .minmax import MaximumFormula, MinimumFormula
-from .periodic import PeriodicFormula
+from .periodic import PeriodicFormula, UnitPeriodicFormula
 from .scheduled import ScheduledFormulas
 from .tiered import TieredFormula
 
@@ -45,6 +45,7 @@ def _formula_discriminator(v: object) -> str | None:
 Formula = Annotated[
     Annotated[IndexFormula, Tag("index")]
     | Annotated[PeriodicFormula, Tag("periodic")]
+    | Annotated[UnitPeriodicFormula, Tag("unit_periodic")]
     | Annotated[ScheduledFormulas, Tag("scheduled")]
     | Annotated[TieredFormula, Tag("tiered")]
     | Annotated[MinimumFormula, Tag("minimum")]

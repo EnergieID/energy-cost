@@ -10,7 +10,8 @@ We also only support the digital meter (slimme meter).
 ## Sources
 More info on how the Belgian energy market is structured: https://www.creg.be/nl/consumenten/energiemarkt/hoe-de-energieprijs-opgebouwd
 
-Distributor tariffs are parsed from the yearly updated excellssheets at https://www.vlaamsenutsregulator.be/elektriciteit-en-aardgas/nettarieven/hoeveel-bedragen-de-distributienettarieven
+Distributor tariffs are parsed from the yearly updated Excel sheets at https://www.vlaamsenutsregulator.be/elektriciteit-en-aardgas/nettarieven/hoeveel-bedragen-de-distributienettarieven
+Regulations on how these tariffs work exactly are explained here: https://assets.vlaamsenutsregulator.be/2025-11/Tariefmethodologie%20reguleringsperiode%202025-2028%20-%20BESL-2024-41.pdf
 Fluxys transport tariffs (gas) are listed here: https://www.fluxys.com/nl/natural-gas-and-biomethane/empowering-you/tariffs/tariff_fluxys-belgium-domestic-2026
 
 Flemish fees are listed here: https://www.vlaanderen.be/belastingen-en-begroting/vlaamse-belastingen/energieheffingen

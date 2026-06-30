@@ -3,7 +3,7 @@ from .formula import Formula
 from .index import IndexAdder, IndexFormula
 from .metertype import MeterTypeFormula
 from .minmax import MaximumFormula, MinimumFormula
-from .periodic import PeriodicFormula
+from .periodic import PeriodicFormula, UnitPeriodicFormula
 from .scheduled import DayOfWeek, ScheduledFormula, ScheduledFormulas, WhenClause
 from .tiered import TierBand, TieredFormula, TieringMode
 
@@ -25,6 +25,7 @@ __all__ = [
     "MinimumFormula",
     "MaximumFormula",
     "PeriodicFormula",
+    "UnitPeriodicFormula",
     "MeterTypeFormula",
     "DayOfWeek",
     "WhenClause",

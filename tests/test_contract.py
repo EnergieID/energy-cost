@@ -545,7 +545,7 @@ def test_avoid_regression_on_real_world_data() -> None:
     result = contract.apply(consumption)
     expected: dict[TariffCategory | Literal["total"], float] = {
         TariffCategory.SUPPLIER: 907.68,  # 4*24*31 * 0.0025 * (12.0 + 100*1.10) = 907.68 €
-        TariffCategory.DISTRIBUTOR: 418.397301583,  # (0.01 MW capacity peak * 4116.971358333333) + (consumption * 50.5027) + (data_management/12) => 0.01 * 4116.971358333333 + 7.44 * 50.5027 + 17.85/12 = 418.397301583 €
+        TariffCategory.DISTRIBUTOR: 419.215385132,  # (0.01 MW capacity peak * 49403.6563 euro/mw/year * 31/365 year) + (consumption * 50.5027) + (data_management/12) => 0.01 * 49403.6563 * 31/365 + 7.44 * 50.5027 + 17.85*31/365 = 419.215385132 €
         TariffCategory.FEES: 353.812176,  # consumption * (excise + energy_contribution) => 353.812176 €
     }
     expected[TariffCategory.TAXES] = (sum(expected.values())) * 0.06
