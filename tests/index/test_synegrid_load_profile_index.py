@@ -2,7 +2,9 @@ import datetime as dt
 from os import environ
 
 from isodate import Duration
+from pytest import skip
 
+from energy_cost.data.be.electricity.indexes import BelpexRLP0N
 from energy_cost.data.be.synergrid_load_profile_index import SynergridLoadProfileIndex
 from energy_cost.index.cached_index import CachedIndex
 from energy_cost.index.entsoe_day_ahead_index import EntsoeDayAheadIndex
@@ -39,6 +41,9 @@ def test_cached_synegrid_load_profile_index_get_values() -> None:
 
 
 def test_load_profile_index() -> None:
+    if not environ.get("ENTSOE_API_KEY"):
+        skip("ENTSOE_API_KEY not set")
+
     load_profile_index = CachedIndex(
         SynergridLoadProfileIndex(profile="RLP0N", resolution=dt.timedelta(minutes=15)),
         "foo",
@@ -58,3 +63,24 @@ def test_load_profile_index() -> None:
     assert not df.empty
     assert "timestamp" in df.columns
     assert "value" in df.columns
+
+
+def test_belpex_rlp0n_index() -> None:
+    if not environ.get("ENTSOE_API_KEY"):
+        skip("ENTSOE_API_KEY not set")
+
+    index = BelpexRLP0N(entsoe_api_key=environ.get("ENTSOE_API_KEY", ""))
+
+    start = dt.datetime(2025, 1, 1)
+    end = dt.datetime(2025, 9, 1)
+    timezone = dt.timezone(dt.timedelta(hours=1))  # CET
+
+    df = index.get_values(start, end, Duration(months=1), timezone)
+
+    assert not df.empty
+    assert "timestamp" in df.columns
+    assert "value" in df.columns
+    expected = [70.78, 85.15, 67.52, 63.28, 75.27, 93.75, 131.43, 115.37]
+    expected.reverse()
+    actual = df["value"].round(2).tolist()
+    assert actual == expected

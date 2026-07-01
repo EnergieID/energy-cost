@@ -1,1 +1,0 @@
-FIRST_YEAR = 2022

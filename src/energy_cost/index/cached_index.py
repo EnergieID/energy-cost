@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import random
+import string
 from pathlib import Path
 
 import pandas as pd
@@ -39,13 +41,13 @@ class CachedIndex(Index):
     def __init__(
         self,
         source: Index,
-        file_name: str,
+        file_name: str | None = None,
         cache_dir: Path | str | None = None,
         old_threshold: dt.timedelta = _OLD_DATA_THRESHOLD,
         refresh_interval: dt.timedelta = _REFRESH_INTERVAL,
     ) -> None:
         self._source = source
-        self.file_name = file_name
+        self.file_name = file_name or "".join(random.choices(string.ascii_letters, k=8))
         self.cache_dir = Path(cache_dir) if cache_dir is not None else _DEFAULT_CACHE_DIR
         self.old_threshold = old_threshold
         self.refresh_interval = refresh_interval

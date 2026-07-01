@@ -14,7 +14,13 @@ ROOT_URL = "https://www.synergrid.be"
 ROOT_HTML = f"{ROOT_URL}/nl/documentencentrum/statistieken-gegevens/profielen-slp-spp-rlp"
 FILE_NAMES = {
     "RLP0N": "RLP0N ?{year} Electricity all DSOs",
-    "SPP": "SPP {year} ex-ante and ex-post",
+    "SPP": "SPP {year}.*",
+}
+COLUMNS = {
+    "belgium": "A,H:AF",  # all DSOs
+    "flanders": "A,H:P,Y,AC",  # all DSOs in Flanders,
+    "wallonia": "A,Q:X,Z,AD:AF",  # all DSOs in Wallonia
+    "brussels": "A,AA,AB",  # all DSOs in Brussels
 }
 
 
@@ -25,9 +31,10 @@ class SynergridLoadProfileIndex(Index):
     This index fetches load profile data from the Synergrid Excel files and provides it in a standardized format.
     """
 
-    def __init__(self, profile: str, resolution: Resolution) -> None:
+    def __init__(self, profile: str, resolution: Resolution, region: str = "belgium") -> None:
         super().__init__(resolution)
         self.profile = profile
+        self.region = region
 
     def _get_values(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo) -> pd.DataFrame:
         years = range(start.year, end.year + 1)
@@ -72,7 +79,7 @@ class SynergridLoadProfileIndex(Index):
                 pd.read_excel(
                     temp_file_path,
                     skiprows=ln,
-                    usecols="A,H:AF",
+                    usecols=COLUMNS.get(self.region, "A,H:AF"),
                     converters={
                         "CET": lambda x: pd.to_datetime(x, origin="1899-12-30", unit="D").round(
                             freq="15min"
@@ -85,7 +92,7 @@ class SynergridLoadProfileIndex(Index):
             )
             rlp.index.name = None
             rlp.dropna(axis=1, how="all", inplace=True)
-            rlp = rlp.mean(axis=1).round(10)
+            rlp = rlp.mean(axis=1)
 
             df = pd.DataFrame({"timestamp": pd.to_datetime(rlp.index).as_unit("us"), "value": rlp.values})
             dfs.append(df)
