@@ -35,6 +35,7 @@ def _make_index(
     refresh_interval: dt.timedelta = dt.timedelta(hours=1),
 ) -> tuple[CachedIndex, MagicMock]:
     mock_source = MagicMock()
+    mock_source.resolution = dt.timedelta(minutes=15)
     idx = CachedIndex(
         source=mock_source,
         file_name="BE",
