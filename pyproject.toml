@@ -27,6 +27,8 @@ dev = [
     "jupyterlab>=4.4.0",
     "nbstripout>=0.8.0",
     "openpyxl>=3.1.0",
+    "requests>=2.32.0",
+    "beautifulsoup4>=4.12.0",
 ]
 [project.urls]
 Source = "https://github.com/EnergieID/energy-cost"
@@ -39,12 +41,13 @@ where = ["src"]
 namespaces = true
 
 [tool.setuptools.package-data]
-"energy_cost.data" = ["**/*.yml"]
+"energy_cost.data" = ["**/*.yml", "**/*.csv"]
 [tool.poe.tasks]
 lint = "ruff check --fix"
 format = "ruff format"
 check = "ty check"
 test = "pytest --cov=energy_cost --cov-report=term-missing"
+synergrid = "python -m energy_cost.data.be.synergrid_preprocess"
 [tool.poe.tasks.notebooks]
 cmd = "jupyter lab notebooks"
 envfile = ".env"

@@ -12,7 +12,7 @@ from energy_cost.index.load_profile_index import LoadProfileIndex
 
 
 def test_synergrid_load_profile_index_get_values() -> None:
-    index = SynergridLoadProfileIndex(profile="RLP0N", resolution=dt.timedelta(minutes=15))
+    index = SynergridLoadProfileIndex(profile="RLP0N")
     start = dt.datetime(2025, 2, 1)
     end = dt.datetime(2025, 2, 2)
     timezone = dt.timezone(dt.timedelta(hours=1))  # CET
@@ -24,9 +24,38 @@ def test_synergrid_load_profile_index_get_values() -> None:
     assert "value" in df.columns
 
 
+def test_synergrid_load_profile_index_region_column_selection() -> None:
+    start = dt.datetime(2025, 6, 1)
+    end = dt.datetime(2025, 6, 2)
+    timezone = dt.timezone(dt.timedelta(hours=1))
+
+    flanders = SynergridLoadProfileIndex(profile="RLP0N", region="flanders")
+    wallonia = SynergridLoadProfileIndex(profile="RLP0N", region="wallonia")
+
+    flanders_df = flanders.get_values(start, end, dt.timedelta(minutes=15), timezone)
+    wallonia_df = wallonia.get_values(start, end, dt.timedelta(minutes=15), timezone)
+
+    assert not flanders_df.empty
+    assert not wallonia_df.empty
+    assert not flanders_df["value"].equals(wallonia_df["value"])
+
+
+def test_synergrid_spp_profile_get_values() -> None:
+    index = SynergridLoadProfileIndex(profile="SPP", region="belgium")
+    start = dt.datetime(2025, 6, 1)
+    end = dt.datetime(2025, 6, 2)
+    timezone = dt.timezone(dt.timedelta(hours=1))
+
+    df = index.get_values(start, end, dt.timedelta(minutes=15), timezone)
+
+    assert not df.empty
+    assert "timestamp" in df.columns
+    assert "value" in df.columns
+
+
 def test_cached_synegrid_load_profile_index_get_values() -> None:
     index = CachedIndex(
-        SynergridLoadProfileIndex(profile="RLP0N", resolution=dt.timedelta(minutes=15)),
+        SynergridLoadProfileIndex(profile="RLP0N"),
         "foo",
     )
     start = dt.datetime(2025, 2, 1)
@@ -45,7 +74,7 @@ def test_load_profile_index() -> None:
         skip("ENTSOE_API_KEY not set")
 
     load_profile_index = CachedIndex(
-        SynergridLoadProfileIndex(profile="RLP0N", resolution=dt.timedelta(minutes=15)),
+        SynergridLoadProfileIndex(profile="RLP0N"),
         "foo",
     )
     data_profile_index = CachedIndex(

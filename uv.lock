@@ -498,12 +498,14 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "beautifulsoup4" },
     { name = "ipykernel" },
     { name = "jupyterlab" },
     { name = "nbstripout" },
     { name = "openpyxl" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "requests" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -520,12 +522,14 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "jupyterlab", specifier = ">=4.4.0" },
     { name = "nbstripout", specifier = ">=0.8.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "requests", specifier = ">=2.32.0" },
     { name = "ruff", specifier = ">=0.14.13" },
     { name = "ty", specifier = ">=0.0.12" },
 ]
