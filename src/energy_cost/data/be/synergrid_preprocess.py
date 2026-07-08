@@ -105,15 +105,42 @@ def _to_header_name(value: object) -> str:
     return text
 
 
+def _localize_cet_timestamps(naive_timestamps: pd.Series) -> pd.Series:
+    """Localize CET-like timestamps according to detected DST behavior.
+
+    Some Synergrid exports encode timestamps as true Europe/Brussels local time
+    (with DST transitions), while others are emitted in fixed +01:00 all year.
+    Strategy:
+    - if timestamps show DST transition signs (duplicate wall-times or days with
+      non-96 quarter-hours), interpret as true Europe/Brussels timeline;
+    - otherwise interpret as fixed +01:00 and convert to Europe/Brussels.
+    """
+    per_day_counts = naive_timestamps.groupby(naive_timestamps.dt.floor("D")).size()
+    has_transition = bool(naive_timestamps.duplicated().any() or per_day_counts.isin([92, 100]).any())
+
+    if has_transition:
+        return naive_timestamps.dt.tz_localize(TZ, ambiguous="infer", nonexistent="shift_forward")
+
+    fixed_plus_one = dt.timezone(dt.timedelta(hours=1))
+    return naive_timestamps.dt.tz_localize(fixed_plus_one).dt.tz_convert(TZ)
+
+
 def _profile_output_path(profile: str, output_dir: Path) -> Path:
     return output_dir / f"synergrid_{profile.lower()}.csv"
+
+
+def _extract_version_parts(value: str) -> tuple[int, ...]:
+    match = re.search(r"\bv(\d+(?:\.\d+)*)\b", value, flags=re.IGNORECASE)
+    if not match:
+        return ()
+    return tuple(int(part) for part in match.group(1).split("."))
 
 
 def _find_download_url(profile: str, year: int, html: str) -> str:
     soup = BeautifulSoup(html, "html.parser")
     label_pattern = PROFILE_LINK_PATTERNS[profile].format(year=year)
-    excel_candidates: list[str] = []
-    for link in soup.find_all("a"):
+    excel_candidates: list[tuple[tuple[int, ...], int, str]] = []
+    for index, link in enumerate(soup.find_all("a")):
         text = link.get_text(" ", strip=True)
         if not text:
             continue
@@ -123,10 +150,14 @@ def _find_download_url(profile: str, year: int, html: str) -> str:
                 continue
             absolute = href_attr if href_attr.startswith("http") else f"{ROOT_URL}{href_attr}"
             if Path(urlparse(absolute).path).suffix.lower() in {".xlsx", ".xls", ".xlsb"}:
-                excel_candidates.append(absolute)
+                version_parts = _extract_version_parts(text) or _extract_version_parts(absolute)
+                excel_candidates.append((version_parts, index, absolute))
 
     if excel_candidates:
-        return excel_candidates[0]
+        # Prefer the highest explicit version when available (e.g. v1.1 over v1.0).
+        # For ties, keep page order stability.
+        selected = max(excel_candidates, key=lambda item: (item[0], -item[1]))
+        return selected[2]
     raise SynergridPreprocessError(f"Could not find {profile} download link for year {year}.")
 
 
@@ -174,7 +205,7 @@ def _read_profile_sheet(file_path: Path, profile: str) -> pd.DataFrame:
         numeric = pd.to_numeric(data["CET"], errors="coerce")
         data = data.assign(CET=numeric).dropna(subset=["CET"]).copy()
         data["timestamp"] = pd.to_datetime(data["CET"], origin="1899-12-30", unit="D").dt.round("15min")
-        data["timestamp"] = data["timestamp"].dt.tz_localize(TZ, ambiguous=False, nonexistent="shift_forward")
+        data["timestamp"] = _localize_cet_timestamps(data["timestamp"])
     else:
         data = data.dropna(subset=["UTC"]).copy()
         data["timestamp"] = pd.to_datetime(data["UTC"], utc=True, errors="coerce").dt.tz_convert(TZ)

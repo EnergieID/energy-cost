@@ -1,3 +1,5 @@
+import datetime as dt
+
 import pandas as pd
 
 from energy_cost.data.be import synergrid_preprocess
@@ -122,3 +124,45 @@ def test_compute_spp_region_dataframe_accepts_float_gln_headers() -> None:
     assert result["flanders"].tolist() == [2.0]
     assert result["wallonia"].tolist() == [6.0]
     assert result["brussels"].tolist() == [10.0]
+
+
+def test_cet_localization_preserves_dst_fallback_both_folds() -> None:
+    first_fold = pd.date_range("2025-10-26 00:00", "2025-10-26 02:45", freq="15min")
+    repeated_fold = pd.date_range("2025-10-26 02:00", "2025-10-26 02:45", freq="15min")
+    after_fallback = pd.date_range("2025-10-26 03:00", "2025-10-26 23:45", freq="15min")
+
+    naive = pd.Series(pd.DatetimeIndex([*first_fold, *repeated_fold, *after_fallback]))
+    localized = synergrid_preprocess._localize_cet_timestamps(naive)
+
+    assert len(localized) == 100
+    two_oclock = [ts for ts in localized if ts.hour == 2 and ts.minute == 0]
+    assert len(two_oclock) == 2
+    assert {ts.utcoffset() for ts in two_oclock} == {dt.timedelta(hours=1), dt.timedelta(hours=2)}
+
+
+def test_cet_localization_without_dst_shift_assumes_fixed_plus_one() -> None:
+    # No DST transition signatures: interpret input as fixed +01:00, then convert to Europe/Brussels.
+    naive = pd.Series(pd.to_datetime(["2025-01-15 12:00", "2025-07-15 12:00"]))
+
+    localized = synergrid_preprocess._localize_cet_timestamps(naive)
+
+    # Winter stays at +01 with same wall-clock time.
+    assert localized.iloc[0].hour == 12
+    assert localized.iloc[0].utcoffset() == dt.timedelta(hours=1)
+
+    # Summer converts from fixed +01 to Brussels DST (+02), so wall-clock shifts by +1h.
+    assert localized.iloc[1].hour == 13
+    assert localized.iloc[1].utcoffset() == dt.timedelta(hours=2)
+
+
+def test_find_download_url_prefers_highest_version() -> None:
+    html = """
+        <html><body>
+            <a href="/images/downloads/spp-2023-ex-ante-and-ex-post-v1.0.xlsx">SPP2023 - ex ante and ex-post - v1.0</a>
+            <a href="/images/downloads/spp-2023-ex-ante-and-ex-post-v1.1.xlsx">SPP2023 - ex ante and ex-post - v1.1</a>
+        </body></html>
+        """
+
+    selected = synergrid_preprocess._find_download_url("SPP", 2023, html)
+
+    assert selected.endswith("spp-2023-ex-ante-and-ex-post-v1.1.xlsx")
