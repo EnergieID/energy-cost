@@ -330,7 +330,7 @@ def _parse_profile_year(profile: str, year: int) -> pd.DataFrame:
 def _read_existing(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=["timestamp", *REGIONS])
-    data = pd.read_csv(path)
+    data = pd.read_csv(path, float_precision="round_trip")
     if "timestamp" not in data.columns:
         raise SynergridPreprocessError(f"Missing timestamp column in existing CSV {path}.")
 
@@ -363,6 +363,7 @@ def update_profile_csv(profile: str, years: list[int], output_dir: Path) -> tupl
 
     merged = pd.concat(frames, ignore_index=True)
     merged = merged.drop_duplicates(subset=["timestamp"], keep="last").sort_values("timestamp").reset_index(drop=True)
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     merged.to_csv(output_path, index=False)
     return output_path, appended

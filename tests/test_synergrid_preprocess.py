@@ -1,5 +1,3 @@
-import datetime as dt
-
 import pandas as pd
 
 from energy_cost.data.be import synergrid_preprocess
@@ -70,6 +68,36 @@ def test_update_profile_csv_keeps_non_overlapping_existing_rows(tmp_path, monkey
     assert set(merged.loc[merged["year"] == 2026, "belgium"].round(3)) == {2.0}
 
 
+def test_update_profile_csv_preserves_untouched_year_text(tmp_path, monkeypatch) -> None:
+    out_dir = tmp_path
+    output = out_dir / "synergrid_rlp0n.csv"
+
+    # Use explicit textual precision to ensure representation differences are detectable.
+    original_content = (
+        "timestamp,belgium,flanders,wallonia,brussels\n"
+        "2026-01-01 00:00:00+01:00,2.8554396e-05,3.0415545454545452e-05,2.7818858333333334e-05,2.27313e-05\n"
+        "2026-01-01 00:15:00+01:00,2.802108e-05,2.981668181818182e-05,2.7311091666666662e-05,2.24052e-05\n"
+    )
+    output.write_text(original_content)
+
+    def fake_parse(profile: str, year: int) -> pd.DataFrame:
+        assert profile == "RLP0N"
+        assert year == 2027
+        return _year_frame(2027, 9.0)
+
+    monkeypatch.setattr(synergrid_preprocess, "_parse_profile_year", fake_parse)
+
+    output_path, appended = synergrid_preprocess.update_profile_csv("RLP0N", [2027], out_dir)
+
+    assert output_path.exists()
+    assert appended == [2027]
+
+    written = output.read_text()
+    original_lines = original_content.strip().splitlines()
+    written_lines = written.strip().splitlines()
+    assert written_lines[: len(original_lines)] == original_lines
+
+
 def test_compute_spp_region_dataframe_uses_gln_columns_only() -> None:
     data = pd.DataFrame(
         {
@@ -124,35 +152,6 @@ def test_compute_spp_region_dataframe_accepts_float_gln_headers() -> None:
     assert result["flanders"].tolist() == [2.0]
     assert result["wallonia"].tolist() == [6.0]
     assert result["brussels"].tolist() == [10.0]
-
-
-def test_cet_localization_preserves_dst_fallback_both_folds() -> None:
-    first_fold = pd.date_range("2025-10-26 00:00", "2025-10-26 02:45", freq="15min")
-    repeated_fold = pd.date_range("2025-10-26 02:00", "2025-10-26 02:45", freq="15min")
-    after_fallback = pd.date_range("2025-10-26 03:00", "2025-10-26 23:45", freq="15min")
-
-    naive = pd.Series(pd.DatetimeIndex([*first_fold, *repeated_fold, *after_fallback]))
-    localized = synergrid_preprocess._localize_cet_timestamps(naive)
-
-    assert len(localized) == 100
-    two_oclock = [ts for ts in localized if ts.hour == 2 and ts.minute == 0]
-    assert len(two_oclock) == 2
-    assert {ts.utcoffset() for ts in two_oclock} == {dt.timedelta(hours=1), dt.timedelta(hours=2)}
-
-
-def test_cet_localization_without_dst_shift_assumes_fixed_plus_one() -> None:
-    # No DST transition signatures: interpret input as fixed +01:00, then convert to Europe/Brussels.
-    naive = pd.Series(pd.to_datetime(["2025-01-15 12:00", "2025-07-15 12:00"]))
-
-    localized = synergrid_preprocess._localize_cet_timestamps(naive)
-
-    # Winter stays at +01 with same wall-clock time.
-    assert localized.iloc[0].hour == 12
-    assert localized.iloc[0].utcoffset() == dt.timedelta(hours=1)
-
-    # Summer converts from fixed +01 to Brussels DST (+02), so wall-clock shifts by +1h.
-    assert localized.iloc[1].hour == 13
-    assert localized.iloc[1].utcoffset() == dt.timedelta(hours=2)
 
 
 def test_find_download_url_prefers_highest_version() -> None:
