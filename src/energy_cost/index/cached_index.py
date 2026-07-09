@@ -45,12 +45,14 @@ class CachedIndex(Index):
         cache_dir: Path | str | None = None,
         old_threshold: dt.timedelta = _OLD_DATA_THRESHOLD,
         refresh_interval: dt.timedelta = _REFRESH_INTERVAL,
+        cache_timezone: dt.tzinfo = dt.UTC,
     ) -> None:
         self._source = source
         self.file_name = file_name or "".join(random.choices(string.ascii_letters, k=8))
         self.cache_dir = Path(cache_dir) if cache_dir is not None else _DEFAULT_CACHE_DIR
         self.old_threshold = old_threshold
         self.refresh_interval = refresh_interval
+        self.cache_timezone = cache_timezone
         self._mem_cache: pd.DataFrame | None = None
         super().__init__(resolution=source.resolution)
 
@@ -137,7 +139,7 @@ class CachedIndex(Index):
     ) -> pd.DataFrame:
         _log.debug("Fetching Index %s [%s, %s) ...", self.file_name, fetch_start, fetch_end)
         try:
-            raw = self._source.get_values(fetch_start, fetch_end, self.resolution, dt.UTC)
+            raw = self._source.get_values(fetch_start, fetch_end, self.resolution, self.cache_timezone)
         except Exception:
             _log.warning(
                 "Failed to fetch Index %s [%s, %s)",

@@ -6,7 +6,7 @@ import pytest
 from isodate import Duration
 from pytest import skip
 
-from energy_cost.data.be.electricity.indexes import BelpexRLP0N, BelpexSPP
+from energy_cost.data.be.electricity.indexes import BelpexLoadProfile, BelpexRLP0N, BelpexSPP
 
 TIMEZONE = zoneinfo.ZoneInfo("Europe/Brussels")
 REAL_VALUES = [
@@ -186,6 +186,39 @@ def _assert_historical_monthly_values(
 
 @pytest.mark.parametrize(("profile", "region", "year", "month", "day", "expected"), REAL_VALUES)
 def test_belpex_real_values(
+    profile: str,
+    region: str,
+    year: int,
+    month: int,
+    day: int,
+    expected: float,
+) -> None:
+    if not environ.get("ENTSOE_API_KEY"):
+        skip("ENTSOE_API_KEY not set")
+
+    if profile == "SPP":
+        index = BelpexLoadProfile(entsoe_api_key=environ.get("ENTSOE_API_KEY", ""), profile="SPP", region=region)
+    elif profile == "RLP0N":
+        index = BelpexLoadProfile(entsoe_api_key=environ.get("ENTSOE_API_KEY", ""), profile="RLP0N", region=region)
+    else:
+        raise ValueError(f"Unknown profile: {profile}")
+
+    start = dt.datetime(year, month, day, tzinfo=TIMEZONE)
+    end = (
+        dt.datetime(year + 1, 1, 1, tzinfo=TIMEZONE)
+        if month == 12
+        else dt.datetime(year, month + 1, 1, tzinfo=TIMEZONE)
+    )
+
+    df = index.get_values(start, end, Duration(months=1), TIMEZONE)
+
+    assert len(df) == 1
+    actual = round(float(df["value"].iloc[0]), 2)
+    assert actual == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(("profile", "region", "year", "month", "day", "expected"), REAL_VALUES)
+def test_cached_belpex_real_values(
     profile: str,
     region: str,
     year: int,
