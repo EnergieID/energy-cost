@@ -13,6 +13,7 @@ REAL_VALUES = [
     ("RLP0N", "flanders", 2026, 6, 1, 121.38),
     ("RLP0N", "flanders", 2025, 12, 1, 87.18),
     ("RLP0N", "flanders", 2025, 4, 1, 76.72),
+    ("RLP0N", "flanders", 2025, 3, 1, 94.61),
     ("RLP0N", "flanders", 2024, 6, 1, 60.27),
     ("RLP0N", "flanders", 2023, 8, 1, 93.17),
     ("RLP0N", "flanders", 2022, 5, 1, 177.23),

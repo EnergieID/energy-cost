@@ -105,26 +105,6 @@ def _to_header_name(value: object) -> str:
     return text
 
 
-def _localize_cet_timestamps(naive_timestamps: pd.Series) -> pd.Series:
-    """Localize CET-like timestamps according to detected DST behavior.
-
-    Some Synergrid exports encode timestamps as true Europe/Brussels local time
-    (with DST transitions), while others are emitted in fixed +01:00 all year.
-    Strategy:
-    - if timestamps show DST transition signs (duplicate wall-times or days with
-      non-96 quarter-hours), interpret as true Europe/Brussels timeline;
-    - otherwise interpret as fixed +01:00 and convert to Europe/Brussels.
-    """
-    per_day_counts = naive_timestamps.groupby(naive_timestamps.dt.floor("D")).size()
-    has_transition = bool(naive_timestamps.duplicated().any() or per_day_counts.isin([92, 100]).any())
-
-    if has_transition:
-        return naive_timestamps.dt.tz_localize(TZ, ambiguous="infer", nonexistent="shift_forward")
-
-    fixed_plus_one = dt.timezone(dt.timedelta(hours=1))
-    return naive_timestamps.dt.tz_localize(fixed_plus_one).dt.tz_convert(TZ)
-
-
 def _profile_output_path(profile: str, output_dir: Path) -> Path:
     return output_dir / f"synergrid_{profile.lower()}.csv"
 
@@ -205,7 +185,7 @@ def _read_profile_sheet(file_path: Path, profile: str) -> pd.DataFrame:
         numeric = pd.to_numeric(data["CET"], errors="coerce")
         data = data.assign(CET=numeric).dropna(subset=["CET"]).copy()
         data["timestamp"] = pd.to_datetime(data["CET"], origin="1899-12-30", unit="D").dt.round("15min")
-        data["timestamp"] = _localize_cet_timestamps(data["timestamp"])
+        data["timestamp"] = data["timestamp"].dt.tz_localize(dt.timezone(dt.timedelta(hours=1))).dt.tz_convert(TZ)
     else:
         data = data.dropna(subset=["UTC"]).copy()
         data["timestamp"] = pd.to_datetime(data["UTC"], utc=True, errors="coerce").dt.tz_convert(TZ)
