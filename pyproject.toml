@@ -54,6 +54,19 @@ envfile = ".env"
 [tool.poe.tasks.rerun-notebooks]
 shell = "jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb && nbstripout --keep-output --keep-count --extra-keys 'cell.metadata.execution metadata.language_info.version' notebooks/*.ipynb"
 interpreter = "bash"
+
+[tool.coverage.run]
+omit = [
+    "src/energy_cost/data/*",
+    "src/energy_cost/data/**/*",
+]
+
+[tool.coverage.report]
+omit = [
+    "src/energy_cost/data/*",
+    "src/energy_cost/data/**/*",
+]
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint]
