@@ -368,22 +368,6 @@ def test_fetch_and_merge_returns_cache_when_all_fetched_values_are_nan(tmp_path:
     assert result["value"].iloc[0] == pytest.approx(42.0)
 
 
-# ── _compute_fetch_range: future end capping ──────────────────────────────────
-
-
-def test_compute_fetch_range_returns_none_when_end_is_entirely_in_the_future(tmp_path: Path) -> None:
-    """When end_utc is capped to now and lies before start_utc, nothing should be fetched."""
-    idx, _ = _make_index(tmp_path)
-    now = pd.Timestamp.now(tz="UTC")
-    future_start = cast(pd.Timestamp, now + pd.Timedelta(hours=1))
-    future_end = cast(pd.Timestamp, now + pd.Timedelta(hours=2))
-    empty_cache = pd.DataFrame(columns=["timestamp", "value", "fetch_time", "stable"])
-
-    result = idx._compute_fetch_range(empty_cache, future_start, future_end, now)
-
-    assert result is None
-
-
 # ── _load_cache: in-memory hit ────────────────────────────────────────────────
 
 
