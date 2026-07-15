@@ -95,9 +95,6 @@ class CachedIndex(Index):
         now: pd.Timestamp,
     ) -> tuple[pd.Timestamp, pd.Timestamp] | None:
         """Return ``(fetch_start, fetch_end)`` if a network request is needed, else ``None``."""
-        if end_utc <= start_utc:
-            return None
-
         if cache.empty:
             return start_utc, end_utc
 
@@ -105,7 +102,7 @@ class CachedIndex(Index):
         ends: list[pd.Timestamp] = []
 
         # Gap before cached data
-        if start_utc + self.resolution < cache["timestamp"].min():
+        if start_utc < cache["timestamp"].min():
             starts.append(start_utc)
             ends.append(cache["timestamp"].min())
 
