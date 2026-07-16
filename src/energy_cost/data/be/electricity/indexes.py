@@ -15,9 +15,9 @@ OVERWRITES = [
 
 class BelpexLoadProfile(LoadProfileIndex):
     def __init__(self, entsoe_api_key: str, profile: str, region: str) -> None:
-        self.region = region
-        self.profile = profile
-        load_profile_index = SynergridLoadProfileIndex(profile=profile, region=region)
+        self.region = region.upper()
+        self.profile = profile.lower()
+        load_profile_index = SynergridLoadProfileIndex(profile=self.profile, region=self.region)
         data_profile_index = CachedIndex(
             EntsoeDayAheadIndex("BE", entsoe_api_key, resolution=dt.timedelta(minutes=15)), file_name="belpex15min"
         )
@@ -43,7 +43,7 @@ class BelpexRLP0N(CachedIndex):
         index = BelpexLoadProfile(entsoe_api_key, "RLP0N", region)
         super().__init__(
             index,
-            f"belpex_rlp0n_{region}",
+            f"belpex_rlp0n_{region.lower()}",
             old_threshold=dt.timedelta(days=32),
             cache_timezone=zoneinfo.ZoneInfo("Europe/Brussels"),
         )
@@ -54,7 +54,7 @@ class BelpexSPP(CachedIndex):
         index = BelpexLoadProfile(entsoe_api_key, "SPP", region)
         super().__init__(
             index,
-            f"belpex_spp_{region}",
+            f"belpex_spp_{region.lower()}",
             old_threshold=dt.timedelta(days=32),
             cache_timezone=zoneinfo.ZoneInfo("Europe/Brussels"),
         )
