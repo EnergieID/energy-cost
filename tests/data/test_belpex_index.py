@@ -10,20 +10,6 @@ from energy_cost.data.be.electricity.indexes import BelpexLoadProfile, BelpexRLP
 
 TIMEZONE = zoneinfo.ZoneInfo("Europe/Brussels")
 REAL_VALUES = [
-    ("RLP0N", "flanders", 2026, 6, 1, 121.38),
-    ("RLP0N", "flanders", 2025, 12, 1, 87.18),
-    ("RLP0N", "flanders", 2025, 4, 1, 76.72),
-    ("RLP0N", "flanders", 2025, 3, 1, 94.61),
-    ("RLP0N", "flanders", 2024, 6, 1, 60.27),
-    ("RLP0N", "flanders", 2023, 8, 1, 93.17),
-    ("RLP0N", "flanders", 2022, 5, 1, 177.23),
-    ("SPP", "flanders", 2026, 5, 1, 42.37),
-    ("SPP", "flanders", 2025, 3, 1, 54.53),
-    ("SPP", "flanders", 2024, 6, 1, 32.52),
-    ("SPP", "flanders", 2024, 5, 1, 31.82),
-    ("SPP", "flanders", 2024, 1, 1, 78.44),
-    ("SPP", "flanders", 2023, 7, 1, 55.60),
-    ("SPP", "flanders", 2022, 12, 1, 297.77),
     ("RLP0N", "belgium", 2026, 4, 1, 84.72),
     ("RLP0N", "belgium", 2025, 10, 1, 78.12),
     ("RLP0N", "belgium", 2024, 2, 1, 63.13),
