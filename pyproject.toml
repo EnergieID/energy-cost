@@ -46,8 +46,10 @@ namespaces = true
 lint = "ruff check --fix"
 format = "ruff format"
 check = "ty check"
-test = "pytest --cov=energy_cost --cov-report=term-missing"
 synergrid = "python -m energy_cost.data.be.synergrid_preprocess"
+[tool.poe.tasks.test]
+cmd = "pytest --cov=energy_cost --cov-report=term-missing"
+envfile = ".env"
 [tool.poe.tasks.notebooks]
 cmd = "jupyter lab notebooks"
 envfile = ".env"

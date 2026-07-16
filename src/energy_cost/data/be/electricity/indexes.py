@@ -9,9 +9,7 @@ from energy_cost.index import CachedIndex, EntsoeDayAheadIndex, LoadProfileIndex
 from ..synergrid_load_profile_index import SynergridLoadProfileIndex
 
 OVERWRITES = [
-    ("RLP0N", "flanders", 2024, 6, 1, 60.27),
     ("RLP0N", "flanders", 2025, 3, 1, 94.61),
-    ("SPP", "flanders", 2024, 6, 1, 32.52),
 ]
 
 
