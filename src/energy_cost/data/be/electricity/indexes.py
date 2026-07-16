@@ -47,7 +47,7 @@ class BelpexLoadProfile(LoadProfileIndex):
 
 class BelpexRLP0N(CachedIndex):
     def __init__(
-        self, entsoe_api_key: str | None = None, region: str = "belgium", belpex15min: Index | None = None
+        self, region: str = "belgium", entsoe_api_key: str | None = None, belpex15min: Index | None = None
     ) -> None:
         index = BelpexLoadProfile("RLP0N", region, entsoe_api_key, belpex15min)
         super().__init__(
@@ -60,7 +60,7 @@ class BelpexRLP0N(CachedIndex):
 
 class BelpexSPP(CachedIndex):
     def __init__(
-        self, entsoe_api_key: str | None = None, region: str = "belgium", belpex15min: Index | None = None
+        self, region: str = "belgium", entsoe_api_key: str | None = None, belpex15min: Index | None = None
     ) -> None:
         index = BelpexLoadProfile("SPP", region, entsoe_api_key, belpex15min)
         super().__init__(
