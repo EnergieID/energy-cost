@@ -10,6 +10,8 @@ from .index import Index
 
 OVERWRITES: dict[str, list[pd.DataFrame]] = {
     "BE": [
+        # on 25/06/2024 the EPEX day ahead prices in Belgium were wrong, due to a decoupling issue.
+        # see https://www.nemo-committee.eu/assets/files/single-day-ahead-market-coupling-(sdac)-report-on-the-partial-decoupling-incident-of-june-25-2024.pdf
         pd.read_csv(
             str(resources.files("energy_cost.data.be").joinpath("EPEX_DA_20240626.csv")), parse_dates=["timestamp"]
         )
