@@ -74,3 +74,51 @@ def test_get_values_supports_finer_divisor_resolution(monkeypatch: pytest.Monkey
     assert out.iloc[0]["value"] == 100.0
     assert out.iloc[-1]["timestamp"] == pd.Timestamp("2025-01-01 01:55:00", tz=dt.UTC)
     assert out.iloc[-1]["value"] == 120.0
+
+
+def test_get_values_applies_overwrite_for_overlapping_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(entsoe_module, "EntsoePandasClient", StubEntsoePandasClient)
+
+    overwrite_df = pd.DataFrame(
+        {
+            "timestamp": [
+                pd.Timestamp("2025-01-01 00:00:00", tz=dt.UTC),
+                pd.Timestamp("2025-01-01 01:00:00", tz=dt.UTC),
+                pd.Timestamp("2025-01-01 03:00:00", tz=dt.UTC),
+            ],
+            "value": [999.0, 777.0, 555.0],
+        }
+    )
+    monkeypatch.setitem(
+        entsoe_module._OVERWRITE_BOUNDS,
+        "BE",
+        [
+            (
+                overwrite_df["timestamp"].min(),
+                overwrite_df["timestamp"].max(),
+                overwrite_df,
+            )
+        ],
+    )
+
+    index = EntsoeDayAheadIndex(country_code="BE", api_key="fake-key", resolution=dt.timedelta(hours=1))
+    out = index.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 2, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert out["value"].tolist() == [999.0, 999.0, 999.0, 999.0, 777.0, 777.0, 777.0, 777.0]
+
+
+def test_get_values_skips_overwrite_when_country_has_no_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(entsoe_module, "EntsoePandasClient", StubEntsoePandasClient)
+
+    index = EntsoeDayAheadIndex(country_code="NL", api_key="fake-key", resolution=dt.timedelta(hours=1))
+    out = index.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 1, 1, 2, 0),
+        resolution=dt.timedelta(minutes=15),
+    )
+
+    assert out["value"].tolist() == [100.0, 100.0, 100.0, 100.0, 120.0, 120.0, 120.0, 120.0]
