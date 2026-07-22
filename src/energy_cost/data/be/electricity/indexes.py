@@ -4,7 +4,7 @@ import zoneinfo
 import pandas as pd
 from isodate import Duration
 
-from energy_cost.index import CachedIndex, EntsoeDayAheadIndex, LoadProfileIndex
+from energy_cost.index import CachedIndex, EntsoeDayAheadIndex, Index, LoadProfileIndex
 
 from ..synergrid_load_profile_index import SynergridLoadProfileIndex
 
@@ -14,13 +14,20 @@ OVERWRITES = [
 
 
 class BelpexLoadProfile(LoadProfileIndex):
-    def __init__(self, entsoe_api_key: str, profile: str, region: str) -> None:
+    def __init__(
+        self, profile: str, region: str, entsoe_api_key: str | None = None, belpex15min: Index | None = None
+    ) -> None:
         self.region = region.upper()
         self.profile = profile.lower()
         load_profile_index = SynergridLoadProfileIndex(profile=self.profile, region=self.region)
-        data_profile_index = CachedIndex(
-            EntsoeDayAheadIndex("BE", entsoe_api_key, resolution=dt.timedelta(minutes=15)), file_name="belpex15min"
-        )
+        if belpex15min is not None:
+            data_profile_index = belpex15min
+        elif entsoe_api_key is not None:
+            data_profile_index = CachedIndex(
+                EntsoeDayAheadIndex("BE", entsoe_api_key, resolution=dt.timedelta(minutes=15)), file_name="belpex15min"
+            )
+        else:
+            raise ValueError("Either entsoe_api_key or belpex15min must be provided.")
         super().__init__(load_profile_index, data_profile_index, resolution=Duration(months=1))
 
     def _get_values(self, start: dt.datetime, end: dt.datetime, timezone: dt.tzinfo) -> pd.DataFrame:
@@ -39,8 +46,10 @@ class BelpexLoadProfile(LoadProfileIndex):
 
 
 class BelpexRLP0N(CachedIndex):
-    def __init__(self, entsoe_api_key: str, region: str) -> None:
-        index = BelpexLoadProfile(entsoe_api_key, "RLP0N", region)
+    def __init__(
+        self, region: str = "belgium", entsoe_api_key: str | None = None, belpex15min: Index | None = None
+    ) -> None:
+        index = BelpexLoadProfile("RLP0N", region, entsoe_api_key, belpex15min)
         super().__init__(
             index,
             f"belpex_rlp0n_{region.lower()}",
@@ -50,8 +59,10 @@ class BelpexRLP0N(CachedIndex):
 
 
 class BelpexSPP(CachedIndex):
-    def __init__(self, entsoe_api_key: str, region: str) -> None:
-        index = BelpexLoadProfile(entsoe_api_key, "SPP", region)
+    def __init__(
+        self, region: str = "belgium", entsoe_api_key: str | None = None, belpex15min: Index | None = None
+    ) -> None:
+        index = BelpexLoadProfile("SPP", region, entsoe_api_key, belpex15min)
         super().__init__(
             index,
             f"belpex_spp_{region.lower()}",
