@@ -84,6 +84,45 @@ def apply_extreme_formula(
     )
 
 
+def get_extreme_values(
+    formulas: list[Formula],
+    extreme_func: Callable[[pd.Series], float],
+    period: Resolution,
+    start: dt.datetime,
+    end: dt.datetime,
+    output_resolution: Resolution,
+    timezone: dt.tzinfo = dt.UTC,
+) -> pd.DataFrame:
+    if period != output_resolution:
+        raise NotImplementedError(
+            "Minimum/maximum get_values() only supports output_resolution equal to formula period. Use apply() instead."
+        )
+
+    value_frames = [
+        formula.get_values(
+            start=start,
+            end=end,
+            output_resolution=output_resolution,
+            timezone=timezone,
+        )
+        for formula in formulas
+    ]
+
+    merged = value_frames[0][["timestamp", "value"]].rename(columns={"value": "value_0"})
+    for i, frame in enumerate(value_frames[1:], start=1):
+        merged = merged.merge(
+            frame[["timestamp", "value"]].rename(columns={"value": f"value_{i}"}),
+            on="timestamp",
+            how="outer",
+        )
+
+    value_columns = [c for c in merged.columns if c.startswith("value_")]
+    merged["value"] = merged[value_columns].agg(extreme_func, axis=1)
+
+    result = merged[["timestamp", "value"]].sort_values("timestamp")
+    return result.reset_index(drop=True)
+
+
 class MinimumFormula(FormulaBase):
     """A formula returns the minimum formula result of multiple formulas in a given period."""
 
@@ -91,6 +130,23 @@ class MinimumFormula(FormulaBase):
     kind: Literal["minimum"] = "minimum"
     period: Resolution
     minimum: list[Formula] = Field(default_factory=list)
+
+    def get_values(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = dt.UTC,
+    ) -> pd.DataFrame:
+        return get_extreme_values(
+            formulas=self.minimum,
+            extreme_func=min,
+            period=self.period,
+            start=start,
+            end=end,
+            output_resolution=output_resolution,
+            timezone=timezone,
+        )
 
     def apply(
         self,
@@ -121,6 +177,23 @@ class MaximumFormula(FormulaBase):
     kind: Literal["maximum"] = "maximum"
     period: Resolution
     maximum: list[Formula] = Field(default_factory=list)
+
+    def get_values(
+        self,
+        start: dt.datetime,
+        end: dt.datetime,
+        output_resolution: Resolution,
+        timezone: dt.tzinfo = dt.UTC,
+    ) -> pd.DataFrame:
+        return get_extreme_values(
+            formulas=self.maximum,
+            extreme_func=max,
+            period=self.period,
+            start=start,
+            end=end,
+            output_resolution=output_resolution,
+            timezone=timezone,
+        )
 
     def apply(
         self,
