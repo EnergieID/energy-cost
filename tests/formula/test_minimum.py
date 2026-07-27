@@ -10,7 +10,25 @@ from energy_cost.formula import IndexFormula, MaximumFormula, MinimumFormula, Pe
 from energy_cost.meter import Meter, TimeseriesFrame
 
 
-def test_minimum_formula_get_values_raises_not_implemented() -> None:
+def test_minimum_formula_get_values_takes_rowwise_minimum() -> None:
+    formula = MinimumFormula(
+        period=isodate.parse_duration("P1M"),
+        minimum=[
+            IndexFormula(constant_cost=1.0),
+            IndexFormula(constant_cost=3.0),
+        ],
+    )
+
+    out = formula.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 2, 1, 0, 0),
+        output_resolution=isodate.parse_duration("P1M"),
+    )
+
+    assert out["value"].tolist() == pytest.approx([1.0])
+
+
+def test_minimum_formula_get_values_raises_when_period_differs_from_resolution() -> None:
     formula = MinimumFormula(
         period=isodate.parse_duration("P1M"),
         minimum=[IndexFormula(constant_cost=1.0)],
@@ -20,7 +38,7 @@ def test_minimum_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 2, 1, 0, 0),
-            output_resolution=isodate.parse_duration("P1M"),
+            output_resolution=isodate.parse_duration("P1D"),
         )
 
 
@@ -232,7 +250,25 @@ def test_minimum_formula_model_validate_from_dict() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_maximum_formula_get_values_raises_not_implemented() -> None:
+def test_maximum_formula_get_values_takes_rowwise_maximum() -> None:
+    formula = MaximumFormula(
+        period=isodate.parse_duration("P1M"),
+        maximum=[
+            IndexFormula(constant_cost=1.0),
+            IndexFormula(constant_cost=3.0),
+        ],
+    )
+
+    out = formula.get_values(
+        start=dt.datetime(2025, 1, 1, 0, 0),
+        end=dt.datetime(2025, 2, 1, 0, 0),
+        output_resolution=isodate.parse_duration("P1M"),
+    )
+
+    assert out["value"].tolist() == pytest.approx([3.0])
+
+
+def test_maximum_formula_get_values_raises_when_period_differs_from_resolution() -> None:
     formula = MaximumFormula(
         period=isodate.parse_duration("P1M"),
         maximum=[IndexFormula(constant_cost=1.0)],
@@ -242,7 +278,7 @@ def test_maximum_formula_get_values_raises_not_implemented() -> None:
         formula.get_values(
             start=dt.datetime(2025, 1, 1, 0, 0),
             end=dt.datetime(2025, 2, 1, 0, 0),
-            output_resolution=isodate.parse_duration("P1M"),
+            output_resolution=isodate.parse_duration("P1D"),
         )
 
 
