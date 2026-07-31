@@ -160,3 +160,67 @@
             constant_cost: 8.23
         - formula:
             constant_cost: 9.0782
+- start: "2026-04-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.3061
+- start: "2026-07-01T00:00:00+02:00"
+  consumption:
+    energy_contribution:
+      constant_cost: 0.9978
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 8.23
+        - formula:
+            constant_cost: 9.3315
+- start: "2026-08-01T00:00:00+02:00"
+  consumption:
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 10.31
+        - formula:
+            constant_cost: 11.16
+- start: "2027-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 11.39
+        - formula:
+            constant_cost: 12.24
+- start: "2028-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 11.39
+        - formula:
+            constant_cost: 12.24
+- start: "2029-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      band_period: P1Y
+      bands:
+        - up_to: 12
+          formula:
+            constant_cost: 13.60
+        - formula:
+            constant_cost: 14.45
