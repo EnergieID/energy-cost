@@ -94,3 +94,19 @@
             constant_cost: 36.28
     energy_contribution:
         constant_cost: 1.9261
+- start: 2026-08-01T00:00:00+02:00
+  consumption:
+    excise:
+      constant_cost: 46
+- start: 2027-01-01T00:00:00+01:00
+  consumption:
+    excise:
+      constant_cost: 43
+- start: 2028-01-01T00:00:00+01:00
+  consumption:
+    excise:
+      constant_cost: 40
+- start: 2029-01-01T00:00:00+01:00
+  consumption:
+    excise:
+      constant_cost: 38

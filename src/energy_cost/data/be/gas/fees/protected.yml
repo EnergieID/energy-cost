@@ -27,3 +27,19 @@
   consumption:
     excise:
       constant_cost: 2.77
+- start: "2026-08-01T00:00:00+02:00"
+  consumption:
+    excise:
+      constant_cost: 3.09
+- start: "2027-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      constant_cost: 3.42
+- start: "2028-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      constant_cost: 3.74
+- start: "2029-01-01T00:00:00+01:00"
+  consumption:
+    excise:
+      constant_cost: 4.08
