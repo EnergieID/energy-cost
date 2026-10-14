@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import threading
 from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
@@ -382,3 +383,44 @@ def test_load_cache_returns_in_memory_cache_when_file_is_unchanged(tmp_path: Pat
     first = idx._load_cache()
     second = idx._load_cache()
     assert second is first
+
+
+# ── _save_cache: concurrent writers ───────────────────────────────────────────
+
+
+def test_concurrent_saves_to_the_same_cache_file_do_not_collide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two workers refreshing the same index each publish a complete cache file."""
+    writers = [_make_index(tmp_path)[0] for _ in range(2)]
+    df = _make_raw(["2020-01-01T00:00:00+00:00"])
+    df["fetch_time"] = pd.Timestamp("2020-01-02", tz="UTC")
+    df["stable"] = True
+
+    # Hold both writers between writing their temp file and renaming it.
+    both_written = threading.Barrier(2)
+    to_pickle = pd.DataFrame.to_pickle
+
+    def to_pickle_then_wait(self: pd.DataFrame, path, *args, **kwargs) -> None:
+        to_pickle(self, path, *args, **kwargs)
+        both_written.wait(timeout=5)
+
+    monkeypatch.setattr(pd.DataFrame, "to_pickle", to_pickle_then_wait)
+
+    errors: list[BaseException] = []
+
+    def save(idx: CachedIndex) -> None:
+        try:
+            idx._save_cache(df)
+        except BaseException as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=save, args=(w,)) for w in writers]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert errors == []
+    pd.testing.assert_frame_equal(pd.read_pickle(_cache_path(tmp_path)), df)
+    assert list((tmp_path / "cache").glob("*.tmp")) == []
