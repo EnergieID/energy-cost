@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import os
 import random
 import string
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -81,9 +83,15 @@ class CachedIndex(Index):
 
     def _save_cache(self, df: pd.DataFrame) -> None:
         path = self._cache_path()
-        tmp = path.with_suffix(".tmp")
-        df.to_pickle(tmp)
-        tmp.replace(path)
+        # A temp file per writer: processes sharing the cache dir would otherwise rename each other's file away.
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f"{path.stem}.", suffix=".tmp")
+        os.close(fd)
+        tmp = Path(tmp_name)
+        try:
+            df.to_pickle(tmp)
+            tmp.replace(path)
+        finally:
+            tmp.unlink(missing_ok=True)
         # Invalidate the in-memory cache so the next _load_cache re-reads the new file.
         self._mem_cache_mtime = None
 
