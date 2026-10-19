@@ -55,11 +55,7 @@ def _fill_default() -> None:
     global _default_filled
     if _default_filled:
         return
-    _default_filled = True
-    try:
-        from .data import registry
+    from .data import registry
 
-        _default.regions.update(registry)
-    except BaseException:
-        _default_filled = False
-        raise
+    _default.regions.update(registry)
+    _default_filled = True
