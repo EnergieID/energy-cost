@@ -1,4 +1,5 @@
 from .capacity import CapacityRule
+from .catalog import Catalog
 from .contract import Contract, ContractHistory
 from .data.models import Supplier
 from .meter import CostGroup, Meter, MeterType, PowerDirection, TariffCategory, TimeseriesFrame
@@ -10,6 +11,7 @@ from .types import TzInfo
 
 __all__ = [
     "CapacityRule",
+    "Catalog",
     "Tariff",
     "TariffVersion",
     "Tax",

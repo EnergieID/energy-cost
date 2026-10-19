@@ -41,9 +41,9 @@ The Flemish data (`src/energy_cost/data/be/flanders/`) is the reference implemen
 
 ```
 src/energy_cost/data/be/flanders/
-├── __init__.py                  # Exports register() function
+├── __init__.py                  # registry: merges the electricity and gas registries
 ├── electricity/
-│   ├── __init__.py              # Builds RegionalData and registers it as "be_flanders" + ELECTRICITY
+│   ├── __init__.py              # Builds RegionalData as `data`; registry = {("be_flanders", ELECTRICITY): data}
 │   ├── parse_distributors.py   # Script to parse distributor tariffs from source files
 │   ├── distributors/           # One YAML file per distributor (e.g. fluvius_imewo.yml)
 │   └── fees/                   # Government fees per customer type
@@ -54,20 +54,24 @@ src/energy_cost/data/be/flanders/
     └── fees/
 ```
 
-The region is registered via `RegionalData.register(("be_flanders", ConnectionType.ELECTRICITY), data)` in `electricity/__init__.py`, and the region's `__init__.py` calls both `electricity.register()` and `gas.register()`.
+Every level exports a `registry` dict that maps `(region, connection type)` to `RegionalData`:
 
-The top-level `src/energy_cost/data/be/__init__.py` in turn imports the region's `register()` function.
+- `electricity/__init__.py` builds its `RegionalData` as `data` and exports `registry = {("be_flanders", ConnectionType.ELECTRICITY): data}`.
+- `flanders/__init__.py` merges the electricity and gas registries.
+- `be/__init__.py` merges the registries of the Belgian regions, and `src/energy_cost/data/__init__.py` merges those of all countries.
+
+The default catalog is filled from `energy_cost.data.registry`, so contracts can refer to any bundled region without setup. Users can add just the regions they need to their own `Catalog`, e.g. `Catalog(regions=flanders.registry)`.
 
 **Steps to add a new region (e.g. `be_brussels`):**
 
 1. Create the folder structure under `src/energy_cost/data/` following the Flanders example.
 2. Add **YAML data files** for distributor tariffs and government fees. See the [example tariff files](examples/tariffs/) for the YAML format.
-3. Add a **`__init__.py`** that builds a `RegionalData` object and registers it with the right key (e.g. `"be_brussels"`).
+3. Add an **`__init__.py`** per connection type that builds a `RegionalData` object and exports it as `registry` (e.g. `registry = {("be_brussels", ConnectionType.ELECTRICITY): data}`), and one for the region that merges them.
 4. Add a **`README.md`** in your region folder documenting:
    - Where the data comes from (URLs, document names)
    - Any choices or assumptions made (e.g. which connection types or meter types are supported)
    - Notes that will help the next person update the data
 5. Optionally add a **`parse_distributors.py`** script if the source data comes in a machine-readable format. This makes future yearly updates much easier.
-6. Register your new region in the parent `__init__.py` (e.g. `src/energy_cost/data/be/__init__.py`).
+6. Merge your region's `registry` into the parent `registry` (e.g. in `src/energy_cost/data/be/__init__.py`).
 
 If you are unsure about the data format or regional structure, open an issue and we can help you get started.

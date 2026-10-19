@@ -5,8 +5,10 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
+from pydantic import TypeAdapter, ValidationError
 
-from energy_cost.formula import IndexAdder, IndexFormula
+from energy_cost import Tariff
+from energy_cost.formula import Formula, IndexAdder, IndexFormula
 from energy_cost.index import DataFrameIndex, Index
 from energy_cost.meter import Meter, TimeseriesFrame
 
@@ -148,4 +150,92 @@ def test_capacity_based_formula_raises_when_meter_has_no_capacity() -> None:
     with pytest.raises(ValueError, match="Capacity is required"):
         formula.apply(
             meter, meter.measurements.start, meter.measurements.end, output_resolution=dt.timedelta(minutes=15)
+        )
+
+
+def _two_quarter_index() -> DataFrameIndex:
+    return DataFrameIndex(
+        pd.DataFrame({"timestamp": pd.date_range("2025-01-01", periods=2, freq="15min"), "value": 1.0})
+    )
+
+
+def test_index_adder_accepts_registered_index() -> None:
+    Index.register("spot", _two_quarter_index())
+
+    assert IndexAdder(index="spot", scalar=1.0).index == "spot"
+
+
+def test_index_adder_serializes_only_the_index_name() -> None:
+    Index.register("spot", _two_quarter_index())
+
+    assert IndexAdder(index="spot", scalar=1.0).model_dump() == {"index": "spot", "scalar": 1.0}
+
+
+def test_index_adder_rejects_unknown_index() -> None:
+    with pytest.raises(ValidationError, match="unknown index 'spot'"):
+        IndexAdder(index="spot", scalar=1.0)
+
+
+@pytest.mark.parametrize(
+    "formula",
+    [
+        pytest.param({"variable_costs": [{"index": "missing", "scalar": 1.0}]}, id="index"),
+        pytest.param(
+            {
+                "bands": [
+                    {"up_to": 1.0, "formula": {"constant_cost": 1.0}},
+                    {"formula": {"variable_costs": [{"index": "missing", "scalar": 1.0}]}},
+                ]
+            },
+            id="tiered",
+        ),
+        pytest.param(
+            {
+                "schedule": [
+                    {
+                        "when": [{"start": "06:00:00"}],
+                        "formula": {"variable_costs": [{"index": "missing", "scalar": 1.0}]},
+                    }
+                ]
+            },
+            id="scheduled",
+        ),
+        pytest.param(
+            {
+                "period": "P1M",
+                "minimum": [{"constant_cost": 1.0}, {"variable_costs": [{"index": "missing", "scalar": 1.0}]}],
+            },
+            id="minimum",
+        ),
+        pytest.param(
+            {
+                "period": "P1M",
+                "maximum": [{"constant_cost": 1.0}, {"variable_costs": [{"index": "missing", "scalar": 1.0}]}],
+            },
+            id="maximum",
+        ),
+        pytest.param(
+            {"by_meter_type": {"default": {"variable_costs": [{"index": "missing", "scalar": 1.0}]}}},
+            id="meter_type",
+        ),
+    ],
+)
+def test_nested_formula_rejects_unknown_index(formula: dict) -> None:
+    with pytest.raises(ValidationError, match="unknown index 'missing'"):
+        TypeAdapter(Formula).validate_python(formula)
+
+
+def test_tariff_rejects_unknown_index_in_later_version() -> None:
+    Index.register("spot", _two_quarter_index())
+    adder = {"variable_costs": [{"index": "spot", "scalar": 1.0}]}
+
+    with pytest.raises(ValidationError, match="unknown index 'missing'"):
+        Tariff.model_validate(
+            [
+                {"start": "2025-01-01T00:00:00+01:00", "consumption": adder},
+                {
+                    "start": "2026-01-01T00:00:00+01:00",
+                    "injection": {"variable_costs": [{"index": "missing", "scalar": 1.0}]},
+                },
+            ]
         )

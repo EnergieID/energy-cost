@@ -1,6 +1,6 @@
-from .be.flanders import register as _register_flanders
+from . import be
 from .models import ConnectionType, CustomerType, RegionalData, Supplier
 
-_register_flanders()
+registry = {**be.registry}
 
-__all__ = ["RegionalData", "CustomerType", "ConnectionType", "Supplier"]
+__all__ = ["RegionalData", "CustomerType", "ConnectionType", "Supplier", "be", "registry"]

@@ -33,6 +33,4 @@ data = RegionalData(
     timezone=_TIMEZONE,
 )
 
-
-def register() -> None:
-    RegionalData.register(("be_flanders", ConnectionType.ELECTRICITY), data)
+registry = {("be_flanders", ConnectionType.ELECTRICITY): data}

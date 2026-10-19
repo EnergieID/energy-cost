@@ -25,6 +25,4 @@ data = RegionalData(
     timezone=_TIMEZONE,
 )
 
-
-def register() -> None:
-    RegionalData.register(("be_flanders", ConnectionType.GAS), data)
+registry = {("be_flanders", ConnectionType.GAS): data}
