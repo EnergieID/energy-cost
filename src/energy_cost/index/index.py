@@ -4,6 +4,7 @@ from typing import cast
 
 import pandas as pd
 
+from ..catalog import Catalog
 from ..registry import RegistryMixin
 from ..resolution import (
     Resolution,
@@ -17,6 +18,10 @@ from ..resolution import (
 
 class Index(RegistryMixin[str, "Index"], ABC):
     """An index used for calculating energy costs (€/MWh)."""
+
+    @classmethod
+    def _registry(cls) -> dict[str, "Index"]:
+        return Catalog.current().indexes
 
     def __init__(self, resolution: Resolution, forward_fill: bool = False) -> None:
         self.resolution = resolution

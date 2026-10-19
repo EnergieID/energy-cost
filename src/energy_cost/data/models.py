@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from energy_cost.capacity import CapacityRule
+from energy_cost.catalog import Catalog
 from energy_cost.registry import RegistryMixin
 from energy_cost.tariff import Tariff
 from energy_cost.tax import Tax
@@ -25,6 +26,10 @@ class Supplier(BaseModel, RegistryMixin[str, "Supplier"]):
 
     products: dict[str, Tariff]
 
+    @classmethod
+    def _registry(cls) -> dict[str, "Supplier"]:
+        return Catalog.current().suppliers
+
 
 class RegionalData(BaseModel, RegistryMixin[tuple[str, ConnectionType], "RegionalData"]):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -34,3 +39,7 @@ class RegionalData(BaseModel, RegistryMixin[tuple[str, ConnectionType], "Regiona
     taxes: Tax | list[Tax]
     timezone: TzInfo
     capacity_rule: CapacityRule | None = None
+
+    @classmethod
+    def _registry(cls) -> dict[tuple[str, ConnectionType], "RegionalData"]:
+        return Catalog.current().regions

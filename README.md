@@ -17,7 +17,7 @@ Contracts can be defined in a yaml file, which makes it easy to manage and updat
 We also have more detailed documentation on the different components of a contract, see [`notebooks`](notebooks/) for all available notebooks.
 You can find example yaml files for tariffs and taxes in the [`examples`](examples) directory.
 
-A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info.
+A lot of tariffs are based on an `Index`, which is a price that changes over time based on the market price of energy, see [`notebooks/index.ipynb`](notebooks/index.ipynb) for more info. Indexes and suppliers are registered by name in a global registry; to use separate sets in one process, see the `Catalog` section in [`notebooks/contract.ipynb`](notebooks/contract.ipynb).
 
 
 > Note on units: all consumption based costs are in €/MWh, all energy values are in MWh. All monetary values are in €.

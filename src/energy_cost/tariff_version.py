@@ -9,6 +9,7 @@ from pydantic import BeforeValidator, Field, TypeAdapter, field_validator
 from energy_cost.versioning import Versioned
 
 from .formula import Formula
+from .formula.formula import _formula_discriminator
 from .meter import CostGroup, Meter, MeterType
 from .resolution import Resolution, align_datetime_to_tz
 
@@ -18,10 +19,9 @@ _formula_adapter: TypeAdapter[Formula] = TypeAdapter(Formula)
 
 def _coerce_named_formulas(value: Any) -> Any:
     """Allow a bare Formula dict to be shorthand for ``{total: it}``."""
-    try:
+    if _formula_discriminator(value) is not None:
         return {"total": _formula_adapter.validate_python(value)}
-    except Exception:
-        return value
+    return value
 
 
 NamedFormulas = Annotated[

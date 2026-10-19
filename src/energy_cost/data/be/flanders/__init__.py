@@ -1,7 +1,5 @@
-from .electricity import register as _register_electricity
-from .gas import register as _register_gas
+from . import electricity, gas
 
+registry = {**electricity.registry, **gas.registry}
 
-def register() -> None:
-    _register_electricity()
-    _register_gas()
+__all__ = ["electricity", "gas", "registry"]
