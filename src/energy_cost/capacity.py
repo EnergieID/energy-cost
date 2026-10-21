@@ -1,18 +1,24 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict, Field
 
 from energy_cost.meter import Meter, TimeseriesFrame
+from energy_cost.model import ADVANCED, EnergyCostModel
 
 from .resolution import Resolution, is_divisor, to_pandas_freq
 
 
-class CapacityRule(BaseModel):
+class CapacityRule(EnergyCostModel):
+    """How the billed peak capacity is derived from the measurements."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     measurement_period: Resolution
+    """Period over which the average power is measured, e.g. 15 minutes."""
     billing_period: Resolution
-    window_periods: int | None = None
+    """Period whose highest measured power is billed, e.g. a month."""
+    window_periods: int | None = Field(default=None, json_schema_extra=ADVANCED)
+    """Number of billing periods to average the peaks over, e.g. 12 for a moving year."""
 
     def apply(
         self,

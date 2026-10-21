@@ -5,17 +5,23 @@ from datetime import UTC
 from typing import Literal, Self
 
 import pandas as pd
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import Field, PrivateAttr, model_validator
 
 from energy_cost.index.index import Index
+from energy_cost.model import EnergyCostModel
 from energy_cost.resolution import Resolution, align_datetime_to_tz, to_pandas_freq
+from energy_cost.types import IndexName
 
 from .base import FormulaBase
 
 
-class IndexAdder(BaseModel):
-    index: str
+class IndexAdder(EnergyCostModel):
+    """An index price multiplied by a scalar."""
+
+    index: IndexName
+    """Name of the index to follow, e.g. a day-ahead price."""
     scalar: float
+    """Factor applied to the index value."""
     _resolved: Index = PrivateAttr()
 
     @model_validator(mode="after")
@@ -37,9 +43,14 @@ class IndexAdder(BaseModel):
 
 
 class IndexFormula(FormulaBase):
+    """A price per unit: a constant plus any number of scaled index prices."""
+
     kind: Literal["index"] = "index"
+    """Selects this formula type."""
     constant_cost: float = 0.0
+    """Fixed price per unit, e.g. €/MWh."""
     variable_costs: list[IndexAdder] = Field(default_factory=list)
+    """Scaled index prices added to the constant cost."""
 
     def get_values(
         self,

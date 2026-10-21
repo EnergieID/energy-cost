@@ -5,14 +5,21 @@ from abc import ABC
 from datetime import UTC
 
 import pandas as pd
-from pydantic import BaseModel
+from pydantic import Field
 
 from energy_cost.meter import Meter, TimeseriesFrame
+from energy_cost.model import ADVANCED, EnergyCostModel
 from energy_cost.resolution import Resolution, redistribute_to_resolution
 
 
-class FormulaBase(ABC, BaseModel):
-    capacity_based: bool = False
+class FormulaBase(ABC, EnergyCostModel):
+    capacity_based: bool = Field(default=False, json_schema_extra=ADVANCED)
+    """Apply the formula to the peak capacity (MW) instead of the consumed energy (MWh)."""
+
+    def model_post_init(self, context: object) -> None:
+        # Always serialise `kind`, also with `exclude_unset`, as it selects the formula type on load.
+        if "kind" in type(self).model_fields:
+            self.__pydantic_fields_set__.add("kind")
 
     def get_values(
         self,

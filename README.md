@@ -59,6 +59,13 @@ contract.apply(consumption)
 
 For more detailed examples, see the notebooks in the [`notebooks`](notebooks) directory.
 
+## JSON schema and storage
+
+All models are pydantic models, so you can get a JSON schema with e.g. `Contract.model_json_schema()` or `TypeAdapter(Formula).json_schema()`. This schema is meant to be usable for generating forms:
+- every model and field has a short `description`
+- fields most users can leave untouched are marked with `"x-advanced": true`
+- strings that refer to a named entry use a `format`
+
 ## Development
 
 ### Prerequisites

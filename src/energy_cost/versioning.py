@@ -6,16 +6,19 @@ from typing import Self, TypeVar
 
 import pandas as pd
 import yaml
-from pydantic import BaseModel, RootModel
+from pydantic import RootModel
 
+from energy_cost.model import EnergyCostModel
 from energy_cost.resolution import align_datetime_to_tz
 
 V = TypeVar("V", bound="Versioned")
 
 
-class Versioned(BaseModel):
+class Versioned(EnergyCostModel):
     start: dt.datetime
+    """Moment from which this version applies."""
     end: dt.datetime | None = None
+    """Moment this version stops applying; when empty, it runs until the next version starts."""
 
 
 class VersionedCollection(RootModel[list[V]]):

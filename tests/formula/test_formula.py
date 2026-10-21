@@ -5,7 +5,14 @@ import pytest
 import yaml
 from pydantic import TypeAdapter, ValidationError
 
-from energy_cost.formula import Formula, IndexFormula, PeriodicFormula, ScheduledFormulas, TieredFormula
+from energy_cost.formula import (
+    Formula,
+    IndexFormula,
+    PeriodicFormula,
+    ScheduledFormulas,
+    TieredFormula,
+    UnitPeriodicFormula,
+)
 from energy_cost.meter import Meter, TimeseriesFrame
 
 _formula_adapter = TypeAdapter(Formula)
@@ -107,6 +114,15 @@ def test_formula_json_schema_covers_all_subtypes() -> None:
 
     for subtype in ("IndexFormula", "PeriodicFormula", "ScheduledFormulas", "TieredFormula"):
         assert subtype in schema_str, f"{subtype} missing from Formula JSON schema"
+
+
+def test_exclude_unset_dump_keeps_kind() -> None:
+    """Regression: without `kind`, a unit periodic formula is loaded back as a periodic one."""
+    formula = UnitPeriodicFormula(period="P1M", constant_cost=1.0)
+    dump = formula.model_dump(mode="json", exclude_unset=True)
+
+    assert dump == {"kind": "unit_periodic", "period": "P1M", "constant_cost": 1.0}
+    assert isinstance(_formula_adapter.validate_python(dump), UnitPeriodicFormula)
 
 
 def test_apply_produces_correct_values_when_data_has_non_default_integer_index() -> None:

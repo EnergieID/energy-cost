@@ -45,7 +45,7 @@ Resolution = Annotated[
     dt.timedelta | isodate.Duration,
     BeforeValidator(parse_resolution),
     PlainSerializer(isodate.duration_isoformat, return_type=str),
-    WithJsonSchema({"type": "string", "examples": ["PT15M", "P1M"]}),
+    WithJsonSchema({"type": "string", "format": "duration", "examples": ["PT15M", "P1M"]}),
 ]
 
 

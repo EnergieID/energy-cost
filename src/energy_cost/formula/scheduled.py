@@ -7,9 +7,10 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 
 from energy_cost.meter import Meter
+from energy_cost.model import EnergyCostModel
 from energy_cost.resolution import (
     Resolution,
     align_datetime_to_tz,
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
 
 
 class DayOfWeek(StrEnum):
+    """A day of the week."""
+
     MONDAY = "monday"
     TUESDAY = "tuesday"
     WEDNESDAY = "wednesday"
@@ -63,15 +66,23 @@ def maximal_resolution(time: dt.time) -> dt.timedelta:
     return next(r for r in _CANDIDATE_RESOLUTIONS if total_seconds % int(r.total_seconds()) == 0)
 
 
-class WhenClause(BaseModel):
+class WhenClause(EnergyCostModel):
+    """A daily time window on selected days of the week."""
+
     days: list[DayOfWeek] = Field(default_factory=lambda: list(DayOfWeek))
+    """Days on which the window applies; all days when not set."""
     start: dt.time = dt.time(0, 0, 0)
+    """Start of the window (inclusive)."""
     end: dt.time | None = None
+    """End of the window (exclusive); empty for midnight."""
 
     @model_validator(mode="after")
     def _validate_time_range(self) -> WhenClause:
-        self.start = self.start.replace(tzinfo=None)
-        self.end = self.end.replace(tzinfo=None) if self.end is not None else None
+        # Only assign when needed, as assigning marks the field as set
+        if self.start.tzinfo is not None:
+            self.start = self.start.replace(tzinfo=None)
+        if self.end is not None and self.end.tzinfo is not None:
+            self.end = self.end.replace(tzinfo=None)
         if self.end is not None and self.start >= self.end:
             raise ValueError(
                 f"WhenClause start ({self.start}) must be strictly before end ({self.end}). "
@@ -99,8 +110,12 @@ class WhenClause(BaseModel):
 
 
 class ScheduledFormula(FormulaBase):
+    """A formula that only applies during the given time windows."""
+
     when: list[WhenClause] | None = None
+    """Time windows in which the formula applies; always when empty."""
     formula: Formula
+    """Formula to apply within the time windows."""
 
     def _filter_by_when(self, df: pd.DataFrame) -> pd.DataFrame:
         if self.when is None:
@@ -142,8 +157,12 @@ class ScheduledFormula(FormulaBase):
 
 
 class ScheduledFormulas(FormulaBase):
+    """Different formulas depending on the time of day or day of the week."""
+
     kind: Literal["scheduled"] = "scheduled"
+    """Selects this formula type."""
     schedule: list[ScheduledFormula] = Field(default_factory=list)
+    """Scheduled formulas; at each moment, the first one whose time windows match applies."""
 
     def maximal_resolution(self) -> dt.timedelta | None:
         """Return the maximal resolution allowed by this formula's schedule."""
