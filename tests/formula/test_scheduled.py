@@ -22,6 +22,19 @@ def test_when_clause_rejects_equal_start_end() -> None:
         WhenClause(start=dt.time(9, 0), end=dt.time(9, 0))
 
 
+def test_when_clause_drops_timezone_from_times() -> None:
+    clause = WhenClause(start=dt.time(9, 0, tzinfo=dt.UTC), end=dt.time(17, 0, tzinfo=dt.UTC))
+
+    assert clause.start == dt.time(9, 0)
+    assert clause.end == dt.time(17, 0)
+
+
+def test_when_clause_keeps_defaults_unset() -> None:
+    clause = WhenClause(days=[DayOfWeek.MONDAY])
+
+    assert clause.model_dump(exclude_unset=True) == {"days": [DayOfWeek.MONDAY]}
+
+
 def test_when_clause_matches_days_and_half_open_time_range() -> None:
     clause = WhenClause(days=[DayOfWeek.MONDAY], start=dt.time(9, 0), end=dt.time(17, 0))
     ts = pd.Series(pd.to_datetime(["2026-03-16 08:59", "2026-03-16 09:00", "2026-03-16 16:59", "2026-03-16 17:00"]))

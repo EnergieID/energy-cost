@@ -16,10 +16,12 @@ if TYPE_CHECKING:
 
 
 class MeterTypeFormula(FormulaBase):
-    """Formula that applies a different formula based on the meter type."""
+    """A different formula per meter type."""
 
     kind: Literal["meter_type"] = "meter_type"
+    """Selects this formula type."""
     by_meter_type: dict[MeterType | Literal["default"], Formula] = Field(default_factory=dict)
+    """Formula per meter type; `default` applies to meter types without their own entry."""
 
     def apply(
         self,

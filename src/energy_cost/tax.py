@@ -3,8 +3,9 @@ from datetime import UTC
 from typing import Literal, TypeAlias, cast
 
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from energy_cost.model import EnergyCostModel
 from energy_cost.versioning import Versioned, VersionedCollection
 
 from .meter import CostGroup, TariffCategory
@@ -29,14 +30,22 @@ def _specificity(pattern: ColumnPattern) -> int:
     return sum((1 << i) for i, p in enumerate(pattern) if p != _WILDCARD)
 
 
-class TaxRule(BaseModel):
+class TaxRule(EnergyCostModel):
+    """A tax rate for specific cost columns."""
+
     rate: float = Field(ge=0.0, le=1.0)
+    """Tax rate as a fraction, e.g. 0.21 for 21%."""
     columns: list[ColumnPattern]
+    """Cost columns as (category, cost group, cost type); `*` matches anything."""
 
 
 class TaxVersion(Versioned):
+    """Tax rates that apply during a period."""
+
     default: float = Field(ge=0.0, le=1.0)
+    """Tax rate as a fraction for costs not matched by any rule."""
     rates: list[TaxRule] = Field(default_factory=list)
+    """Rates for specific costs; the most specific matching rule wins."""
 
     @property
     def sorted_rates(self) -> list[tuple[float, ColumnPattern]]:
@@ -103,6 +112,8 @@ def _total_pattern(pattern: ColumnPattern) -> ColumnPattern:
 
 
 class Tax(VersionedCollection[TaxVersion]):
+    """Tax rates over time, as a list of versions."""
+
     def apply(
         self,
         data: pd.DataFrame,

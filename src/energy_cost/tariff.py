@@ -17,6 +17,8 @@ from .tariff_version import TariffVersion
 
 
 class Tariff(VersionedCollection[TariffVersion]):
+    """A tariff over time, as a list of versions."""
+
     def get_values(
         self,
         start: dt.datetime,

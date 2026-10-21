@@ -7,48 +7,71 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import yaml
 from isodate import Duration
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, Field, ModelWrapValidatorHandler, model_validator
 
 from energy_cost.capacity import CapacityRule
+from energy_cost.model import ADVANCED
 
 from .data.models import ConnectionType, CustomerType, RegionalData, Supplier
 from .meter import Meter, TariffCategory
 from .resolution import Resolution, align_datetime_to_tz
 from .tariff import Tariff
 from .tax import Tax
-from .types import TzInfo
+from .types import DistributorKey, ProductKey, RegionKey, SupplierKey, TzInfo
 from .versioning import Versioned, VersionedCollection, sum_frames
 
 
 class Contract(Versioned):
+    """A connection's supplier, distributor, fees and taxes, combined into one bill."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     start: dt.datetime = dt.datetime(1970, 1, 1, tzinfo=UTC)
+    """Moment from which this contract applies."""
 
     # Reference keys (optional) — resolved into live objects by the validator
-    region: str | None = None
+    region: RegionKey | None = None
+    """Region whose fees, taxes and distributors apply."""
     connection_type: ConnectionType | None = None
+    """Energy carrier of the connection."""
     customer_type: CustomerType | None = None
-    distributor_key: str | None = None
-    supplier_key: str | None = None
-    product_key: str | None = None
+    """Customer type, used to pick the region's fees."""
+    distributor_key: DistributorKey | None = None
+    """Distributor within the region."""
+    supplier_key: SupplierKey | None = None
+    """Energy supplier."""
+    product_key: ProductKey | None = None
+    """Product of the supplier."""
 
     # Live objects — populated directly or resolved from reference keys
-    supplier: Tariff | list[Tariff] | None = None
-    distributor: Tariff | list[Tariff] | None = None
-    fees: Tariff | list[Tariff] | None = None
-    taxes: Tax | list[Tax] | None = None
-    capacity_rule: CapacityRule | None = None
-    timezone: TzInfo = ZoneInfo("UTC")
-    """All datetime operations use this timezone. Naive datetimes are treated as being
-    in this timezone; tz-aware datetimes are converted to it."""
+    supplier: Tariff | list[Tariff] | None = Field(default=None, json_schema_extra=ADVANCED)
+    """Supplier tariff; overrides the one selected by supplier and product."""
+    distributor: Tariff | list[Tariff] | None = Field(default=None, json_schema_extra=ADVANCED)
+    """Distributor tariff; overrides the one selected by region and distributor."""
+    fees: Tariff | list[Tariff] | None = Field(default=None, json_schema_extra=ADVANCED)
+    """Fees; override the ones selected by region and customer type."""
+    taxes: Tax | list[Tax] | None = Field(default=None, json_schema_extra=ADVANCED)
+    """Taxes; override the ones of the region."""
+    capacity_rule: CapacityRule | None = Field(default=None, json_schema_extra=ADVANCED)
+    """How peak capacity is billed; overrides the rule of the region."""
+    timezone: TzInfo = Field(default=ZoneInfo("UTC"), json_schema_extra=ADVANCED)
+    """Timezone for all date handling; naive datetimes are read in this timezone."""
 
-    @model_validator(mode="before")
+    @model_validator(mode="wrap")
     @classmethod
-    def _resolve_references(cls, values: Any) -> Any:
+    def _resolve_references(cls, values: Any, handler: ModelWrapValidatorHandler[Self]) -> Self:
         if not isinstance(values, dict):
-            return values
+            return handler(values)
 
+        resolved = cls._resolve(dict(values))
+        contract = handler(resolved)
+        # Values looked up from the references are not set by the user, so `exclude_unset` leaves them out
+        contract.__pydantic_fields_set__ -= {key for key, value in resolved.items() if values.get(key) is not value}
+        return contract
+
+    @staticmethod
+    def _resolve(values: dict[str, Any]) -> dict[str, Any]:
+        """Fill in the live objects selected by the reference keys."""
         # Resolve supplier from supplier registry
         supplier_key = values.get("supplier_key")
         product_key = values.get("product_key")
@@ -172,6 +195,8 @@ class Contract(Versioned):
 
 
 class ContractHistory(VersionedCollection[Contract]):
+    """Contracts over time, as a list of versions."""
+
     def apply(
         self,
         consumption: Meter,

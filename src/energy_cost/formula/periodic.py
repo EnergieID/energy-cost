@@ -18,11 +18,16 @@ from .base import FormulaBase
 
 
 class PeriodicFormula(FormulaBase):
+    """A fixed amount charged every period, independent of usage."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: Literal["periodic"] = "periodic"
+    """Selects this formula type."""
     period: Resolution
+    """How often the amount is charged."""
     constant_cost: float
+    """Amount charged per period, e.g. €/month."""
 
     def _apply(
         self,
@@ -46,15 +51,16 @@ class PeriodicFormula(FormulaBase):
 
 
 class UnitPeriodicFormula(FormulaBase):
-    """
-    Represents a formula in euro/unit/period (eg euro/MW/year)
-    """
+    """A price per unit per period, e.g. €/MW/year."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: Literal["unit_periodic"] = "unit_periodic"
+    """Selects this formula type."""
     period: Resolution
+    """Period the price is expressed in."""
     constant_cost: float
+    """Price per unit per period."""
 
     def get_values(
         self,

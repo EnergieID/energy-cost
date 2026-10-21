@@ -34,6 +34,7 @@ def add_period_sum(df: pd.DataFrame, period_bins: pd.DatetimeIndex) -> pd.DataFr
 class ExtremeFormulaBase(FormulaBase):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     period: Resolution
+    """Period over which the results of the formulas are compared."""
 
     @property
     @abstractmethod
@@ -130,10 +131,12 @@ class ExtremeFormulaBase(FormulaBase):
 
 
 class MinimumFormula(ExtremeFormulaBase):
-    """A formula returns the minimum formula result of multiple formulas in a given period."""
+    """The cheapest of several formulas, per period."""
 
     kind: Literal["minimum"] = "minimum"
+    """Selects this formula type."""
     minimum: list[Formula] = Field(default_factory=list)
+    """Formulas to compare."""
 
     @property
     def formulas(self) -> list[Formula]:
@@ -145,10 +148,12 @@ class MinimumFormula(ExtremeFormulaBase):
 
 
 class MaximumFormula(ExtremeFormulaBase):
-    """A formula returns the maximum formula result of multiple formulas in a given period."""
+    """The most expensive of several formulas, per period."""
 
     kind: Literal["maximum"] = "maximum"
+    """Selects this formula type."""
     maximum: list[Formula] = Field(default_factory=list)
+    """Formulas to compare."""
 
     @property
     def formulas(self) -> list[Formula]:

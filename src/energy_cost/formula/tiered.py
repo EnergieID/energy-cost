@@ -6,9 +6,10 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
 from energy_cost.meter import Meter
+from energy_cost.model import ADVANCED, EnergyCostModel
 from energy_cost.resolution import (
     Resolution,
     redistribute_to_resolution,
@@ -23,22 +24,34 @@ if TYPE_CHECKING:
 
 
 class TieringMode(StrEnum):
+    """How usage is split over the tier bands."""
+
     BANDED = "banded"
     PROGRESSIVE = "progressive"
 
 
-class TierBand(BaseModel):
+class TierBand(EnergyCostModel):
+    """A usage range and the formula that prices it."""
+
     up_to: float | None = None
+    """Upper bound of this band (e.g. MWh per band period); empty for the last, unbounded band."""
     formula: Formula
+    """Formula used for usage in this band."""
 
 
 class TieredFormula(FormulaBase):
+    """Different formulas depending on how much is used."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     kind: Literal["tiered"] = "tiered"
+    """Selects this formula type."""
     bands: list[TierBand] = Field(default_factory=list)
-    band_period: Resolution | None = None
-    mode: TieringMode = TieringMode.PROGRESSIVE
+    """Bands in increasing order of their upper bound."""
+    band_period: Resolution | None = Field(default=None)
+    """Period over which usage is totalled to pick bands; when empty, each measurement stands alone."""
+    mode: TieringMode = Field(default=TieringMode.PROGRESSIVE, json_schema_extra=ADVANCED)
+    """Progressive splits usage over the bands; banded prices all usage with the single matching band."""
 
     def apply(
         self,

@@ -8,6 +8,8 @@ from energy_cost.resolution import Resolution, align_timestamps_to_tz, detect_re
 
 
 class CostGroup(StrEnum):
+    """A group of costs that is billed on the same basis."""
+
     CONSUMPTION = "consumption"
     INJECTION = "injection"
     CAPACITY = "capacity"
@@ -15,16 +17,22 @@ class CostGroup(StrEnum):
 
 
 class MeterType(StrEnum):
+    """The kind of meter, as some tariffs differ per meter type."""
+
     SINGLE_RATE = "single_rate"
     NIGHT_ONLY = "night_only"
 
 
 class PowerDirection(StrEnum):
+    """Whether a meter measures energy taken from or fed into the grid."""
+
     CONSUMPTION = "consumption"
     INJECTION = "injection"
 
 
 class TariffCategory(StrEnum):
+    """The party or component a cost belongs to on the bill."""
+
     SUPPLIER = "supplier"
     DISTRIBUTOR = "distributor"
     FEES = "fees"

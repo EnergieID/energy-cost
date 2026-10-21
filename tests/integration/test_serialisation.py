@@ -1,9 +1,10 @@
 """
-Integration tests for serialisation and deserialisation of contracts.
+Integration tests for serialisation and deserialisation of contracts and tariffs.
 
 Verifies that all example contract YAML files can be round-tripped through
 model_dump() and model_validate(), producing the same contract as the original
 (after from_yaml), and that the dump contains all keys present in the original YAML.
+Dumps with ``exclude_unset=True`` must also round-trip, without adding keys the YAML did not set.
 """
 
 from __future__ import annotations
@@ -83,6 +84,27 @@ def _assert_yaml_keys_in_dump(yaml_data: Any, dump: Any, path: str = "") -> None
             _assert_yaml_keys_in_dump(item, dump[i], f"{path}[{i}]")
 
 
+def _assert_no_keys_beyond_yaml(yaml_data: Any, dump: Any, path: str = "") -> None:
+    """Recursively assert *dump* holds no keys that are absent from *yaml_data*.
+
+    Allowed exceptions: ``kind``, which is always dumped to select the formula type, and the
+    ``{"total": ...}`` wrapper added by the NamedFormulas shorthand coercion.
+    """
+    if isinstance(dump, dict):
+        assert isinstance(yaml_data, dict), f"{path}: expected dict, got {type(yaml_data).__name__}"
+        if set(dump) == {"total"} and "total" not in yaml_data:
+            _assert_no_keys_beyond_yaml(yaml_data, dump["total"], f"{path}.total")
+            return
+        for key in dump:
+            if key == "kind":
+                continue
+            assert key in yaml_data, f"{path}.{key}: key in dump but not set in YAML"
+            _assert_no_keys_beyond_yaml(yaml_data[key], dump[key], f"{path}.{key}")
+    elif isinstance(dump, list):
+        for i, item in enumerate(dump):
+            _assert_no_keys_beyond_yaml(yaml_data[i], item, f"{path}[{i}]")
+
+
 # ---------------------------------------------------------------------------
 # Single contract configs
 # ---------------------------------------------------------------------------
@@ -122,6 +144,27 @@ class TestContractSerialisation:
             yaml_data = yaml.safe_load(f)
 
         _assert_yaml_keys_in_dump(yaml_data, original.model_dump())
+
+    @pytest.mark.parametrize(
+        "config_name",
+        ["simple.yml", "dynamic.yml", "injection.yml", "gas.yml", "inline.yml", "inline_full.yml"],
+    )
+    def test_exclude_unset_roundtrip(
+        self,
+        config_name: str,
+        fake_index: None,
+        fake_supplier: None,
+    ) -> None:
+        config_path = EXAMPLES / "contracts" / config_name
+        original = Contract.from_yaml(config_path)
+        dump = original.model_dump(mode="json", exclude_unset=True)
+
+        with config_path.open(encoding="utf-8") as f:
+            yaml_data = yaml.safe_load(f)
+
+        assert Contract.model_validate(dump) == original
+        _assert_yaml_keys_in_dump(yaml_data, dump)
+        _assert_no_keys_beyond_yaml(yaml_data, dump)
 
 
 # ---------------------------------------------------------------------------
@@ -163,3 +206,43 @@ class TestContractHistorySerialisation:
             yaml_list = yaml.safe_load(f)
 
         _assert_yaml_keys_in_dump(yaml_list, original.model_dump())
+
+    @pytest.mark.parametrize(
+        "config_name",
+        ["history.yml", "history_with_gap.yml"],
+    )
+    def test_exclude_unset_roundtrip(
+        self,
+        config_name: str,
+        fake_index: None,
+        fake_supplier: None,
+    ) -> None:
+        config_path = EXAMPLES / "contracts" / config_name
+        original = ContractHistory.from_yaml(config_path)
+        dump = original.model_dump(mode="json", exclude_unset=True)
+
+        with config_path.open(encoding="utf-8") as f:
+            yaml_list = yaml.safe_load(f)
+
+        assert ContractHistory.model_validate(dump) == original
+        _assert_yaml_keys_in_dump(yaml_list, dump)
+        _assert_no_keys_beyond_yaml(yaml_list, dump)
+
+
+# ---------------------------------------------------------------------------
+# Tariff configs
+# ---------------------------------------------------------------------------
+
+
+class TestTariffSerialisation:
+    @pytest.mark.parametrize("config_path", sorted((EXAMPLES / "tariffs").glob("*.yml")), ids=lambda p: p.name)
+    def test_exclude_unset_roundtrip(self, config_path: Path, fake_index: None) -> None:
+        original = Tariff.from_yaml(config_path)
+        dump = original.model_dump(mode="json", exclude_unset=True)
+
+        with config_path.open(encoding="utf-8") as f:
+            yaml_list = yaml.safe_load(f)
+
+        assert Tariff.model_validate(dump) == original
+        _assert_yaml_keys_in_dump(yaml_list, dump)
+        _assert_no_keys_beyond_yaml(yaml_list, dump)

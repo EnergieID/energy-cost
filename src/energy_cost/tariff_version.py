@@ -5,12 +5,14 @@ from typing import Annotated, Any
 
 import pandas as pd
 from pydantic import BeforeValidator, Field, TypeAdapter, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from energy_cost.versioning import Versioned
 
 from .formula import Formula
 from .formula.formula import _formula_discriminator
 from .meter import CostGroup, Meter, MeterType
+from .model import ADVANCED
 from .resolution import Resolution, align_datetime_to_tz
 
 _METER_KEYS = {e.value for e in MeterType}
@@ -31,6 +33,10 @@ NamedFormulas = Annotated[
 
 
 class TariffVersion(Versioned):
+    """Tariff formulas that apply from a start date until the next version starts."""
+
+    end: SkipJsonSchema[dt.datetime | None] = None
+
     @field_validator("end")
     @classmethod
     def end_must_be_none(cls, v: dt.datetime | None) -> None:
@@ -41,9 +47,13 @@ class TariffVersion(Versioned):
         return v
 
     injection: NamedFormulas = Field(default_factory=dict)
+    """Costs for energy fed into the grid, per cost type."""
     consumption: NamedFormulas = Field(default_factory=dict)
-    capacity: NamedFormulas = Field(default_factory=dict)
+    """Costs for energy taken from the grid, per cost type."""
+    capacity: NamedFormulas = Field(default_factory=dict, json_schema_extra=ADVANCED)
+    """Costs based on peak capacity, per cost type."""
     fixed: NamedFormulas = Field(default_factory=dict)
+    """Fixed costs per period, per cost type."""
 
     def _combine_energy_formulas(
         self,
