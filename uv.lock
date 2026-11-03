@@ -492,7 +492,6 @@ dependencies = [
     { name = "isodate" },
     { name = "pandas" },
     { name = "pydantic" },
-    { name = "pyxlsb" },
     { name = "pyyaml" },
 ]
 
@@ -505,6 +504,7 @@ dev = [
     { name = "openpyxl" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "pyxlsb" },
     { name = "requests" },
     { name = "ruff" },
     { name = "ty" },
@@ -513,11 +513,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "entsoe-py", specifier = ">=0.7.10" },
-    { name = "isodate", specifier = ">=0.7.2" },
+    { name = "isodate", specifier = ">=0.6.0" },
     { name = "pandas", specifier = ">=2.2.0" },
-    { name = "pydantic", specifier = ">=2.7.0" },
-    { name = "pyxlsb", specifier = ">=1.0.10" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "pydantic", specifier = ">=2.11.3" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -529,6 +528,7 @@ dev = [
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pyxlsb", specifier = ">=1.0.10" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "ruff", specifier = ">=0.14.13" },
     { name = "ty", specifier = ">=0.0.12" },

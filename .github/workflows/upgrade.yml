@@ -1,0 +1,51 @@
+name: upgrade
+
+# Once a month, uv.lock moves to the newest versions the ranges in pyproject.toml allow, in one pull request: indirect
+# dependencies too, which Dependabot only updates for security fixes. A pull request opened with the workflow's own
+# token doesn't start other workflows, so this starts the checks on it, which then show on the pull request as usual.
+# It needs "Allow GitHub Actions to create and approve pull requests" in the repository's settings.
+on:
+  schedule:
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
+
+concurrency:
+  group: upgrade
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      BRANCH: chore/upgrade-dependencies
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.9.21'
+      - name: Upgrade the lock
+        run: uv lock --upgrade
+      # The branch is rewritten each time, so an upgrade nobody merged yet is replaced by the newer one.
+      - name: Open the pull request, and start its checks
+        run: |
+          if git diff --quiet; then
+            echo "The lock is up to date already"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git commit -am "Upgrade dependencies"
+          git push --force origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --json number --jq '.[].number')" ]; then
+            gh pr create --head "$BRANCH" --label dependencies --title "Upgrade dependencies" \
+              --body "The monthly \`uv lock --upgrade\`: the lock at the newest versions the ranges in pyproject.toml allow."
+          fi
+          for workflow in test.yml pre-commit.yml notebooks.yml; do
+            gh workflow run "$workflow" --ref "$BRANCH"
+          done

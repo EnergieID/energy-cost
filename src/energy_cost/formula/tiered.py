@@ -12,6 +12,7 @@ from energy_cost.meter import Meter
 from energy_cost.model import ADVANCED, EnergyCostModel
 from energy_cost.resolution import (
     Resolution,
+    in_timezone_of,
     redistribute_to_resolution,
     snap_billing_period,
     to_pandas_freq,
@@ -93,13 +94,15 @@ class TieredFormula(FormulaBase):
             full_slot_count = full_grid_labelled.groupby("period_start")["timestamp"].count()
 
             # Label every data row with its billing period, then sum and count per period.
+            rows = indexed.reset_index().sort_values("timestamp")
+            rows["__key"] = in_timezone_of(rows["timestamp"], period_starts["period_start"])
             data_labelled = pd.merge_asof(
-                indexed.reset_index().sort_values("timestamp"),
+                rows,
                 period_starts,
-                left_on="timestamp",
+                left_on="__key",
                 right_on="period_start",
                 direction="backward",
-            )
+            ).drop(columns="__key")
             actual_sum = data_labelled.groupby("period_start")["value"].sum()
             actual_slot_count = data_labelled.groupby("period_start")["value"].count()
 
