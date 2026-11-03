@@ -37,6 +37,7 @@ jobs:
           path: cov.xml
 
   # The tests against the lowest versions the ranges in pyproject.toml allow: a floor nothing installs isn't one.
+  # On the oldest Python too: the lowest versions are the ones a user on it can still get.
   lowest-versions:
     runs-on: ubuntu-latest
     steps:
@@ -45,6 +46,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           version: '0.9.21'
+          python-version: '3.11'
       - name: Install the lowest versions
         run: |
           uv lock --resolution lowest-direct
