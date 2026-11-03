@@ -422,5 +422,5 @@ def test_concurrent_saves_to_the_same_cache_file_do_not_collide(
         t.join(timeout=10)
 
     assert errors == []
-    pd.testing.assert_frame_equal(pd.read_pickle(_cache_path(tmp_path)), df)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, pd.read_pickle(_cache_path(tmp_path))), df)
     assert list((tmp_path / "cache").glob("*.tmp")) == []

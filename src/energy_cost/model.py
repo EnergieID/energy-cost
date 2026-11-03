@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict
+from pydantic.json_schema import JsonDict
 
-ADVANCED = {"x-advanced": True}
+ADVANCED: JsonDict = {"x-advanced": True}
 """JSON schema extra marking a field that most users can leave untouched."""
 
 

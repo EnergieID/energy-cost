@@ -11,12 +11,25 @@ from energy_cost.resolution import (
     align_timestamps_to_tz,
     detect_resolution_and_range,
     find_common_divisor,
+    in_timezone_of,
     is_divisor,
     parse_resolution,
     redistribute_to_resolution,
     snap_billing_period,
     to_pandas_freq,
 )
+
+
+def test_in_timezone_of_converts_aware_timestamps_and_keeps_naive_ones():
+    utc = pd.Series(pd.date_range("2025-01-01", periods=2, freq="h", tz="UTC"))
+    brussels = pd.Series(pd.date_range("2025-01-01", periods=2, freq="h", tz="Europe/Brussels"))
+    naive = pd.Series(pd.date_range("2025-01-01", periods=2, freq="h"))
+
+    converted = in_timezone_of(utc, brussels)
+    assert str(converted.dt.tz) == "Europe/Brussels"
+    assert (converted == utc).all()
+    assert in_timezone_of(naive, brussels) is naive
+    assert in_timezone_of(utc, naive) is utc
 
 
 def test_to_pandas_freq_correctly_handles_monthly_durations():

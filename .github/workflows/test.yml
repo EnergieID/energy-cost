@@ -2,6 +2,7 @@ name: test
 
 on:
   workflow_call:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -34,6 +35,22 @@ jobs:
         with:
           name: coverage-data
           path: cov.xml
+
+  # The tests against the lowest versions the ranges in pyproject.toml allow: a floor nothing installs isn't one.
+  lowest-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.9.21'
+      - name: Install the lowest versions
+        run: |
+          uv lock --resolution lowest-direct
+          uv sync --group dev --frozen
+      - name: Run tests
+        run: uv run --frozen pytest
 
   coverage:
     runs-on: ubuntu-latest

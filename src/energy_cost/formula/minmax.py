@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import pandas as pd
 from pydantic import ConfigDict, Field
@@ -117,9 +117,9 @@ class ExtremeFormulaBase(FormulaBase):
             df["formula_id"] = i
 
         all_data = pd.concat(summed_by_period, ignore_index=True)
-        extreme_period_sums = (
-            all_data.groupby("period")["period_sum"].agg(self.extreme_func).reset_index(name="extreme_period_sum")
-        )
+        extreme_period_sums = cast(
+            pd.Series, all_data.groupby("period")["period_sum"].agg(self.extreme_func)
+        ).reset_index(name="extreme_period_sum")
         winners = all_data.merge(extreme_period_sums, on="period")
         winners = winners[winners["period_sum"] == winners["extreme_period_sum"]]
         winners = winners.sort_values(["timestamp", "formula_id"]).drop_duplicates(subset="timestamp", keep="first")

@@ -203,6 +203,16 @@ def find_common_divisor(a: Resolution, b: Resolution) -> Resolution:
     return find_common_divisor(td, isodate.parse_duration("P1D"))
 
 
+def in_timezone_of(timestamps: pd.Series, other: pd.Series) -> pd.Series:
+    """*timestamps* converted to the timezone of *other*, when both are timezone-aware.
+
+    pandas 2 refuses to merge_asof keys in different timezones; converting keeps the instants.
+    """
+    if timestamps.dt.tz is None or other.dt.tz is None:
+        return timestamps
+    return timestamps.dt.tz_convert(other.dt.tz)
+
+
 def _distribute(
     df: pd.DataFrame,
     source_resolution: Resolution,
@@ -226,6 +236,7 @@ def _distribute(
 
     # Backward merge: each fine slot inherits the coarse value and its coarse timestamp.
     src = df.rename(columns={"timestamp": "__coarse_ts"})
+    src["__coarse_ts"] = in_timezone_of(src["__coarse_ts"], target_df["timestamp"])
     merged = pd.merge_asof(target_df, src, left_on="timestamp", right_on="__coarse_ts", direction="backward")
 
     # Each full source period is now fully populated, so count == total fine slots in that period.
@@ -279,6 +290,7 @@ def _aggregate_to_resolution(
     bin_df = pd.DataFrame({"__bin": pd.date_range(start=snapped_start, end=snapped_end, freq=freq, inclusive="left")})
     # Filter to [start, end) — rows outside are out-of-scope and should not affect bin sums
     df = df[(df["timestamp"] >= start) & (df["timestamp"] < end)]
+    df = df.assign(timestamp=in_timezone_of(df["timestamp"], bin_df["__bin"]))
     merged = pd.merge_asof(df, bin_df, left_on="timestamp", right_on="__bin", direction="backward")
     value_cols = [c for c in merged.columns if c not in ("timestamp", "__bin")]
     agg = merged.groupby("__bin")[value_cols].sum()

@@ -101,4 +101,6 @@ def sum_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
 
     # Concatenate and sum over timestamp, keeping NaN values if any frame has NaN for a given timestamp
     combined = pd.concat(indexed, axis=0).sort_index(axis=1)
-    return combined.groupby("timestamp").sum(skipna=False).reset_index().sort_values("timestamp").reset_index(drop=True)
+    # Mask sums that contain any NaN back to NaN: GroupBy.sum(skipna=False) needs pandas 3
+    summed = combined.groupby("timestamp").sum().where(~combined.isna().groupby("timestamp").any())
+    return summed.reset_index().sort_values("timestamp").reset_index(drop=True)

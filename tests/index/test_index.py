@@ -129,7 +129,7 @@ def test_index_get_values_return_in_timezone_of_input() -> None:
         resolution=dt.timedelta(minutes=15),
     )
 
-    assert df["timestamp"].dtype == "datetime64[us, UTC]"
+    assert str(df["timestamp"].dt.tz) == "UTC"
 
 
 def test_index_ger_values_return_in_timezone_of_the_request() -> None:
@@ -157,4 +157,4 @@ def test_index_ger_values_return_in_timezone_of_the_request() -> None:
         timezone=z,
     )
 
-    assert df["timestamp"].dtype == "datetime64[us, Europe/Amsterdam]"
+    assert str(df["timestamp"].dt.tz) == "Europe/Amsterdam"
